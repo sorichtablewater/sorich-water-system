@@ -1,0 +1,243 @@
+/* 🌊 WATER ANIMATED BACKGROUND */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    animation: waterFlow 12s infinite linear;
+    background: linear-gradient(180deg, #0077c2, #0099ff, #33ccff);
+    background-size: 400% 400%;
+}
+
+@keyframes waterFlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* GENERAL PAGE STYLING */
+.page {
+    padding: 20px;
+    display: none;
+    color: white;
+}
+
+h1, h2, h3 {
+    text-align: center;
+}
+
+/* ✅ LOGIN PAGE */
+#loginPage {
+    display: block;
+    text-align: center;
+    padding-top: 80px;
+}
+
+.appTitle {
+    font-size: 35px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px #000;
+}
+
+.tagline {
+    opacity: 0.8;
+    letter-spacing: 2px;
+    margin-bottom: 30px;
+}
+
+.loginBox {
+    background: rgba(255,255,255,0.15);
+    padding: 20px;
+    width: 80%;
+    margin: auto;
+    border-radius: 12px;
+    backdrop-filter: blur(6px);
+}
+
+.loginBox input {
+    width: 90%;
+    padding: 10px;
+    margin: 10px;
+    border: none;
+    border-radius: 8px;
+}
+
+#loginBtn {
+    width: 93%;
+    padding: 12px;
+    background: #004a99;
+    color: white;
+    border: none;
+    border-radius: 10px;
+}
+
+.loginError {
+    color: yellow;
+    margin-top: 10px;
+    display: none;
+}
+
+/* ✅ ENTER DASHBOARD PAGE */
+.bigTitle {
+    font-size: 28px;
+    font-weight: bold;
+    margin-top: 40px;
+}
+
+.animatedWords {
+    font-size: 20px;
+    margin-top: 10px;
+    animation: fadeWords 3s infinite;
+}
+
+@keyframes fadeWords {
+    0% {opacity: 0;}
+    50% {opacity: 1;}
+    100% {opacity: 0;}
+}
+
+.clockBox {
+    font-size: 18px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.enterBtn {
+    width: 80%;
+    display: block;
+    margin: auto;
+    padding: 12px;
+    background: #003a80;
+    color: white;
+    border-radius: 10px;
+    border: none;
+}
+
+/* ✅ DASHBOARD STATS ROW */
+.statsRow {
+    display: flex;
+    overflow-x: auto;
+    padding: 10px;
+    gap: 10px;
+}
+
+.statBox {
+    min-width: 220px;
+    padding: 15px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    box-shadow: 0px 0px 5px #000;
+}
+
+/* COLORS */
+.blue { background: #0066cc; }
+.green { background: #00a651; }
+.orange { background: #ff6600; }
+.red { background: #cc0000; }
+.purple { background: #9933cc; }
+.brown { background: #8b4513; }
+
+/* ✅ NAVIGATION MENU */
+.navMenu {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.navBtn {
+    padding: 12px 18px;
+    border: none;
+    background: #003366;
+    color: white;
+    border-radius: 10px;
+}
+
+/* ✅ SALES PAGE */
+#salesPage input {
+    width: 95%;
+    padding: 10px;
+    margin: 8px;
+    border-radius: 8px;
+    border: none;
+}
+
+.smallBtn {
+    background: #0066cc;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: none;
+}
+
+#saveSaleBtn, #printInvoiceBtn {
+    width: 95%;
+    padding: 12px;
+    margin-top: 10px;
+    border-radius: 10px;
+    background: #004a99;
+    color: white;
+    border: none;
+}
+
+/* ✅ DEBTORS LIST */
+#debtorsList {
+    margin-top: 20px;
+    padding: 10px;
+}
+
+/* ✅ EXPENSES */
+#expenseList {
+    margin-top: 15px;
+}
+
+#expensesPage input {
+    width: 95%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    margin: 5px;
+}
+
+#saveExpenseBtn {
+    width: 95%;
+    padding: 12px;
+    margin-top: 10px;
+    background: #0066cc;
+    color: white;
+    border-radius: 10px;
+    border: none;
+}
+
+/* ✅ END OF DAY */
+#endDayPage button {
+    padding: 15px;
+    width: 90%;
+    display: block;
+    margin: 20px auto;
+    background: #cc0000;
+    color: white;
+    border-radius: 10px;
+    border: none;
+}
+
+/* ✅ SETTINGS */
+#settingsPage input {
+    width: 95%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    margin: 5px;
+}
+
+#saveLoginSettingsBtn {
+    width: 95%;
+    padding: 12px;
+    background: #003366;
+    color: white;
+    border: none;
+    border-radius: 10px;
+}
