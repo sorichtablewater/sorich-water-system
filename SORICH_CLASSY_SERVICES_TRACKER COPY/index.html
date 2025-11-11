@@ -1,191 +1,440 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SORICH TABLE WATER SYSTEM</title>
+  <meta charset="utf-8" />
+  <title>SORICH SALES (Firebase)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { margin:0; font-family:Arial,sans-serif; background:linear-gradient(to bottom,#cceeff,#fff); transition:0.5s;}
-    header {text-align:center;font-size:26px;font-weight:bold;color:#0066cc;padding:20px;}
-    .time {text-align:center;font-size:14px;color:#333;margin-bottom:20px;}
-    .container {width:90%;margin:auto;}
-    button {margin:5px;padding:10px 15px;font-size:14px;border:none;border-radius:5px;cursor:pointer;transition:0.3s;}
-    button:hover {background:#0066cc;color:#fff;}
-    .stat-boxes {display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
-    .stat-box {flex:1;min-width:120px;background:#f0f8ff;padding:15px;border-radius:8px;text-align:center;font-weight:bold;color:#0066cc;}
-    table {width:100%;border-collapse:collapse;margin-bottom:15px;}
-    th,td {border:1px solid #0066cc;padding:8px;text-align:center;}
-    th {background:#cceeff;}
-    input, select {padding:5px;margin:3px;}
-    .section {margin-bottom:30px;}
-    body.dark-mode {background:#001f3f;color:#fff;}
-    body.dark-mode table th, body.dark-mode table td {border-color:#fff;}
-    body.dark-mode th {background-color:#003366;}
-    .btn-debt {background-color:red;color:#fff;}
-    .btn-expense {background-color:yellow;color:#000;}
-    .invoice-modal {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;justify-content:center;align-items:center;z-index:1000;}
-    .invoice-content {background:#fff;padding:20px;width:90%;max-width:600px;border-radius:10px;overflow:auto;max-height:90%;}
-    .invoice-content table {border:1px solid #000;}
-    .invoice-content th, .invoice-content td {border:1px solid #000;padding:5px;}
-    .close-btn {float:right;background:red;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;}
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    .section { margin-bottom: 24px; }
+    input, button { margin: 6px 4px; padding:6px; }
+    table { width:100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border:1px solid #ccc; padding:6px; text-align:left; }
+    .invoice-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
+    .invoice-content { background:#fff; padding:12px; width:90%; max-width:900px; max-height:90vh; overflow:auto; position:relative; }
+    .close-btn { position:absolute; right:8px; top:8px; }
   </style>
 </head>
 <body>
 
-<header>SORICH TABLE WATER — DRINK IT. LOVE IT</header>
-<div class="time" id="liveTime"></div>
-<div class="container">
+<h1>SORICH SALES — Factory</h1>
 
-  <!-- SALES PAGE -->
-  <div id="salesPage" class="section" style="display:none;">
-    <h2>Sales</h2>
-    <label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
-    <label>Qty: <input type="number" id="saleQty" value="10"></label>
-    <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-    <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
-    <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
-    <button onclick="addSale()">Add Sale</button>
-    <button onclick="printInvoice()">Print Invoice</button>
-    <button onclick="backToDashboard()">Back to Dashboard</button>
+<!-- Settings -->
+<div class="section">
+  <label>Manager name: <input id="managerName" value="Manager"></label>
+  <label>Currency: <input id="currency" value="₦"></label>
+  <button id="clearLocal">Clear local cache</button>
+</div>
 
-    <h4>Live Summary:</h4>
-    <p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
+<!-- SALES PAGE -->
+<div id="salesPage" class="section">
+  <h2>Sales</h2>
+  <label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+  <label>Qty: <input type="number" id="saleQty" value="10"></label>
+  <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
+  <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
+  <p>Unit Price: <span id="saleUnitPrice">0</span> | Owing: <span id="saleOwing">0</span></p>
+  <button id="btnAddSale">Add Sale</button>
+  <button id="btnPrintInvoice">Print Invoice</button>
 
-    <table id="salesTable">
-      <tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>🖨</th></tr>
-    </table>
+  <h4>Live Summary:</h4>
+  <p>Total Qty: <span id="sumQty">0</span> | Total Amount: <span id="sumTotal">0</span> | Total Paid: <span id="sumPaid">0</span> | Total Owing: <span id="sumOwing">0</span> | Avg Unit Price: <span id="avgPrice">0</span></p>
+
+  <table id="salesTable">
+    <thead><tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>Receipt</th></tr></thead>
+    <tbody id="salesTbody"></tbody>
+  </table>
+</div>
+
+<!-- INVOICE MODAL -->
+<div class="invoice-modal" id="invoiceModal">
+  <div class="invoice-content" id="invoiceContent">
+    <button class="close-btn" onclick="closeInvoiceModal()">X</button>
+    <div id="invoiceBody"></div>
+    <button onclick="printModalInvoice()">Print</button>
   </div>
+</div>
 
-  <!-- INVOICE MODAL -->
-  <div class="invoice-modal" id="invoiceModal">
-    <div class="invoice-content" id="invoiceContent">
-      <button class="close-btn" onclick="closeInvoiceModal()">X</button>
-      <div id="invoiceBody"></div>
-      <button onclick="printModalInvoice()">Print</button>
-    </div>
-  </div>
+<!-- Firebase + app logic (module) -->
+<script type="module">
+  // ---------------------------
+  // Firebase imports (modular CDN)
+  // ---------------------------
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, onSnapshot, doc, getDoc, setDoc, runTransaction,
+    query, where, orderBy, getDocs, updateDoc, serverTimestamp, increment
+  } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-<script>
-// =======================
-// SALES LOGIC
-// =======================
-const saleQty=document.getElementById('saleQty'), saleTotal=document.getElementById('saleTotal'), salePaid=document.getElementById('salePaid');
-function updateSaleCalc(){
-  const q=parseFloat(saleQty.value)||0, t=parseFloat(saleTotal.value)||0, p=parseFloat(salePaid.value)||0;
-  document.getElementById('saleUnitPrice').innerText=q?(t/q).toFixed(2):0;
-  document.getElementById('saleOwing').innerText=(t-p).toFixed(2);
-}
-[saleQty,saleTotal,salePaid].forEach(e=>e.addEventListener('input',updateSaleCalc)); updateSaleCalc();
+  // ---------------------------
+  // Your firebase config (you gave this)
+  // ---------------------------
+  const firebaseConfig = {
+    apiKey: "AIzaSyCH_7tB_HC8c9fNOoWSLv140zw9ouORDkI",
+    authDomain: "sorichservices.firebaseapp.com",
+    projectId: "sorichservices",
+    storageBucket: "sorichservices.firebasestorage.app",
+    messagingSenderId: "124882250723",
+    appId: "1:124882250723:web:dc1ac38088f818afc64ed6"
+  };
 
-function addSale(){
-  const customer=document.getElementById('saleCustomer').value||'Unknown';
-  const qty=parseFloat(saleQty.value)||0, total=parseFloat(saleTotal.value)||0, paid=parseFloat(salePaid.value)||0;
-  const unit=qty?(total/qty).toFixed(2):0, owing=(total-paid).toFixed(2);
+  // Initialize Firebase app + Firestore
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-  salesData.push({customer,qty,total,unit:parseFloat(unit),paid,owing:parseFloat(owing)});
+  // ---------------------------
+  // DOM refs
+  // ---------------------------
+  const saleQty = document.getElementById('saleQty');
+  const saleTotal = document.getElementById('saleTotal');
+  const salePaid = document.getElementById('salePaid');
+  const saleCustomer = document.getElementById('saleCustomer');
 
-  // SAVE TO LOCALSTORAGE
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-}
+  const saleUnitPriceEl = document.getElementById('saleUnitPrice');
+  const saleOwingEl = document.getElementById('saleOwing');
 
-// =======================
-// INVOICE PRINTING
-// =======================
-function printInvoice(){
-  const cur = document.getElementById('currency').value || '₦';
-  const copies = 4; // Customer, Driver, Security, Manager
+  const salesTbody = document.getElementById('salesTbody');
+  const sumQtyEl = document.getElementById('sumQty');
+  const sumTotalEl = document.getElementById('sumTotal');
+  const sumPaidEl = document.getElementById('sumPaid');
+  const sumOwingEl = document.getElementById('sumOwing');
+  const avgPriceEl = document.getElementById('avgPrice');
 
-  const manager = document.getElementById('managerName').value || "Manager";
-  const now = new Date();
-  const date = now.toLocaleDateString();
-  const time = now.toLocaleTimeString();
-  const issuer = manager;
+  const btnAddSale = document.getElementById('btnAddSale');
+  const btnPrintInvoice = document.getElementById('btnPrintInvoice');
+  const currencyEl = document.getElementById('currency');
+  const managerNameEl = document.getElementById('managerName');
 
-  const items = salesData;  // All sales data or use selected sale if necessary
+  // Local cache fallback
+  let localSales = JSON.parse(localStorage.getItem('salesData') || '[]');
 
-  let fullHTML = "";
+  // Live cache of sales from Firestore
+  let salesData = [];
 
-  const copyNames = ["CUSTOMER'S COPY", "DRIVER'S COPY", "SECURITY'S COPY", "MANAGER'S COPY"];
+  // Compute unit and owing in UI when inputs change
+  function updateSaleCalc(){
+    const q = parseFloat(saleQty.value) || 0;
+    const t = parseFloat(saleTotal.value) || 0;
+    const p = parseFloat(salePaid.value) || 0;
+    const unit = q ? (t / q) : 0;
+    saleUnitPriceEl.innerText = Number(unit).toFixed(2);
+    saleOwingEl.innerText = (t - p).toFixed(2);
+  }
+  [saleQty, saleTotal, salePaid].forEach(e => e.addEventListener('input', updateSaleCalc));
+  updateSaleCalc();
 
-  items.forEach(sa => {
-    for (let i = 0; i < copies; i++) {
-      let copyType = copyNames[i];
+  // Prefill owing for a customer (sum of outstanding balances)
+  async function prefillOwing(){
+    const name = saleCustomer.value.trim();
+    if (!name) { saleOwingEl.innerText = '0'; return; }
 
-      fullHTML += `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-body { margin:0; font-family:Arial,sans-serif; }
-table { width:100%; border-collapse:collapse; }
-th, td { border:1px solid #000; padding:5px; text-align:center; }
-</style>
-</head>
-<body>
+    try {
+      const q = query(collection(db, 'sales'), where('customer', '==', name));
+      const snap = await getDocs(q);
+      let owing = 0;
+      snap.forEach(doc => {
+        const d = doc.data();
+        owing += (Number(d.total || 0) - Number(d.paid || 0));
+      });
+      saleOwingEl.innerText = owing.toFixed(2);
+    } catch (err) {
+      console.warn('Firestore prefill failed, using local cache', err);
+      // fallback: use localSales
+      const owing = localSales.filter(s => s.customer === name).reduce((acc, s) => acc + (Number(s.total||0) - Number(s.paid||0)), 0);
+      saleOwingEl.innerText = owing.toFixed(2);
+    }
+  }
+  window.prefillOwing = prefillOwing;
 
-<header style="text-align:center; font-size:22px; font-weight:bold;">
-    SORICH CLASSY SERVICES
-</header>
+  // Add sale (writes to Firestore, if fails writes to localStorage)
+  async function addSale(){
+    const customer = saleCustomer.value.trim() || 'Unknown';
+    const qty = parseFloat(saleQty.value) || 0;
+    const total = parseFloat(saleTotal.value) || 0;
+    const paid = parseFloat(salePaid.value) || 0;
+    const unit = qty ? Number((total/qty).toFixed(2)) : 0;
+    const owing = Number((total - paid).toFixed(2));
+    const record = {
+      customer, qty, total, paid, unit, owing,
+      createdAt: serverTimestamp()
+    };
 
-<div style="text-align:center; font-size:14px;">
-    <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-    <p>08164084402, 07012623006, 08067338211</p>
-    <p><strong>FACTORY SALE - ${copyType}</strong></p>
-    <p><strong>RECEIPT:</strong> F${invoiceNumber}</p>
-    <p><strong>DATE:</strong> ${date} | <strong>TIME:</strong> ${time}</p>
-    <p><strong>ISSUER:</strong> ${issuer}</p>
+    try {
+      await addDoc(collection(db, 'sales'), record);
+      // clear inputs
+      saleQty.value = 10;
+      saleTotal.value = 2500;
+      salePaid.value = 2000;
+      saleCustomer.value = '';
+      updateSaleCalc();
+      console.log('Sale saved to Firestore');
+    } catch (err) {
+      // fallback: save locally
+      console.error('Could not save to Firestore, saving locally', err);
+      localSales.push(record);
+      localStorage.setItem('salesData', JSON.stringify(localSales));
+      // update UI from local cache
+      loadLocalSalesIntoUI();
+    }
+  }
+  window.addSale = addSale;
+  btnAddSale.addEventListener('click', addSale);
+
+  // Real-time listener: update table & summary
+  function attachSalesListener(){
+    try {
+      const q = query(collection(db, 'sales'), orderBy('createdAt', 'desc'));
+      onSnapshot(q, snapshot => {
+        salesData = [];
+        snapshot.forEach(d => {
+          const data = d.data();
+          data._id = d.id;
+          // Firestore serverTimestamp may be special object - ignore for UI
+          salesData.push(data);
+        });
+        renderSales();
+      }, err => {
+        console.error('Realtime snapshot error', err);
+        // fallback to local
+        loadLocalSalesIntoUI();
+      });
+    } catch (err) {
+      console.warn('attachSalesListener failed', err);
+      loadLocalSalesIntoUI();
+    }
+  }
+
+  // Render sales table and summary from salesData
+  function renderSales(){
+    // merge localSales (if any) that are not yet in Firestore (optional)
+    const combined = [...salesData];
+    // show in table
+    salesTbody.innerHTML = '';
+    let totalQty = 0, totalAmount = 0, totalPaid = 0, totalOwing = 0;
+    combined.forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(s.customer)}</td>
+        <td>${s.qty}</td>
+        <td>${formatNumber(s.total)}</td>
+        <td>${formatNumber(s.unit)}</td>
+        <td>${formatNumber(s.paid)}</td>
+        <td>${formatNumber(s.owing)}</td>
+        <td><button data-id="${s._id || ''}" class="print-row">Print</button></td>
+      `;
+      salesTbody.appendChild(tr);
+      totalQty += Number(s.qty || 0);
+      totalAmount += Number(s.total || 0);
+      totalPaid += Number(s.paid || 0);
+      totalOwing += Number(s.owing || 0);
+    });
+
+    sumQtyEl.innerText = totalQty;
+    sumTotalEl.innerText = formatNumber(totalAmount);
+    sumPaidEl.innerText = formatNumber(totalPaid);
+    sumOwingEl.innerText = formatNumber(totalOwing);
+    avgPriceEl.innerText = totalQty ? formatNumber((totalAmount/totalQty).toFixed(2)) : '0';
+
+    // wire row print buttons
+    document.querySelectorAll('.print-row').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        const id = ev.target.dataset.id;
+        const sale = salesData.find(s=>s._id===id);
+        if (sale) printInvoice([sale]);
+        else alert('Sale record not found for printing.');
+      });
+    });
+  }
+
+  // Format helpers
+  function formatNumber(n){
+    if (n === undefined || n === null) return '0';
+    return Number(n).toLocaleString();
+  }
+  function escapeHtml(s){
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Local fallback UI loader
+  function loadLocalSalesIntoUI(){
+    const combined = localSales.slice().reverse(); // newest first
+    salesTbody.innerHTML = '';
+    let totalQty = 0, totalAmount = 0, totalPaid = 0, totalOwing = 0;
+    combined.forEach((s, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(s.customer)}</td>
+        <td>${s.qty}</td>
+        <td>${formatNumber(s.total)}</td>
+        <td>${formatNumber(s.unit)}</td>
+        <td>${formatNumber(s.paid)}</td>
+        <td>${formatNumber(s.owing)}</td>
+        <td>local</td>
+      `;
+      salesTbody.appendChild(tr);
+      totalQty += Number(s.qty || 0);
+      totalAmount += Number(s.total || 0);
+      totalPaid += Number(s.paid || 0);
+      totalOwing += Number(s.owing || 0);
+    });
+
+    sumQtyEl.innerText = totalQty;
+    sumTotalEl.innerText = formatNumber(totalAmount);
+    sumPaidEl.innerText = formatNumber(totalPaid);
+    sumOwingEl.innerText = formatNumber(totalOwing);
+    avgPriceEl.innerText = totalQty ? formatNumber((totalAmount/totalQty).toFixed(2)) : '0';
+  }
+
+  // Clear local cache button
+  document.getElementById('clearLocal').addEventListener('click', () => {
+    if (confirm('Clear local saved sales?')) {
+      localSales = [];
+      localStorage.removeItem('salesData');
+      loadLocalSalesIntoUI();
+    }
+  });
+
+  // ---------------------------
+  // Invoice printing + invoice number increment (transaction)
+  // ---------------------------
+  // ensure invoice counter exists
+  async function ensureInvoiceCounter(){
+    const ref = doc(db, 'counters', 'invoiceNumber');
+    try {
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        await setDoc(ref, { value: 1 });
+      }
+    } catch (err) {
+      console.warn('Could not ensure counter (maybe offline):', err);
+    }
+  }
+
+  // Print invoice for provided items (array). If none provided, print all salesData.
+  async function printInvoice(itemsArray){
+    const items = itemsArray && itemsArray.length ? itemsArray : salesData.slice().reverse();
+    if (!items.length) { alert('No items to print'); return; }
+
+    // use a transaction to get and increment invoiceNumber atomically
+    let invoiceNum = null;
+    const counterRef = doc(db, 'counters', 'invoiceNumber');
+
+    try {
+      invoiceNum = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(counterRef);
+        if (!snap.exists()) {
+          tx.set(counterRef, { value: 1 });
+          return 1;
+        } else {
+          const current = snap.data().value || 0;
+          const next = current + 1;
+          tx.update(counterRef, { value: next });
+          return next;
+        }
+      });
+    } catch (err) {
+      console.warn('Transaction failed - falling back to local invoice counter', err);
+      // fallback - use localStorage
+      const localInv = Number(localStorage.getItem('invoiceNumber') || '0') + 1;
+      localStorage.setItem('invoiceNumber', localInv);
+      invoiceNum = localInv;
+    }
+
+    // Build HTML for invoice modal (multiple copies)
+    const copies = 4;
+    const copyNames = ["CUSTOMER'S COPY", "DRIVER'S COPY", "SECURITY'S COPY", "MANAGER'S COPY"];
+    const now = new Date();
+    const date = now.toLocaleDateString();
+    const time = now.toLocaleTimeString();
+    const manager = managerNameEl.value || 'Manager';
+    const cur = currencyEl.value || '₦';
+
+    let fullHTML = '';
+    items.forEach(sa => {
+      for (let i=0; i<copies; i++){
+        const copyType = copyNames[i];
+        fullHTML += `
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice</title>
+<style>body{font-family:Arial;} table{width:100%;border-collapse:collapse} th,td{border:1px solid #000;padding:6px;text-align:center}</style>
+</head><body>
+<header style="text-align:center;font-weight:bold;font-size:18px">SORICH CLASSY SERVICES</header>
+<div style="text-align:center;font-size:13px">
+  <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+  <p>08164084402, 07012623006, 08067338211</p>
+  <p><strong>FACTORY SALE - ${copyType}</strong></p>
+  <p><strong>RECEIPT:</strong> F${invoiceNum}</p>
+  <p><strong>DATE:</strong> ${date} | <strong>TIME:</strong> ${time}</p>
+  <p><strong>ISSUER:</strong> ${escapeHtml(manager)}</p>
 </div>
 
 <table>
-<thead>
-<tr>
-    <th>DESCRIPTION</th>
-    <th>QTY</th>
-    <th>RATE</th>
-    <th>AMOUNT</th>
-</tr>
-</thead>
+<thead><tr><th>DESCRIPTION</th><th>QTY</th><th>RATE</th><th>AMOUNT</th></tr></thead>
 <tbody>
 <tr>
-    <td>${sa.customer}</td>
-    <td>${sa.qty}</td>
-    <td>${Number(sa.unit).toLocaleString()}</td>
-    <td>${Number(sa.total).toLocaleString()}</td>
+  <td>${escapeHtml(sa.customer)}</td>
+  <td>${sa.qty}</td>
+  <td>${formatNumber(sa.unit)}</td>
+  <td>${formatNumber(sa.total)}</td>
 </tr>
 </tbody>
 </table>
 
-<div style="font-size:14px;">
-    <p><strong>Sub Total:</strong> ${Number(sa.total).toLocaleString()}</p>
-    <p><strong>Discount:</strong> 0.00</p>
-    <p><strong>Grand Total:</strong> ${Number(sa.total).toLocaleString()}</p>
-    <p><strong>Amount Paid:</strong> ${Number(sa.paid).toLocaleString()}</p>
-    <p><strong>Balance:</strong> ${Number(sa.owing).toLocaleString()}</p>
+<div style="font-size:13px">
+  <p><strong>Sub Total:</strong> ${formatNumber(sa.total)}</p>
+  <p><strong>Discount:</strong> 0.00</p>
+  <p><strong>Grand Total:</strong> ${formatNumber(sa.total)}</p>
+  <p><strong>Amount Paid:</strong> ${formatNumber(sa.paid)}</p>
+  <p><strong>Balance:</strong> ${formatNumber(sa.owing)}</p>
 </div>
 
-<div style="text-align:center; margin-top:10px;">
-    <p><strong>SORICH WATER, Drink it. Love it!</strong></p>
-    <p>Thanks for your patronage!</p>
-</div>
-
-</body>
-</html>
-<br><br>
-      `;
+<div style="text-align:center;margin-top:8px"><p><strong>SORICH WATER, Drink it. Love it!</strong></p><p>Thanks for your patronage!</p></div>
+</body></html><br><br>`;
+      }
     });
+
+    showInvoiceModal(fullHTML);
+  }
+  window.printInvoice = printInvoice;
+  btnPrintInvoice.addEventListener('click', () => printInvoice());
+
+  // modal helpers
+  function showInvoiceModal(html){ document.getElementById('invoiceBody').innerHTML = html; document.getElementById('invoiceModal').style.display = 'flex'; }
+  window.closeInvoiceModal = function(){ document.getElementById('invoiceModal').style.display = 'none'; }
+  function printModalInvoice(){
+    const content = document.getElementById('invoiceContent').innerHTML;
+    const w = window.open('','','width=800,height=800');
+    w.document.write(content);
+    w.document.close();
+    w.print();
+  }
+  window.printModalInvoice = printModalInvoice;
+
+  // Initialize: ensure counter & attach listener
+  (async function init(){
+    try {
+      await ensureInvoiceCounter();
+    } catch(e){ console.warn('ensureInvoiceCounter error', e); }
+    attachSalesListener();
+    // load local if no live data arrives quickly
+    setTimeout(() => {
+      if (!salesData.length && localSales.length) loadLocalSalesIntoUI();
+    }, 1200);
+  })();
+
+  // On unload: attempt to push localSales to Firestore (best-effort)
+  window.addEventListener('beforeunload', async () => {
+    if (!localSales || !localSales.length) return;
+    try {
+      for (const s of localSales) {
+        await addDoc(collection(db, 'sales'), { ...s, createdAt: serverTimestamp() });
+      }
+      localStorage.removeItem('salesData');
+    } catch (err) {
+      // ignore - keep local
+    }
   });
 
-  invoiceNumber++;
-  localStorage.setItem('invoiceNumber', invoiceNumber);
-
-  showInvoiceModal(fullHTML);
-}
-
-function showInvoiceModal(html){ document.getElementById('invoiceBody').innerHTML=html; document.getElementById('invoiceModal').style.display='flex'; }
-function closeInvoiceModal(){ document.getElementById('invoiceModal').style.display='none'; }
-function printModalInvoice(){ const content=document.getElementById('invoiceContent').innerHTML; const w=window.open('','','width=600,height=600'); w.document.write(content); w.document.close(); w.print(); }
 </script>
+
 </body>
 </html>
-
