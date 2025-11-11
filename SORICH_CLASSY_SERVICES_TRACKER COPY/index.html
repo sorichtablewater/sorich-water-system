@@ -1,31 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORICH TABLE WATER SYSTEM</title>
-<style>
-body { margin:0; font-family:Arial,sans-serif; background:linear-gradient(to bottom,#cceeff,#fff); transition:0.5s;}
-header {text-align:center;font-size:26px;font-weight:bold;color:#0066cc;padding:20px;}
-.time {text-align:center;font-size:14px;color:#333;margin-bottom:20px;}
-.container {width:90%;margin:auto;}
-button {margin:5px;padding:10px 15px;font-size:14px;border:none;border-radius:5px;cursor:pointer;transition:0.3s;}
-button:hover {background:#0066cc;color:#fff;}
-.stat-boxes {display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
-.stat-box {flex:1;min-width:120px;background:#f0f8ff;padding:15px;border-radius:8px;text-align:center;font-weight:bold;color:#0066cc;}
-table {width:100%;border-collapse:collapse;margin-bottom:15px;}
-th,td {border:1px solid #0066cc;padding:8px;text-align:center;}
-th {background:#cceeff;}
-input, select {padding:5px;margin:3px;}
-.section {margin-bottom:30px;}
-body.dark-mode {background:#001f3f;color:#fff;}
-body.dark-mode table th, body.dark-mode table td {border-color:#fff;}
-body.dark-mode th {background-color:#003366;}
-.invoice-modal {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;justify-content:center;align-items:center;z-index:1000;}
-.invoice-content {background:#fff;padding:20px;width:90%;max-width:600px;border-radius:10px;overflow:auto;max-height:90%;}
-.close-btn {float:right;background:red;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;}
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SORICH TABLE WATER SYSTEM</title>
+
+  <!-- FIREBASE SETUP -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBKBJ9ysvIVmwJUIHkoDFPyHdZNKuoYcHo",
+      authDomain: "sorichwebsite.firebaseapp.com",
+      projectId: "sorichwebsite",
+      storageBucket: "sorichwebsite.firebasestorage.app",
+      messagingSenderId: "691940788091",
+      appId: "1:691940788091:web:9d6c4c7ed0dede829cdfde"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Make db global so your other scripts can use it
+    window.db = db;
+    window.addSaleToFirebase = async function(saleData) {
+      try {
+        await addDoc(collection(db, "sales"), saleData);
+        console.log("Saved to Firebase!");
+      } catch (e) {
+        console.error("Error saving sale:", e);
+      }
+    };
+  </script>
+
+  <style>
+    body { margin:0; font-family:Arial,sans-serif; background:linear-gradient(to bottom,#cceeff,#fff); transition:0.5s;}
+    header {text-align:center;font-size:26px;font-weight:bold;color:#0066cc;padding:20px;}
+    .time {text-align:center;font-size:14px;color:#333;margin-bottom:20px;}
+    .container {width:90%;margin:auto;}
+    button {margin:5px;padding:10px 15px;font-size:14px;border:none;border-radius:5px;cursor:pointer;transition:0.3s;}
+    button:hover {background:#0066cc;color:#fff;}
+    .stat-boxes {display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
+    .stat-box {flex:1;min-width:120px;background:#f0f8ff;padding:15px;border-radius:8px;text-align:center;font-weight:bold;color:#0066cc;}
+    table {width:100%;border-collapse:collapse;margin-bottom:15px;}
+    th,td {border:1px solid #0066cc;padding:8px;text-align:center;}
+    th {background:#cceeff;}
+    input, select {padding:5px;margin:3px;}
+    .section {margin-bottom:30px;}
+    body.dark-mode {background:#001f3f;color:#fff;}
+    body.dark-mode table th, body.dark-mode table td {border-color:#fff;}
+    body.dark-mode th {background-color:#003366;}
+    .btn-debt {background-color:red;color:#fff;}
+    .btn-expense {background-color:yellow;color:#000;}
+    .invoice-modal {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;justify-content:center;align-items:center;z-index:1000;}
+    .invoice-content {background:#fff;padding:20px;width:90%;max-width:600px;border-radius:10px;overflow:auto;max-height:90%;}
+    .invoice-content table {border:1px solid #000;}
+    .invoice-content th, .invoice-content td {border:1px solid #000;padding:5px;}
+    .close-btn {float:right;background:red;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;}
+  </style>
 </head>
 <body>
 
@@ -486,3 +521,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
