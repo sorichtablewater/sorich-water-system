@@ -1,41 +1,9 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SORICH TABLE WATER SYSTEM</title>
-
-  <!-- FIREBASE SETUP -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { 
-      getFirestore, 
-      collection, 
-      addDoc 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBKBJ9ysvIVmwJUIHkoDFPyHdZNKuoYcHo",
-      authDomain: "sorichwebsite.firebaseapp.com",
-      projectId: "sorichwebsite",
-      storageBucket: "sorichwebsite.firebasestorage.app",
-      messagingSenderId: "691940788091",
-      appId: "1:691940788091:web:9d6c4c7ed0dede829cdfde"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // Make db global so your other scripts can use it
-    window.db = db;
-    window.addSaleToFirebase = async function(saleData) {
-      try {
-        await addDoc(collection(db, "sales"), saleData);
-        console.log("Saved to Firebase!");
-      } catch (e) {
-        console.error("Error saving sale:", e);
-      }
-    };
-  </script>
-
   <style>
     body { margin:0; font-family:Arial,sans-serif; background:linear-gradient(to bottom,#cceeff,#fff); transition:0.5s;}
     header {text-align:center;font-size:26px;font-weight:bold;color:#0066cc;padding:20px;}
@@ -68,159 +36,39 @@
 <div class="time" id="liveTime"></div>
 <div class="container">
 
-<!-- LOGIN PAGE -->
-<div id="loginPage" class="section">
-<h2>Login</h2>
-<label>Username: <input type="text" id="username"></label><br>
-<label>Password: <input type="password" id="password"></label><br><br>
-<button onclick="login()">Login</button>
-</div>
+  <!-- SALES PAGE -->
+  <div id="salesPage" class="section" style="display:none;">
+    <h2>Sales</h2>
+    <label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+    <label>Qty: <input type="number" id="saleQty" value="10"></label>
+    <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
+    <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
+    <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
+    <button onclick="addSale()">Add Sale</button>
+    <button onclick="printInvoice()">Print Invoice</button>
+    <button onclick="backToDashboard()">Back to Dashboard</button>
 
-<!-- DASHBOARD ENTRY -->
-<div id="enterDashboardPage" class="section" style="display:none;">
-<h2>Welcome to SORICH TABLE WATER SYSTEM</h2>
-<button onclick="showSection('dashboardPage')">Enter Dashboard</button>
-<button onclick="logout()">Logout</button>
-</div>
+    <h4>Live Summary:</h4>
+    <p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
 
-<!-- DASHBOARD -->
-<div id="dashboardPage" class="section" style="display:none;">
-<h2>Main Dashboard</h2>
-<div class="stat-boxes">
-<div class="stat-box">💰 Total Sales: ₦<span id="totalSales">0</span></div>
-<div class="stat-box">✅ Total Paid: ₦<span id="totalPaid">0</span></div>
-<div class="stat-box">💲 Expenses: ₦<span id="expenses">0</span></div>
-<div class="stat-box">❌ Debts: ₦<span id="debts">0</span></div>
-<div class="stat-box">📈 Avg Unit Price: ₦<span id="avgUnitPrice">0</span></div>
-</div>
+    <table id="salesTable">
+      <tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>🖨</th></tr>
+    </table>
+  </div>
 
-<div class="dashboard-buttons">
-<button onclick="showSection('salesPage')">🛒 Sales</button>
-<button onclick="showSection('debtorsPage')">💳 Debtors</button>
-<button onclick="showSection('expensesPage')">💰 Expenses</button>
-<button onclick="endOfDay()">📅 End of Day</button>
-<button onclick="showSection('dailyRecordsPage')">📋 Daily Records</button>
-<button onclick="showSection('chartsPage')">📊 Charts</button>
-<button onclick="settingsPage()">⚙ Settings</button>
-<button onclick="logout()">Logout</button>
-</div>
-</div>
+  <!-- INVOICE MODAL -->
+  <div class="invoice-modal" id="invoiceModal">
+    <div class="invoice-content" id="invoiceContent">
+      <button class="close-btn" onclick="closeInvoiceModal()">X</button>
+      <div id="invoiceBody"></div>
+      <button onclick="printModalInvoice()">Print</button>
+    </div>
+  </div>
 
-<!-- SALES PAGE -->
-<div id="salesPage" class="section" style="display:none;">
-<h2>Sales</h2>
-<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
-<label>Qty: <input type="number" id="saleQty" value="10"></label>
-<label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-<label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
-<p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
-<button onclick="addSale()">Add Sale</button>
-<button onclick="printInvoice()">Print Invoice</button>
-<button onclick="backToDashboard()">Back to Dashboard</button>
-
-<h4>Live Summary:</h4>
-<p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
-
-<table id="salesTable">
-<tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>🖨</th></tr>
-</table>
-</div>
-
-<!-- DEBTORS PAGE -->
-<div id="debtorsPage" class="section" style="display:none;">
-<h2>Debtors</h2>
-<table id="debtorsTable">
-<tr><th>Customer</th><th>Total Owed</th><th>Amount Paid</th><th>Balance</th><th>Status</th><th>Pay Now</th></tr>
-</table>
-<button onclick="backToDashboard()">Back to Dashboard</button>
-</div>
-
-<!-- EXPENSES PAGE -->
-<div id="expensesPage" class="section" style="display:none;">
-<h2>Expenses & Profit</h2>
-<label>Type: <input type="text" id="expenseType"></label>
-<label>Description: <input type="text" id="expenseDesc"></label>
-<label>Amount: <input type="number" id="expenseAmount"></label>
-<label>Paid To: <input type="text" id="expensePaidTo"></label>
-<button onclick="addExpense()">Add Expense</button>
-<button onclick="clearMonthlyExpenses()">Clear Monthly Expenses</button>
-<button onclick="backToDashboard()">Back to Dashboard</button>
-
-<h4>Expenses Table:</h4>
-<table id="expensesTable">
-<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>
-</table>
-<p>Total Sales: ₦<span id="expenseTotalSales">0</span> | Total Expenses: ₦<span id="expenseTotal">0</span> | Profit: ₦<span id="expenseProfit">0</span></p>
-</div>
-
-<!-- DAILY RECORDS PAGE -->
-<div id="dailyRecordsPage" class="section" style="display:none;">
-<h2>Daily Records</h2>
-<table id="dailyTable">
-<tr><th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th><th>Avg Unit Price</th><th>View</th><th>Clear</th></tr>
-</table>
-<button onclick="backToDashboard()">Back to Dashboard</button>
-</div>
-
-<!-- CHARTS PAGE -->
-<div id="chartsPage" class="section" style="display:none;">
-<h2>Top Buying Customers (Text-Based)</h2>
-<pre id="chartText"></pre>
-<button onclick="backToDashboard()">Back to Dashboard</button>
-</div>
-
-<!-- SETTINGS PAGE -->
-<div id="settingsPage" class="section" style="display:none;">
-  <h2>Settings</h2>
-  <label>Dark Mode: <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"></label><br>
-  <label>Background Color: <input type="color" id="bgColorPicker" onchange="updateBgColor()"></label><br>
-  <label>Manager Name: <input type="text" id="managerName"></label><br>
-  <label>Contact Phone 1: <input type="text" id="contact1"></label><br>
-  <label>Invoice Footer: <input type="text" id="invoiceFooter" value="Drink It. Love It."></label><br>
-  <label>Invoice Copies: <input type="number" id="invoiceCopies" value="4"></label><br><br>
-
-  <h3>Change Login Credentials</h3>
-  <label>Old Password: <input type="password" id="oldPassword"></label><br>
-  <label>New Username: <input type="text" id="newUsername"></label><br>
-  <label>New Password: <input type="password" id="newPassword"></label><br>
-  <label>Confirm New Password: <input type="password" id="confirmPassword"></label><br>
-  <button onclick="changeCredentials()">Update Credentials</button><br><br>
-
-  <button onclick="backToDashboard()">Back to Dashboard</button>
-</div>
 <script>
-// ====== Offline JS Logic ======
-let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
-let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
-let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
-let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
-let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
-
-// ====== TIME ======
-function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
-setInterval(updateTime,1000); updateTime();
-
-// ====== LOGIN ======
-function login(){ 
-  const u=document.getElementById('username').value; 
-  const p=document.getElementById('password').value;
-  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
-  else alert('Invalid credentials');
-}
-function logout(){ location.reload(); }
-function showSection(id){
-  ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','settingsPage']
-  .forEach(s=>document.getElementById(s).style.display='none');
-  document.getElementById(id).style.display='block';
-  if(id==='chartsPage') renderChart();
-  if(id==='debtorsPage') renderDebtors();
-}
-function backToDashboard(){ showSection('dashboardPage'); }
-function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
-function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
-function settingsPage(){ showSection('settingsPage'); }
-
-// ====== SALES ======
+// =======================
+// SALES LOGIC
+// =======================
 const saleQty=document.getElementById('saleQty'), saleTotal=document.getElementById('saleTotal'), salePaid=document.getElementById('salePaid');
 function updateSaleCalc(){
   const q=parseFloat(saleQty.value)||0, t=parseFloat(saleTotal.value)||0, p=parseFloat(salePaid.value)||0;
@@ -229,295 +77,114 @@ function updateSaleCalc(){
 }
 [saleQty,saleTotal,salePaid].forEach(e=>e.addEventListener('input',updateSaleCalc)); updateSaleCalc();
 
-function prefillOwing(){
-  const name=document.getElementById('saleCustomer').value;
-  const debt=debtData.find(d=>d.customer.toLowerCase()===name.toLowerCase());
-  if(debt) { const total=parseFloat(saleTotal.value)||0; salePaid.value = total - debt.owing; }
-  updateSaleCalc();
-}
-
 function addSale(){
   const customer=document.getElementById('saleCustomer').value||'Unknown';
   const qty=parseFloat(saleQty.value)||0, total=parseFloat(saleTotal.value)||0, paid=parseFloat(salePaid.value)||0;
   const unit=qty?(total/qty).toFixed(2):0, owing=(total-paid).toFixed(2);
-  salesData.push({customer, qty, total, unit:parseFloat(unit), paid, owing:parseFloat(owing), date: new Date().toLocaleDateString()});
-  const debtIndex = debtData.findIndex(d=>d.customer.toLowerCase()===customer.toLowerCase());
-  if(debtIndex>=0){ debtData[debtIndex].owing += parseFloat(owing); debtData[debtIndex].totalPaid += paid; } 
-  else { debtData.push({customer, owing:parseFloat(owing), totalPaid:paid}); }
-  renderSalesTable(); renderDebtors();
-  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2000; updateSaleCalc();
+
+  salesData.push({customer,qty,total,unit:parseFloat(unit),paid,owing:parseFloat(owing)});
+
+  // SAVE TO LOCALSTORAGE
   localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
 }
 
-function renderSalesTable(){
-  const table=document.getElementById('salesTable');
-  table.innerHTML='<tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>🖨</th></tr>';
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0, unitSum=0;
-  salesData.forEach(s=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=s.customer;
-    row.insertCell(1).innerText=s.qty;
-    row.insertCell(2).innerText=s.total;
-    row.insertCell(3).innerText=s.unit;
-    row.insertCell(4).innerText=s.paid;
-    row.insertCell(5).innerText=s.owing;
-    const btn=document.createElement('button'); btn.innerText='Print'; btn.onclick=()=>printInvoice(s); row.insertCell(6).appendChild(btn);
-    sumQty+=s.qty; sumTotal+=s.total; sumPaid+=s.paid; sumOwing+=s.owing; unitSum+=s.unit;
-  });
-  const avgUnit = salesData.length ? (unitSum/salesData.length).toFixed(2) : 0;
-  document.getElementById('sumQty').innerText=sumQty;
-  document.getElementById('sumTotal').innerText=sumTotal;
-  document.getElementById('sumPaid').innerText=sumPaid;
-  document.getElementById('sumOwing').innerText=sumOwing;
-  document.getElementById('avgPrice').innerText=avgUnit;
-  document.getElementById('totalSales').innerText=sumTotal;
-  document.getElementById('totalPaid').innerText=sumPaid;
-  const totalDebt = debtData.reduce((acc,d)=>acc+d.owing,0);
-  document.getElementById('debts').innerText=totalDebt.toFixed(2);
-  document.getElementById('avgUnitPrice').innerText=avgUnit;
-}
+// =======================
+// INVOICE PRINTING
+// =======================
+function printInvoice(){
+  const cur = document.getElementById('currency').value || '₦';
+  const copies = 4; // Customer, Driver, Security, Manager
 
-// ====== DEBTORS ======
-function renderDebtors(){
-  const table=document.getElementById('debtorsTable');
-  table.innerHTML='<tr><th>Customer</th><th>Total Owed</th><th>Amount Paid</th><th>Balance</th><th>Status</th><th>Pay Now</th></tr>';
-  debtData.forEach(d=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=d.customer;
-    row.insertCell(1).innerText=(d.owing+d.totalPaid).toFixed(2);
-    row.insertCell(2).innerText=d.totalPaid.toFixed(2);
-    row.insertCell(3).innerText=d.owing.toFixed(2);
-    row.insertCell(4).innerText=d.owing>0?'❌':'✅';
-    const btn=document.createElement('button'); btn.innerText='Pay'; btn.onclick=()=>{ const payment = parseFloat(prompt('Enter payment amount',d.owing))||0; d.owing -= payment; d.totalPaid += payment; renderDebtors(); renderSalesTable(); localStorage.setItem('debtData', JSON.stringify(debtData)); };
-    row.insertCell(5).appendChild(btn);
-  });
-}
+  const manager = document.getElementById('managerName').value || "Manager";
+  const now = new Date();
+  const date = now.toLocaleDateString();
+  const time = now.toLocaleTimeString();
+  const issuer = manager;
 
-// ====== INVOICE PRINTING ======
-function printInvoice(sale){
-  const copies=parseInt(document.getElementById('invoiceCopies').value)||4;
-  const m=document.getElementById('managerName').value||'Manager';
-  const f=document.getElementById('invoiceFooter').value||'Drink It. Love It.';
-  const now=new Date(); 
-  const customer=sale?sale.customer:document.getElementById('saleCustomer').value||'Customer';
-  const qty=sale?sale.qty:parseFloat(document.getElementById('saleQty').value)||0;
-  const total=sale?sale.total:parseFloat(document.getElementById('saleTotal').value)||0;
-  const paid=sale?sale.paid:parseFloat(document.getElementById('salePaid').value)||0;
-  const unit=sale?sale.unit:(qty?total/qty:0).toFixed(2);
-  const owing=(total-paid).toFixed(2);
+  const items = salesData;  // All sales data or use selected sale if necessary
 
-  const win=window.open('','PRINT','width=600,height=800');
-  for(let i=0;i<copies;i++){
-    const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
-    win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
-    win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
-  }
-  win.document.close(); win.focus(); win.print(); win.close();
-  invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
-}
+  let fullHTML = "";
 
-// ====== EXPENSES ======
-function addExpense(){
-  const type=document.getElementById('expenseType').value||'General';
-  const desc=document.getElementById('expenseDesc').value||'No description';
-  const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
-  const paidTo=document.getElementById('expensePaidTo').value||'Unknown';
-  const date=new Date().toLocaleString();
-  expenseData.push({type,desc,amount,paidTo,date});
-  localStorage.setItem('expenseData', JSON.stringify(expenseData));
-  renderExpenses();
-}
-function renderExpenses(){
-  const table=document.getElementById('expensesTable');
-  table.innerHTML='<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
-  let totalExpense=0;
-  expenseData.forEach(e=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=e.type;
-    row.insertCell(1).innerText=e.desc;
-    row.insertCell(2).innerText=e.amount;
-    row.insertCell(3).innerText=e.paidTo;
-    row.insertCell(4).innerText=e.date;
-    totalExpense+=e.amount;
-  });
-  document.getElementById('expenses').innerText=totalExpense;
-  const totalSales = salesData.reduce((acc,s)=>acc+s.total,0);
-  document.getElementById('expenseTotalSales').innerText=totalSales;
-  document.getElementById('expenseTotal').innerText=totalExpense;
-  document.getElementById('expenseProfit').innerText=(totalSales-totalExpense).toFixed(2);
-}
-function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData=[]; localStorage.setItem('expenseData','[]'); renderExpenses(); }}
+  const copyNames = ["CUSTOMER'S COPY", "DRIVER'S COPY", "SECURITY'S COPY", "MANAGER'S COPY"];
 
-// ====== DAILY RECORDS ======
-function renderDailyRecords() {
-    const table = document.getElementById('dailyTable');
-    table.innerHTML = '<tr><th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th><th>Avg Unit Price</th><th>View</th><th>Clear</th></tr>';
+  items.forEach(sa => {
+    for (let i = 0; i < copies; i++) {
+      let copyType = copyNames[i];
 
-    dailyData.forEach((d, index) => {
-        const row = table.insertRow();
-        row.insertCell(0).innerText = d.date;
-        row.insertCell(1).innerText = d.totalSales.toFixed(2);
-        row.insertCell(2).innerText = d.totalExpenses.toFixed(2);
-        row.insertCell(3).innerText = d.net.toFixed(2);
-        row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
+      fullHTML += `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { margin:0; font-family:Arial,sans-serif; }
+table { width:100%; border-collapse:collapse; }
+th, td { border:1px solid #000; padding:5px; text-align:center; }
+</style>
+</head>
+<body>
 
-        // View button — opens invoice-style window
-        const viewBtn = document.createElement('button');
-        viewBtn.innerText = 'View';
-        viewBtn.onclick = () => {
-            const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
-            const manager = document.getElementById('managerName').value || 'Manager';
-            const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
-            const win = window.open('', '', 'width=600,height=800');
+<header style="text-align:center; font-size:22px; font-weight:bold;">
+    SORICH CLASSY SERVICES
+</header>
 
-            for (let i = 0; i < copies; i++) {
-                const copyName = ['Customer','Driver','Security','Manager'][i] || 'Copy';
-                win.document.write(`<h2>SORICH CLASSY SERVICES</h2>
-<p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-<p>08164084402, 07012623006, 08067338211</p>
-<h3>DAILY RECORD - ${copyName.toUpperCase()} COPY</h3>
-<p>DATE: ${d.date}</p>
-<p>ISSUER: ${manager}</p>
-<hr>
-<h4>SALES</h4>
-<table border="1" cellpadding="5" cellspacing="0">
-<tr><th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th></tr>`);
+<div style="text-align:center; font-size:14px;">
+    <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+    <p>08164084402, 07012623006, 08067338211</p>
+    <p><strong>FACTORY SALE - ${copyType}</strong></p>
+    <p><strong>RECEIPT:</strong> F${invoiceNumber}</p>
+    <p><strong>DATE:</strong> ${date} | <strong>TIME:</strong> ${time}</p>
+    <p><strong>ISSUER:</strong> ${issuer}</p>
+</div>
 
-                d.sales.forEach(s => {
-                    win.document.write(`<tr>
-<td>${s.customer}</td>
-<td>${s.qty}</td>
-<td>${s.unit}</td>
-<td>${s.total}</td>
-<td>${s.paid}</td>
-<td>${s.owing}</td>
-</tr>`);
-                });
+<table>
+<thead>
+<tr>
+    <th>DESCRIPTION</th>
+    <th>QTY</th>
+    <th>RATE</th>
+    <th>AMOUNT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td>${sa.customer}</td>
+    <td>${sa.qty}</td>
+    <td>${Number(sa.unit).toLocaleString()}</td>
+    <td>${Number(sa.total).toLocaleString()}</td>
+</tr>
+</tbody>
+</table>
 
-                win.document.write(`</table>
-<h4>EXPENSES</h4>
-<table border="1" cellpadding="5" cellspacing="0">
-<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>`);
+<div style="font-size:14px;">
+    <p><strong>Sub Total:</strong> ${Number(sa.total).toLocaleString()}</p>
+    <p><strong>Discount:</strong> 0.00</p>
+    <p><strong>Grand Total:</strong> ${Number(sa.total).toLocaleString()}</p>
+    <p><strong>Amount Paid:</strong> ${Number(sa.paid).toLocaleString()}</p>
+    <p><strong>Balance:</strong> ${Number(sa.owing).toLocaleString()}</p>
+</div>
 
-                d.expenses.forEach(e => {
-                    win.document.write(`<tr>
-<td>${e.type}</td>
-<td>${e.desc}</td>
-<td>${e.amount}</td>
-<td>${e.paidTo}</td>
-</tr>`);
-                });
+<div style="text-align:center; margin-top:10px;">
+    <p><strong>SORICH WATER, Drink it. Love it!</strong></p>
+    <p>Thanks for your patronage!</p>
+</div>
 
-                win.document.write(`</table>
-<p>Total Sales: ₦${d.totalSales.toFixed(2)}</p>
-<p>Total Expenses: ₦${d.totalExpenses.toFixed(2)}</p>
-<p>Net: ₦${d.net.toFixed(2)}</p>
-<p>${footer}</p>
-<hr>`);
-            }
-
-            win.document.close();
-            win.focus();
-            win.print();
-            win.close();
-        };
-
-        row.insertCell(5).appendChild(viewBtn);
-
-        // Clear button
-        const clearBtn = document.createElement('button');
-        clearBtn.innerText = 'Clear';
-        clearBtn.onclick = () => {
-            if(confirm('Delete this daily record?')) {
-                dailyData.splice(index, 1);
-                localStorage.setItem('dailyData', JSON.stringify(dailyData));
-                renderDailyRecords();
-            }
-        };
-        row.insertCell(6).appendChild(clearBtn);
+</body>
+</html>
+<br><br>
+      `;
     });
+  });
+
+  invoiceNumber++;
+  localStorage.setItem('invoiceNumber', invoiceNumber);
+
+  showInvoiceModal(fullHTML);
 }
 
-// ====== END OF DAY ======
-function endOfDay() {
-    if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
-
-    const todayStr = new Date().toLocaleDateString();
-
-    const totalSales = salesData.reduce((acc, s) => acc + s.total, 0);
-    const totalExpenses = expenseData.reduce((acc, e) => acc + e.amount, 0);
-    const avgUnitPrice = salesData.length ? (salesData.reduce((acc, s) => acc + s.unit, 0) / salesData.length) : 0;
-
-    dailyData.push({
-        date: todayStr,
-        totalSales,
-        totalExpenses,
-        net: totalSales - totalExpenses,
-        avgUnitPrice,
-        sales: [...salesData],
-        expenses: [...expenseData]
-    });
-
-    localStorage.setItem('dailyData', JSON.stringify(dailyData));
-
-    salesData = [];
-    expenseData = [];
-    localStorage.setItem('salesData', JSON.stringify(salesData));
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
-
-    renderSalesTable();
-    renderExpenses();
-    renderDailyRecords();
-
-    alert("End of day completed! Today's sales and expenses archived.");
-}
-
-// ====== CHANGE LOGIN CREDENTIALS ======
-function changeCredentials() {
-    const oldPass = document.getElementById('oldPassword').value;
-    const newUser = document.getElementById('newUsername').value.trim();
-    const newPass = document.getElementById('newPassword').value;
-    const confirmPass = document.getElementById('confirmPassword').value;
-
-    // Retrieve stored credentials or use defaults
-    const storedCreds = JSON.parse(localStorage.getItem('loginCredentials')) || {username:'admin', password:'admin'};
-
-    if (oldPass !== storedCreds.password) {
-        alert('Old password is incorrect.');
-        return;
-    }
-
-    if (!newUser || !newPass) {
-        alert('Username and password cannot be empty.');
-        return;
-    }
-
-    if (newPass !== confirmPass) {
-        alert('New password and confirm password do not match.');
-        return;
-    }
-
-    storedCreds.username = newUser;
-    storedCreds.password = newPass;
-    localStorage.setItem('loginCredentials', JSON.stringify(storedCreds));
-
-    alert('Credentials updated successfully!');
-    // Clear input fields
-    document.getElementById('oldPassword').value = '';
-    document.getElementById('newUsername').value = '';
-    document.getElementById('newPassword').value = '';
-    document.getElementById('confirmPassword').value = '';
-}
-
-// ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {username:'admin', password:'admin'};
-// ====== INIT ======
-renderSalesTable();
-renderDebtors();
-renderExpenses();
-renderDailyRecords();
-
+function showInvoiceModal(html){ document.getElementById('invoiceBody').innerHTML=html; document.getElementById('invoiceModal').style.display='flex'; }
+function closeInvoiceModal(){ document.getElementById('invoiceModal').style.display='none'; }
+function printModalInvoice(){ const content=document.getElementById('invoiceContent').innerHTML; const w=window.open('','','width=600,height=600'); w.document.write(content); w.document.close(); w.print(); }
 </script>
 </body>
 </html>
