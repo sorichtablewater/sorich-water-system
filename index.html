@@ -339,6 +339,7 @@ function renderDailyRecords() {
 <th>Total Expenses</th>
 <th>Net Balance</th>
 <th>Avg Unit Price</th>
+<th>Total Qty</th>
 <th>View</th>
 <th>Clear</th>
 </tr>`;
@@ -351,21 +352,28 @@ function renderDailyRecords() {
         row.insertCell(3).innerText = d.net.toFixed(2);
         row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
 
+        const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+        row.insertCell(5).innerText = totalQty;
+
+        // Create View button in its own cell
+        const viewCell = row.insertCell(6);
         const viewBtn = document.createElement('button');
         viewBtn.innerText = 'View';
-        viewBtn.onclick = () => renderDailyRecordInvoice(d);
-        row.insertCell(5).appendChild(viewBtn);
+        viewBtn.onclick = function() { renderDailyRecordInvoice(d); };
+        viewCell.appendChild(viewBtn);
 
+        // Create Clear button in its own cell
+        const clearCell = row.insertCell(7);
         const clearBtn = document.createElement('button');
         clearBtn.innerText = 'Clear';
-        clearBtn.onclick = () => {
+        clearBtn.onclick = function() {
             if(confirm('Delete this daily record?')) {
                 dailyData.splice(index, 1);
                 localStorage.setItem('dailyData', JSON.stringify(dailyData));
                 renderDailyRecords();
             }
         };
-        row.insertCell(6).appendChild(clearBtn);
+        clearCell.appendChild(clearBtn);
     });
 }
 
@@ -389,6 +397,7 @@ function filterDailyRecords() {
 <th>Total Expenses</th>
 <th>Net Balance</th>
 <th>Avg Unit Price</th>
+<th>Total Qty</th>
 <th>View</th>
 <th>Clear</th>
 </tr>`;
@@ -401,14 +410,21 @@ function filterDailyRecords() {
         row.insertCell(3).innerText = d.net.toFixed(2);
         row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
 
+        const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+        row.insertCell(5).innerText = totalQty;
+
+        // View button
+        const viewCell = row.insertCell(6);
         const viewBtn = document.createElement('button');
         viewBtn.innerText = 'View';
-        viewBtn.onclick = () => renderDailyRecordInvoice(d);
-        row.insertCell(5).appendChild(viewBtn);
+        viewBtn.onclick = function() { renderDailyRecordInvoice(d); };
+        viewCell.appendChild(viewBtn);
 
+        // Clear button
+        const clearCell = row.insertCell(7);
         const clearBtn = document.createElement('button');
         clearBtn.innerText = 'Clear';
-        clearBtn.onclick = () => {
+        clearBtn.onclick = function() {
             const originalIndex = dailyData.indexOf(d);
             if(confirm('Delete this daily record?')) {
                 dailyData.splice(originalIndex, 1);
@@ -416,7 +432,7 @@ function filterDailyRecords() {
                 renderDailyRecords();
             }
         };
-        row.insertCell(6).appendChild(clearBtn);
+        clearCell.appendChild(clearBtn);
     });
 }
 
@@ -431,10 +447,15 @@ function renderDailyRecordInvoice(d) {
     const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
     const manager = document.getElementById('managerName').value || 'Manager';
     const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+
     const win = window.open('', '', 'width=600,height=800');
+    if (!win) { alert("Pop-up blocked! Please allow pop-ups for this site."); return; }
+
+    const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
 
     for (let i = 0; i < copies; i++) {
-        const copyName = ['Customer','Driver','Security','Manager'][i] || 'Copy';
+        const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+
         win.document.write(`
             <h2>SORICH CLASSY SERVICES</h2>
             <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
@@ -445,7 +466,9 @@ function renderDailyRecordInvoice(d) {
             <hr>
             <h4>SALES</h4>
             <table border="1" cellpadding="5" cellspacing="0">
-                <tr><th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th></tr>
+                <tr>
+                    <th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th>
+                </tr>
         `);
 
         d.sales.forEach(s => {
@@ -461,8 +484,10 @@ function renderDailyRecordInvoice(d) {
             `);
         });
 
+        win.document.write(`</table>`);
+        win.document.write(`<p><strong>Total Quantity Sold: ${totalQty}</strong></p>`);
+
         win.document.write(`
-            </table>
             <h4>EXPENSES</h4>
             <table border="1" cellpadding="5" cellspacing="0">
                 <tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>
@@ -479,8 +504,8 @@ function renderDailyRecordInvoice(d) {
             `);
         });
 
+        win.document.write(`</table>`);
         win.document.write(`
-            </table>
             <p>Total Sales: ₦${d.totalSales.toFixed(2)}</p>
             <p>Total Expenses: ₦${d.totalExpenses.toFixed(2)}</p>
             <p>Net: ₦${d.net.toFixed(2)}</p>
