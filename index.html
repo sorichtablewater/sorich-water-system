@@ -120,18 +120,33 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- DAILY RECORDS PAGE -->
 <div id="dailyRecordsPage" class="section" style="display:none;">
-<h2>Daily Records</h2>
-<table id="dailyTable">
-<tr><th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th><th>Avg Unit Price</th><th>View</th><th>Clear</th></tr>
-</table>
-<button onclick="backToDashboard()">Back to Dashboard</button>
+  <h2>Daily Records</h2>
+
+  <!-- DATE FILTER -->
+  <label>From: <input type="date" id="fromDate"></label>
+  <label>To: <input type="date" id="toDate"></label>
+  <button onclick="filterDailyRecords()">Filter</button>
+  <button onclick="clearFilter()">Clear Filter</button>
+
+  <table id="dailyTable">
+    <tr>
+      <th>Date</th>
+      <th>Total Sales</th>
+      <th>Total Expenses</th>
+      <th>Net Balance</th>
+      <th>Avg Unit Price</th>
+      <th>View</th>
+      <th>Clear</th>
+    </tr>
+  </table>
+  <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 
 <!-- CHARTS PAGE -->
 <div id="chartsPage" class="section" style="display:none;">
-<h2>Top Buying Customers (Text-Based)</h2>
-<pre id="chartText"></pre>
-<button onclick="backToDashboard()">Back to Dashboard</button>
+  <h2>Top Buying Customers (Text-Based)</h2>
+  <pre id="chartText"></pre>
+  <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 
 <!-- SETTINGS PAGE -->
@@ -317,7 +332,16 @@ function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData
 // ====== DAILY RECORDS ======
 function renderDailyRecords() {
     const table = document.getElementById('dailyTable');
-    table.innerHTML = '<tr><th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th><th>Avg Unit Price</th><th>View</th><th>Clear</th></tr>';
+    table.innerHTML = `
+<tr>
+<th>Date</th>
+<th>Total Sales</th>
+<th>Total Expenses</th>
+<th>Net Balance</th>
+<th>Avg Unit Price</th>
+<th>View</th>
+<th>Clear</th>
+</tr>`;
 
     dailyData.forEach((d, index) => {
         const row = table.insertRow();
@@ -327,70 +351,11 @@ function renderDailyRecords() {
         row.insertCell(3).innerText = d.net.toFixed(2);
         row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
 
-        // View button — opens invoice-style window
         const viewBtn = document.createElement('button');
         viewBtn.innerText = 'View';
-        viewBtn.onclick = () => {
-            const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
-            const manager = document.getElementById('managerName').value || 'Manager';
-            const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
-            const win = window.open('', '', 'width=600,height=800');
-
-            for (let i = 0; i < copies; i++) {
-                const copyName = ['Customer','Driver','Security','Manager'][i] || 'Copy';
-                win.document.write(`<h2>SORICH CLASSY SERVICES</h2>
-<p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-<p>08164084402, 07012623006, 08067338211</p>
-<h3>DAILY RECORD - ${copyName.toUpperCase()} COPY</h3>
-<p>DATE: ${d.date}</p>
-<p>ISSUER: ${manager}</p>
-<hr>
-<h4>SALES</h4>
-<table border="1" cellpadding="5" cellspacing="0">
-<tr><th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th></tr>`);
-
-                d.sales.forEach(s => {
-                    win.document.write(`<tr>
-<td>${s.customer}</td>
-<td>${s.qty}</td>
-<td>${s.unit}</td>
-<td>${s.total}</td>
-<td>${s.paid}</td>
-<td>${s.owing}</td>
-</tr>`);
-                });
-
-                win.document.write(`</table>
-<h4>EXPENSES</h4>
-<table border="1" cellpadding="5" cellspacing="0">
-<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>`);
-
-                d.expenses.forEach(e => {
-                    win.document.write(`<tr>
-<td>${e.type}</td>
-<td>${e.desc}</td>
-<td>${e.amount}</td>
-<td>${e.paidTo}</td>
-</tr>`);
-                });
-
-                win.document.write(`</table>
-<p>Total Sales: ₦${d.totalSales.toFixed(2)}</p>
-<p>Total Expenses: ₦${d.totalExpenses.toFixed(2)}</p>
-<p>Net: ₦${d.net.toFixed(2)}</p>
-<p>${footer}</p>
-<hr>`);
-            }
-
-            win.document.close();
-            win.focus();
-            win.print();
-            win.close();
-        };
-
+        viewBtn.onclick = () => renderDailyRecordInvoice(d);
         row.insertCell(5).appendChild(viewBtn);
 
-        // Clear button
         const clearBtn = document.createElement('button');
         clearBtn.innerText = 'Clear';
         clearBtn.onclick = () => {
@@ -404,77 +369,182 @@ function renderDailyRecords() {
     });
 }
 
-// ====== END OF DAY ======
+// ====== FILTER DAILY RECORDS ======
+function filterDailyRecords() {
+    const from = document.getElementById('fromDate').value;
+    const to = document.getElementById('toDate').value;
+
+    if (!from || !to) {
+        alert("Please select both From and To dates.");
+        return;
+    }
+
+    const filteredData = dailyData.filter(d => d.date >= from && d.date <= to);
+
+    const table = document.getElementById('dailyTable');
+    table.innerHTML = `
+<tr>
+<th>Date</th>
+<th>Total Sales</th>
+<th>Total Expenses</th>
+<th>Net Balance</th>
+<th>Avg Unit Price</th>
+<th>View</th>
+<th>Clear</th>
+</tr>`;
+
+    filteredData.forEach(d => {
+        const row = table.insertRow();
+        row.insertCell(0).innerText = d.date;
+        row.insertCell(1).innerText = d.totalSales.toFixed(2);
+        row.insertCell(2).innerText = d.totalExpenses.toFixed(2);
+        row.insertCell(3).innerText = d.net.toFixed(2);
+        row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
+
+        const viewBtn = document.createElement('button');
+        viewBtn.innerText = 'View';
+        viewBtn.onclick = () => renderDailyRecordInvoice(d);
+        row.insertCell(5).appendChild(viewBtn);
+
+        const clearBtn = document.createElement('button');
+        clearBtn.innerText = 'Clear';
+        clearBtn.onclick = () => {
+            const originalIndex = dailyData.indexOf(d);
+            if(confirm('Delete this daily record?')) {
+                dailyData.splice(originalIndex, 1);
+                localStorage.setItem('dailyData', JSON.stringify(dailyData));
+                renderDailyRecords();
+            }
+        };
+        row.insertCell(6).appendChild(clearBtn);
+    });
+}
+
+function clearFilter() {
+    document.getElementById('fromDate').value = '';
+    document.getElementById('toDate').value = '';
+    renderDailyRecords();
+}
+
+// ====== RENDER DAILY RECORD INVOICE ======
+function renderDailyRecordInvoice(d) {
+    const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
+    const manager = document.getElementById('managerName').value || 'Manager';
+    const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+    const win = window.open('', '', 'width=600,height=800');
+
+    for (let i = 0; i < copies; i++) {
+        const copyName = ['Customer','Driver','Security','Manager'][i] || 'Copy';
+        win.document.write(`
+            <h2>SORICH CLASSY SERVICES</h2>
+            <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+            <p>08164084402, 07012623006, 08067338211</p>
+            <h3>DAILY RECORD - ${copyName.toUpperCase()} COPY</h3>
+            <p>DATE: ${d.date}</p>
+            <p>ISSUER: ${manager}</p>
+            <hr>
+            <h4>SALES</h4>
+            <table border="1" cellpadding="5" cellspacing="0">
+                <tr><th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th></tr>
+        `);
+
+        d.sales.forEach(s => {
+            win.document.write(`
+                <tr>
+                    <td>${s.customer}</td>
+                    <td>${s.qty}</td>
+                    <td>${s.unit}</td>
+                    <td>${s.total}</td>
+                    <td>${s.paid}</td>
+                    <td>${s.owing}</td>
+                </tr>
+            `);
+        });
+
+        win.document.write(`
+            </table>
+            <h4>EXPENSES</h4>
+            <table border="1" cellpadding="5" cellspacing="0">
+                <tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>
+        `);
+
+        d.expenses.forEach(e => {
+            win.document.write(`
+                <tr>
+                    <td>${e.type}</td>
+                    <td>${e.desc}</td>
+                    <td>${e.amount}</td>
+                    <td>${e.paidTo}</td>
+                </tr>
+            `);
+        });
+
+        win.document.write(`
+            </table>
+            <p>Total Sales: ₦${d.totalSales.toFixed(2)}</p>
+            <p>Total Expenses: ₦${d.totalExpenses.toFixed(2)}</p>
+            <p>Net: ₦${d.net.toFixed(2)}</p>
+            <p>${footer}</p>
+            <hr>
+        `);
+    }
+
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+}
 function endOfDay() {
-    if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
+    if (!confirm("Close the day? Today's sales will be archived.")) return;
 
-    const todayStr = new Date().toLocaleDateString();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
 
-    const totalSales = salesData.reduce((acc, s) => acc + s.total, 0);
-    const totalExpenses = expenseData.reduce((acc, e) => acc + e.amount, 0);
-    const avgUnitPrice = salesData.length ? (salesData.reduce((acc, s) => acc + s.unit, 0) / salesData.length) : 0;
+    const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+    const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
+    const avgUnitPrice = salesData.length 
+        ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
+        : 0;
 
+    // Archive daily data
     dailyData.push({
         date: todayStr,
         totalSales,
         totalExpenses,
         net: totalSales - totalExpenses,
         avgUnitPrice,
-        sales: [...salesData],
-        expenses: [...expenseData]
+        sales: salesData.map(s => ({
+            customer: s.customer,
+            qty: Number(s.qty),
+            total: Number(s.total),
+            unit: Number(s.unit),
+            paid: Number(s.paid),
+            owing: Number(s.owing)
+        })),
+        expenses: expenseData.map(e => ({
+            type: e.type,
+            desc: e.desc,
+            amount: Number(e.amount),
+            paidTo: e.paidTo
+        }))
     });
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
+    // Clear only sales for a new day
     salesData = [];
-    expenseData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
+    // Leave expenseData and debtData intact
+    // expenseData and debtData remain unchanged
+
+    // Reset dashboard
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales and expenses archived.");
+    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
 }
-
-// ====== CHANGE LOGIN CREDENTIALS ======
-function changeCredentials() {
-    const oldPass = document.getElementById('oldPassword').value;
-    const newUser = document.getElementById('newUsername').value.trim();
-    const newPass = document.getElementById('newPassword').value;
-    const confirmPass = document.getElementById('confirmPassword').value;
-
-    // Retrieve stored credentials or use defaults
-    const storedCreds = JSON.parse(localStorage.getItem('loginCredentials')) || {username:'admin', password:'admin'};
-
-    if (oldPass !== storedCreds.password) {
-        alert('Old password is incorrect.');
-        return;
-    }
-
-    if (!newUser || !newPass) {
-        alert('Username and password cannot be empty.');
-        return;
-    }
-
-    if (newPass !== confirmPass) {
-        alert('New password and confirm password do not match.');
-        return;
-    }
-
-    storedCreds.username = newUser;
-    storedCreds.password = newPass;
-    localStorage.setItem('loginCredentials', JSON.stringify(storedCreds));
-
-    alert('Credentials updated successfully!');
-    // Clear input fields
-    document.getElementById('oldPassword').value = '';
-    document.getElementById('newUsername').value = '';
-    document.getElementById('newPassword').value = '';
-    document.getElementById('confirmPassword').value = '';
-}
-
 // ====== INITIAL LOGIN CREDENTIALS ======
 let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {username:'admin', password:'admin'};
 // ====== INIT ======
