@@ -92,9 +92,28 @@ body.dark-mode th {background-color:#003366;}
 </div>
 
 <!-- DEBTORS PAGE -->
-<div id="debtorsPage" class="section" style="display:none;">
+<div id="debtorsPage" class="section" style="display:none; position: relative;">
   <h2>Debtors</h2>
+  
+  <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
+  <button onclick="backToDashboard()" style="
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 10px;
+    padding: 8px 12px;
+    background: #0066cc;
+    color: #fff;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s;
+  " onmouseover="this.style.background='#004999'" onmouseout="this.style.background='#0066cc'">
+    ⬅ Back to Dashboard
+  </button>
+
   <input type="text" id="debtorSearch" placeholder="Search customer..." style="padding:5px; margin-bottom:10px; width:30%;">
+  
   <table id="debtorsTable">
     <tr>
       <th>Customer</th>
@@ -105,7 +124,6 @@ body.dark-mode th {background-color:#003366;}
       <th>Pay Now</th>
     </tr>
   </table>
-  <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 
 
@@ -648,4 +666,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
