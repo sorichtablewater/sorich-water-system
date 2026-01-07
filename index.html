@@ -93,12 +93,21 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- DEBTORS PAGE -->
 <div id="debtorsPage" class="section" style="display:none;">
-<h2>Debtors</h2>
-<table id="debtorsTable">
-<tr><th>Customer</th><th>Total Owed</th><th>Amount Paid</th><th>Balance</th><th>Status</th><th>Pay Now</th></tr>
-</table>
-<button onclick="backToDashboard()">Back to Dashboard</button>
+  <h2>Debtors</h2>
+  <input type="text" id="debtorSearch" placeholder="Search customer..." style="padding:5px; margin-bottom:10px; width:30%;">
+  <table id="debtorsTable">
+    <tr>
+      <th>Customer</th>
+      <th>Total Owed</th>
+      <th>Amount Paid</th>
+      <th>Balance</th>
+      <th>Status</th>
+      <th>Pay Now</th>
+    </tr>
+  </table>
+  <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
+
 
 <!-- EXPENSES PAGE -->
 <div id="expensesPage" class="section" style="display:none;">
@@ -259,20 +268,78 @@ function renderSalesTable(){
 }
 
 // ====== DEBTORS ======
-function renderDebtors(){
-  const table=document.getElementById('debtorsTable');
-  table.innerHTML='<tr><th>Customer</th><th>Total Owed</th><th>Amount Paid</th><th>Balance</th><th>Status</th><th>Pay Now</th></tr>';
-  debtData.forEach(d=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=d.customer;
-    row.insertCell(1).innerText=(d.owing+d.totalPaid).toFixed(2);
-    row.insertCell(2).innerText=d.totalPaid.toFixed(2);
-    row.insertCell(3).innerText=d.owing.toFixed(2);
-    row.insertCell(4).innerText=d.owing>0?'❌':'✅';
-    const btn=document.createElement('button'); btn.innerText='Pay'; btn.onclick=()=>{ const payment = parseFloat(prompt('Enter payment amount',d.owing))||0; d.owing -= payment; d.totalPaid += payment; renderDebtors(); renderSalesTable(); localStorage.setItem('debtData', JSON.stringify(debtData)); };
-    row.insertCell(5).appendChild(btn);
+// ====== DEBTORS ======
+function renderDebtors() {
+  const table = document.getElementById('debtorsTable');
+  const search = document.getElementById('debtorSearch').value.toLowerCase();
+
+  table.innerHTML = `
+    <tr>
+      <th>Customer</th>
+      <th>Total Owed</th>
+      <th>Amount Paid</th>
+      <th>Balance</th>
+      <th>Status</th>
+      <th>Pay Now</th>
+    </tr>
+  `;
+
+  debtData.forEach((d, index) => {
+    if (!d.customer.toLowerCase().includes(search)) return;
+
+    const row = table.insertRow();
+    row.insertCell(0).innerText = d.customer;
+    row.insertCell(1).innerText = (d.totalPaid + d.owing).toFixed(2);
+    row.insertCell(2).innerText = d.totalPaid.toFixed(2);
+    row.insertCell(3).innerText = d.owing.toFixed(2);
+    row.insertCell(4).innerText = d.owing > 0 ? '❌ Owing' : '✅ Cleared';
+
+    const actionCell = row.insertCell(5);
+    actionCell.innerHTML = '';
+    if (d.owing > 0) {
+      const btn = document.createElement('button');
+      btn.innerText = 'Pay';
+      btn.onclick = () => payDebt(index);
+      actionCell.appendChild(btn);
+    }
   });
 }
+
+// ====== PAY DEBT ======
+function payDebt(index) {
+  let d = debtData[index];
+  let payment = parseFloat(prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))) || 0;
+  if (payment <= 0) return alert('Invalid payment amount');
+  if (payment > d.owing) {
+    alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
+    return;
+  }
+
+  d.owing -= payment;
+  d.totalPaid += payment;
+
+  // Update corresponding sales entries
+  salesData.forEach(sale => {
+    if (sale.customer.toLowerCase() === d.customer.toLowerCase() && sale.owing > 0) {
+      let deduction = Math.min(sale.owing, payment);
+      sale.paid += deduction;
+      sale.owing -= deduction;
+      payment -= deduction;
+    }
+  });
+
+  if (d.owing <= 0) d.owing = 0;
+
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+
+  renderDebtors();
+  renderSalesTable();
+}
+
+// ====== DEBTORS SEARCH LISTENER ======
+document.getElementById('debtorSearch').addEventListener('input', renderDebtors);
+
 
 // ====== INVOICE PRINTING ======
 function printInvoice(sale){
@@ -581,3 +648,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
