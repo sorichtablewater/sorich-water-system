@@ -146,8 +146,25 @@ body.dark-mode th {background-color:#003366;}
 </div>
 
 <!-- DAILY RECORDS PAGE -->
-<div id="dailyRecordsPage" class="section" style="display:none;">
+<div id="dailyRecordsPage" class="section" style="display:none; position: relative;">
   <h2>Daily Records</h2>
+
+  <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
+  <button onclick="backToDashboard()" style="
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 10px;
+    padding: 8px 12px;
+    background: #0066cc;
+    color: #fff;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s;
+  " onmouseover="this.style.background='#004999'" onmouseout="this.style.background='#0066cc'">
+    ⬅ Back to Dashboard
+  </button>
 
   <!-- DATE FILTER -->
   <label>From: <input type="date" id="fromDate"></label>
@@ -162,12 +179,13 @@ body.dark-mode th {background-color:#003366;}
       <th>Total Expenses</th>
       <th>Net Balance</th>
       <th>Avg Unit Price</th>
+      <th>Total Qty</th>
       <th>View</th>
       <th>Clear</th>
     </tr>
   </table>
-  <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
+
 
 <!-- CHARTS PAGE -->
 <div id="chartsPage" class="section" style="display:none;">
@@ -666,5 +684,6 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
