@@ -302,8 +302,6 @@ function renderSalesTable(){
   document.getElementById('debts').innerText=totalDebt.toFixed(2);
   document.getElementById('avgUnitPrice').innerText=avgUnit;
 }
-
-// ====== DEBTORS ======
 // ====== DEBTORS ======
 function renderDebtors() {
   const table = document.getElementById('debtorsTable');
@@ -316,7 +314,7 @@ function renderDebtors() {
       <th>Amount Paid</th>
       <th>Balance</th>
       <th>Status</th>
-      <th>Pay Now</th>
+      <th>Action</th>
     </tr>
   `;
 
@@ -332,35 +330,55 @@ function renderDebtors() {
 
     const actionCell = row.insertCell(5);
     actionCell.innerHTML = '';
+
     if (d.owing > 0) {
-      const btn = document.createElement('button');
-      btn.innerText = 'Pay';
-      btn.onclick = () => payDebt(index);
-      actionCell.appendChild(btn);
+      const payBtn = document.createElement('button');
+      payBtn.innerText = 'Pay';
+      payBtn.onclick = () => payDebt(index);
+      actionCell.appendChild(payBtn);
+    } else {
+      const clearBtn = document.createElement('button');
+      clearBtn.innerText = '🗑 Clear';
+      clearBtn.style.background = 'green';
+      clearBtn.style.color = '#fff';
+      clearBtn.onclick = () => clearDebtor(index);
+      actionCell.appendChild(clearBtn);
     }
   });
 }
 
-// ====== PAY DEBT ======
+// ====== PAY DEBT (FIXED) ======
 function payDebt(index) {
-  let d = debtData[index];
-  let payment = parseFloat(prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))) || 0;
-  if (payment <= 0) return alert('Invalid payment amount');
-  if (payment > d.owing) {
+  const d = debtData[index];
+
+  let remainingPayment = parseFloat(
+    prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))
+  );
+
+  if (isNaN(remainingPayment) || remainingPayment <= 0) {
+    alert('Invalid payment amount');
+    return;
+  }
+
+  if (remainingPayment > d.owing) {
     alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
     return;
   }
 
-  d.owing -= payment;
-  d.totalPaid += payment;
+  d.owing -= remainingPayment;
+  d.totalPaid += remainingPayment;
 
   // Update corresponding sales entries
   salesData.forEach(sale => {
-    if (sale.customer.toLowerCase() === d.customer.toLowerCase() && sale.owing > 0) {
-      let deduction = Math.min(sale.owing, payment);
+    if (
+      remainingPayment > 0 &&
+      sale.customer.toLowerCase() === d.customer.toLowerCase() &&
+      sale.owing > 0
+    ) {
+      const deduction = Math.min(sale.owing, remainingPayment);
       sale.paid += deduction;
       sale.owing -= deduction;
-      payment -= deduction;
+      remainingPayment -= deduction;
     }
   });
 
@@ -372,6 +390,19 @@ function payDebt(index) {
   renderDebtors();
   renderSalesTable();
 }
+
+// ====== CLEAR CLEARED DEBTOR ======
+function clearDebtor(index) {
+  if (!confirm('Remove this cleared debtor from the list?')) return;
+
+  debtData.splice(index, 1);
+
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+
+  renderDebtors();
+  renderSalesTable();
+}
+
 
 // ====== DEBTORS SEARCH LISTENER ======
 document.getElementById('debtorSearch').addEventListener('input', renderDebtors);
@@ -684,6 +715,7 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
 
