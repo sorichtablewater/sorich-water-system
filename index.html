@@ -704,29 +704,29 @@ function endOfDay() {
 
     alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
 }
-// ====== TEXT-BASED CHART (TOP BUYING CUSTOMERS) ======
+// ====== TEXT-BASED CHART (TOP BUYING CUSTOMERS - ALL TIME) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
-
   if (!chartEl) return;
 
-  if (!salesData || salesData.length === 0) {
-    chartEl.textContent = "No sales data available.";
+  if (!dailyData || dailyData.length === 0) {
+    chartEl.textContent = "No historical sales data available.";
     return;
   }
 
-  // Calculate total sales per customer
   const totals = {};
-  salesData.forEach(s => {
-    totals[s.customer] = (totals[s.customer] || 0) + Number(s.total);
+
+  dailyData.forEach(day => {
+    day.sales.forEach(s => {
+      totals[s.customer] = (totals[s.customer] || 0) + Number(s.total);
+    });
   });
 
-  // Sort customers by highest total
   const sorted = Object.entries(totals)
     .sort((a, b) => b[1] - a[1]);
 
-  let output = "TOP BUYING CUSTOMERS\n";
-  output += "--------------------\n";
+  let output = "TOP BUYING CUSTOMERS (ALL TIME)\n";
+  output += "-------------------------------\n";
 
   sorted.forEach(([name, amount], index) => {
     output += `${index + 1}. ${name} — ₦${amount.toFixed(2)}\n`;
@@ -741,6 +741,7 @@ let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
   password: 'admin'
 };
 
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
@@ -750,6 +751,7 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
 
