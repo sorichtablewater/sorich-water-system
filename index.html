@@ -703,8 +703,7 @@ function endOfDay() {
     renderDailyRecords();
 
     alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
-}
-// ====== TEXT-BASED CHART (TOP BUYING CUSTOMERS - ALL TIME) ======
+}// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
   if (!chartEl) return;
@@ -714,26 +713,35 @@ function renderChart() {
     return;
   }
 
+  // Aggregate total quantities per customer
   const totals = {};
-
   dailyData.forEach(day => {
     day.sales.forEach(s => {
-      totals[s.customer] = (totals[s.customer] || 0) + Number(s.total);
+      const name = s.customer.trim();
+      totals[name] = (totals[name] || 0) + Number(s.qty);
     });
   });
 
+  // Sort descending by total quantity
   const sorted = Object.entries(totals)
     .sort((a, b) => b[1] - a[1]);
 
-  let output = "TOP BUYING CUSTOMERS (ALL TIME)\n";
-  output += "-------------------------------\n";
+  // Determine scaling for bar length
+  const maxQty = sorted.length ? sorted[0][1] : 0;
+  const maxBarLength = 40; // max characters for bar
 
-  sorted.forEach(([name, amount], index) => {
-    output += `${index + 1}. ${name} — ₦${amount.toFixed(2)}\n`;
+  let output = "TOP BUYING CUSTOMERS (TOTAL QUANTITY)\n";
+  output += "-------------------------------------\n";
+
+  sorted.forEach(([name, qty], index) => {
+    const barLength = Math.round((qty / maxQty) * maxBarLength);
+    const bar = '█'.repeat(barLength); // full block character
+    output += `${index + 1}. ${name.padEnd(15)} | ${bar} ${qty}\n`;
   });
 
   chartEl.textContent = output;
 }
+
 
 // ====== INITIAL LOGIN CREDENTIALS ======
 let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
@@ -751,6 +759,7 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
 
