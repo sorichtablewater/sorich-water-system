@@ -87,7 +87,16 @@ body.dark-mode th {background-color:#003366;}
 <p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
 
 <table id="salesTable">
-<tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>🖨</th></tr>
+  <tr>
+    <th>Customer</th>
+    <th>Qty</th>
+    <th>Total</th>
+    <th>Unit Price</th>
+    <th>Paid</th>
+    <th>Owing</th>
+    <th>Edit</th>
+    <th>🖨</th>
+  </tr>
 </table>
 </div>
 
@@ -277,9 +286,22 @@ function addSale(){
 
 function renderSalesTable(){
   const table=document.getElementById('salesTable');
-  table.innerHTML='<tr><th>Customer</th><th>Qty</th><th>Total</th><th>Unit Price</th><th>Paid</th><th>Owing</th><th>🖨</th></tr>';
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0, unitSum=0;
-  salesData.forEach(s=>{
+  table.innerHTML=`
+    <tr>
+      <th>Customer</th>
+      <th>Qty</th>
+      <th>Total</th>
+      <th>Unit Price</th>
+      <th>Paid</th>
+      <th>Owing</th>
+      <th>Edit</th>
+      <th>🖨</th>
+    </tr>
+  `;
+
+  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0,unitSum=0;
+
+  salesData.forEach((s,index)=>{
     const row=table.insertRow();
     row.insertCell(0).innerText=s.customer;
     row.insertCell(1).innerText=s.qty;
@@ -287,9 +309,26 @@ function renderSalesTable(){
     row.insertCell(3).innerText=s.unit;
     row.insertCell(4).innerText=s.paid;
     row.insertCell(5).innerText=s.owing;
-    const btn=document.createElement('button'); btn.innerText='Print'; btn.onclick=()=>printInvoice(s); row.insertCell(6).appendChild(btn);
-    sumQty+=s.qty; sumTotal+=s.total; sumPaid+=s.paid; sumOwing+=s.owing; unitSum+=s.unit;
+
+    // ✏️ EDIT BUTTON
+    const editBtn=document.createElement('button');
+    editBtn.innerText='Edit';
+    editBtn.onclick=()=>editSale(index);
+    row.insertCell(6).appendChild(editBtn);
+
+    // 🖨 PRINT BUTTON
+    const printBtn=document.createElement('button');
+    printBtn.innerText='Print';
+    printBtn.onclick=()=>printInvoice(s);
+    row.insertCell(7).appendChild(printBtn);
+
+    sumQty+=s.qty;
+    sumTotal+=s.total;
+    sumPaid+=s.paid;
+    sumOwing+=s.owing;
+    unitSum+=s.unit;
   });
+
   const avgUnit = salesData.length ? (unitSum/salesData.length).toFixed(2) : 0;
   document.getElementById('sumQty').innerText=sumQty;
   document.getElementById('sumTotal').innerText=sumTotal;
@@ -298,10 +337,12 @@ function renderSalesTable(){
   document.getElementById('avgPrice').innerText=avgUnit;
   document.getElementById('totalSales').innerText=sumTotal;
   document.getElementById('totalPaid').innerText=sumPaid;
+
   const totalDebt = debtData.reduce((acc,d)=>acc+d.owing,0);
   document.getElementById('debts').innerText=totalDebt.toFixed(2);
   document.getElementById('avgUnitPrice').innerText=avgUnit;
 }
+
 // ====== DEBTORS ======
 function renderDebtors() {
   const table = document.getElementById('debtorsTable');
@@ -743,6 +784,39 @@ function renderChart() {
 }
 
 
+// ====== EDIT SALE FUNCTION ======
+function editSale(index){
+  const s = salesData[index];
+
+  const newCustomer = prompt("Edit Customer Name:", s.customer);
+  if(newCustomer === null) return;
+
+  const newQty = parseFloat(prompt("Edit Quantity:", s.qty));
+  if(isNaN(newQty)) return;
+
+  const newTotal = parseFloat(prompt("Edit Total Amount:", s.total));
+  if(isNaN(newTotal)) return;
+
+  const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
+  if(isNaN(newPaid)) return;
+
+  const newUnit = newQty ? (newTotal/newQty).toFixed(2) : 0;
+  const newOwing = (newTotal - newPaid).toFixed(2);
+
+  // update record
+  s.customer = newCustomer;
+  s.qty = newQty;
+  s.total = newTotal;
+  s.paid = newPaid;
+  s.unit = parseFloat(newUnit);
+  s.owing = parseFloat(newOwing);
+
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+
+  renderSalesTable();
+  renderDebtors();
+}
+
 // ====== INITIAL LOGIN CREDENTIALS ======
 let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
   username: 'admin',
@@ -759,6 +833,7 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
 
