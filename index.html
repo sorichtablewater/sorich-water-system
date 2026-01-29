@@ -138,21 +138,119 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- EXPENSES PAGE -->
 <div id="expensesPage" class="section" style="display:none;">
-<h2>Expenses & Profit</h2>
-<label>Type: <input type="text" id="expenseType"></label>
-<label>Description: <input type="text" id="expenseDesc"></label>
-<label>Amount: <input type="number" id="expenseAmount"></label>
-<label>Paid To: <input type="text" id="expensePaidTo"></label>
-<button onclick="addExpense()">Add Expense</button>
-<button onclick="clearMonthlyExpenses()">Clear Monthly Expenses</button>
-<button onclick="backToDashboard()">Back to Dashboard</button>
+  <h2>Expenses & Profit</h2>
+  
+  <label>Type: <input type="text" id="expenseType"></label>
+  <label>Description: <input type="text" id="expenseDesc"></label>
+  <label>Amount: <input type="number" id="expenseAmount"></label>
+  <label>Paid To: <input type="text" id="expensePaidTo"></label>
+  
+  <button onclick="addExpense()">Add Expense</button>
+  <button onclick="clearMonthlyExpenses()">Clear Monthly Expenses</button>
+  <button onclick="backToDashboard()">Back to Dashboard</button>
 
-<h4>Expenses Table:</h4>
-<table id="expensesTable">
-<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>
-</table>
-<p>Total Sales: ₦<span id="expenseTotalSales">0</span> | Total Expenses: ₦<span id="expenseTotal">0</span> | Profit: ₦<span id="expenseProfit">0</span></p>
+  <h4>Expenses Table:</h4>
+  <table id="expensesTable">
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Paid To</th>
+      <th>Date</th>
+    </tr>
+  </table>
+
+  <p>Total Sales: ₦<span id="expenseTotalSales">0</span> | 
+     Total Expenses: ₦<span id="expenseTotal">0</span> | 
+     Profit: ₦<span id="expenseProfit">0</span>
+  </p>
+
+  <!-- ✅ Monthly Expense Records -->
+  <h3>📆 Monthly Expense Records</h3>
+  <table id="monthlyExpenseTable">
+    <tr>
+      <th>Month</th>
+      <th>Total Expenses</th>
+      <th>No. of Items</th>
+    </tr>
+  </table>
 </div>
+
+<script>
+// ====== Monthly Expenses Data ======
+let monthlyExpenseRecords = JSON.parse(localStorage.getItem('monthlyExpenseRecords')) || [];
+
+// ====== Add Expense ======
+function addExpense(){
+  const type = document.getElementById('expenseType').value || 'General';
+  const desc = document.getElementById('expenseDesc').value || 'No description';
+  const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
+  const paidTo = document.getElementById('expensePaidTo').value || 'Unknown';
+  const date = new Date().toLocaleString();
+
+  expenseData.push({ type, desc, amount, paidTo, date });
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
+// ====== Render Expenses Table & Monthly Records ======
+function renderExpenses() {
+  const table = document.getElementById('expensesTable');
+  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+
+  let totalExpense = 0;
+  expenseData.forEach(e => {
+    const row = table.insertRow();
+    row.insertCell(0).innerText = e.type;
+    row.insertCell(1).innerText = e.desc;
+    row.insertCell(2).innerText = e.amount;
+    row.insertCell(3).innerText = e.paidTo;
+    row.insertCell(4).innerText = e.date;
+    totalExpense += e.amount;
+  });
+
+  document.getElementById('expenses').innerText = totalExpense;
+  const totalSales = salesData.reduce((acc, s) => acc + s.total, 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales;
+  document.getElementById('expenseTotal').innerText = totalExpense;
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+
+  // Render Monthly Expense Table
+  const monthlyTable = document.getElementById('monthlyExpenseTable');
+  monthlyTable.innerHTML = `
+    <tr>
+      <th>Month</th>
+      <th>Total Expenses</th>
+      <th>No. of Items</th>
+    </tr>
+  `;
+  monthlyExpenseRecords.forEach(record => {
+    const row = monthlyTable.insertRow();
+    row.insertCell(0).innerText = record.month;
+    row.insertCell(1).innerText = `₦${record.total.toFixed(2)}`;
+    row.insertCell(2).innerText = record.expenses.length;
+  });
+}
+
+// ====== Clear & Archive Monthly Expenses ======
+function clearMonthlyExpenses() {
+  if (!confirm('Clear all expenses for this month?')) return;
+
+  if (expenseData.length) {
+    // Archive current month
+    const month = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    const total = expenseData.reduce((sum, e) => sum + e.amount, 0);
+    monthlyExpenseRecords.push({ month, total, expenses: [...expenseData] });
+    localStorage.setItem('monthlyExpenseRecords', JSON.stringify(monthlyExpenseRecords));
+  }
+
+  expenseData = [];
+  localStorage.setItem('expenseData', '[]');
+  renderExpenses();
+}
+</script>
+
+
 
 <!-- DAILY RECORDS PAGE -->
 <div id="dailyRecordsPage" class="section" style="display:none; position: relative;">
@@ -224,11 +322,16 @@ body.dark-mode th {background-color:#003366;}
 </div>
 <script>
 // ====== Offline JS Logic ======
-let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
-let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
-let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
-let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
-let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
+let salesData = JSON.parse(localStorage.getItem('salesData')) || [];
+let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
+let expenseData = JSON.parse(localStorage.getItem('expenseData')) || [];
+let dailyData = JSON.parse(localStorage.getItem('dailyData')) || [];
+let invoiceNumber = parseInt(localStorage.getItem('invoiceNumber')) || 1;
+
+// ✅ Monthly Expense Records (NEW)
+let monthlyExpenseRecords =
+  JSON.parse(localStorage.getItem('monthlyExpenseRecords')) || [];
+
 
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
@@ -483,25 +586,46 @@ function addExpense(){
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
 }
-function renderExpenses(){
-  const table=document.getElementById('expensesTable');
-  table.innerHTML='<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
-  let totalExpense=0;
-  expenseData.forEach(e=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=e.type;
-    row.insertCell(1).innerText=e.desc;
-    row.insertCell(2).innerText=e.amount;
-    row.insertCell(3).innerText=e.paidTo;
-    row.insertCell(4).innerText=e.date;
-    totalExpense+=e.amount;
+function renderExpenses() {
+  const table = document.getElementById('expensesTable');
+  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+
+  let totalExpense = 0;
+  expenseData.forEach(e => {
+    const row = table.insertRow();
+    row.insertCell(0).innerText = e.type;
+    row.insertCell(1).innerText = e.desc;
+    row.insertCell(2).innerText = e.amount;
+    row.insertCell(3).innerText = e.paidTo;
+    row.insertCell(4).innerText = e.date;
+    totalExpense += e.amount;
   });
-  document.getElementById('expenses').innerText=totalExpense;
-  const totalSales = salesData.reduce((acc,s)=>acc+s.total,0);
-  document.getElementById('expenseTotalSales').innerText=totalSales;
-  document.getElementById('expenseTotal').innerText=totalExpense;
-  document.getElementById('expenseProfit').innerText=(totalSales-totalExpense).toFixed(2);
+
+  document.getElementById('expenses').innerText = totalExpense;
+  const totalSales = salesData.reduce((acc, s) => acc + s.total, 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales;
+  document.getElementById('expenseTotal').innerText = totalExpense;
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+
+  // ====== NEW: Render Monthly Expense Records Table ======
+  const monthlyTable = document.getElementById('monthlyExpenseTable');
+  if (monthlyTable) {
+    monthlyTable.innerHTML = `
+      <tr>
+        <th>Month</th>
+        <th>Total Expenses</th>
+        <th>No. of Items</th>
+      </tr>
+    `;
+    monthlyExpenseRecords.forEach(record => {
+      const row = monthlyTable.insertRow();
+      row.insertCell(0).innerText = record.month;
+      row.insertCell(1).innerText = `₦${record.total.toFixed(2)}`;
+      row.insertCell(2).innerText = record.expenses.length;
+    });
+  }
 }
+
 function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData=[]; localStorage.setItem('expenseData','[]'); renderExpenses(); }}
 
 // ====== DAILY RECORDS ======
@@ -833,6 +957,7 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
 
