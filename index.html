@@ -74,10 +74,7 @@ body.dark-mode th {background-color:#003366;}
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
 <h2>Sales</h2>
-<label>Customer: 
-  <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()" list="customerList">
-  <datalist id="customerList"></datalist>
-</label>
+<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
 <label>Qty: <input type="number" id="saleQty" value="10"></label>
 <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
 <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
@@ -103,7 +100,6 @@ body.dark-mode th {background-color:#003366;}
   </tr>
 </table>
 </div>
-
 
 
 <!-- DEBTORS PAGE -->
@@ -282,34 +278,13 @@ updateSaleCalc();
 
 function prefillOwing(){
   const name = document.getElementById('saleCustomer').value;
-  
-  // ===== Auto-fill previous debt if customer exists =====
   const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
   if(debt) { 
     const total = parseFloat(saleTotal.value) || 0; 
     salePaid.value = total - debt.owing; 
-    salePrevDebt.value = debt.owing; // auto-fill previous debt
+    salePrevDebt.value = debt.owing; // NEW: auto-fill previous debt if customer exists
   }
-
   updateSaleCalc();
-
-  // ===== Update customer suggestions in the datalist =====
-  const datalist = document.getElementById('customerList');
-  datalist.innerHTML = '';
-
-  // Get unique customer names from salesData and debtData
-  const customers = [
-    ...new Set([
-      ...salesData.map(s => s.customer),
-      ...debtData.map(d => d.customer)
-    ])
-  ];
-
-  customers.forEach(name => {
-    const option = document.createElement('option');
-    option.value = name;
-    datalist.appendChild(option);
-  });
 }
 
 function addSale(){
@@ -318,55 +293,6 @@ function addSale(){
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
   const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
-
-  // Include previous debt in owing
-  const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2); // UPDATED
-
-  // Push to sales data
-  salesData.push({
-    customer,
-    qty,
-    total,
-    unit: parseFloat(unit),
-    paid,
-    owing: parseFloat(owing),
-    prevDebt: prevDebt, // store previous debt
-    date: new Date().toLocaleDateString()
-  });
-
-  // Update debt data
-  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
-  if(debtIndex >= 0){
-    debtData[debtIndex].owing += parseFloat(owing);
-    debtData[debtIndex].totalPaid += paid;
-  } else {
-    debtData.push({
-      customer,
-      owing: parseFloat(owing),
-      totalPaid: paid
-    });
-  }
-
-  // Re-render tables
-  renderSalesTable();
-  renderDebtors();
-
-  // ===== Reset form =====
-  document.getElementById('saleCustomer').value = '';
-  saleQty.value = 10;
-  saleTotal.value = 2500;
-  salePaid.value = 2000;
-  salePrevDebt.value = 0; // RESET previous debt
-  updateSaleCalc();
-
-  // ===== Update localStorage =====
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-
-  // ===== Step 3: Refresh customer suggestions =====
-  prefillOwing(); // This will also update the datalist with the new customer
-}
 
   // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
@@ -964,4 +890,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
