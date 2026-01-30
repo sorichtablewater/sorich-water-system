@@ -244,14 +244,28 @@ let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
 setInterval(updateTime,1000); updateTime();
 
+// ====== INITIAL LOGIN CREDENTIALS ======
+let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
+  username: 'admin',
+  password: 'admin'
+};
+
 // ====== LOGIN ======
 function login(){ 
-  const u=document.getElementById('username').value; 
-  const p=document.getElementById('password').value;
-  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
-  else alert('Invalid credentials');
+  const u = document.getElementById('username').value; 
+  const p = document.getElementById('password').value;
+  
+  if(u === loginCredentials.username && p === loginCredentials.password){ 
+    showSection('enterDashboardPage'); 
+  } else {
+    alert('Invalid credentials');
+  }
 }
-function logout(){ location.reload(); }
+
+function logout(){ 
+  location.reload(); 
+}
+
 function showSection(id){
   ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','settingsPage']
   .forEach(s=>document.getElementById(s).style.display='none');
@@ -978,11 +992,7 @@ function editSale(index){
   renderDebtors();
 }
 
-// ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
-  username: 'admin',
-  password: 'admin'
-};
+
 
 
 // ====== INIT ======
@@ -994,4 +1004,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
