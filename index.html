@@ -73,37 +73,32 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
-  <h2>Sales</h2>
-  <label>
-    Customer: 
-    <input list="customerList" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()">
-    <datalist id="customerList"></datalist>
-  </label>
-  <label>Qty: <input type="number" id="saleQty" value="10"></label>
-  <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-  <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
-  <!-- ✅ Previous Debt Input -->
-  <label>Previous Debt: <input type="number" id="salePrevDebt" value="0"></label>
-  <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
-  <button onclick="addSale()">Add Sale</button>
-  <button onclick="printInvoice()">Print Invoice</button>
-  <button onclick="backToDashboard()">Back to Dashboard</button>
+<h2>Sales</h2>
+<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+<label>Qty: <input type="number" id="saleQty" value="10"></label>
+<label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
+<label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
+<label>Previous Debt: <input type="number" id="salePrevDebt" value="0"></label> <!-- NEW FIELD -->
+<p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
+<button onclick="addSale()">Add Sale</button>
+<button onclick="printInvoice()">Print Invoice</button>
+<button onclick="backToDashboard()">Back to Dashboard</button>
 
-  <h4>Live Summary:</h4>
-  <p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
+<h4>Live Summary:</h4>
+<p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
 
-  <table id="salesTable">
-    <tr>
-      <th>Customer</th>
-      <th>Qty</th>
-      <th>Total</th>
-      <th>Unit Price</th>
-      <th>Paid</th>
-      <th>Owing</th>
-      <th>Edit</th>
-      <th>🖨</th>
-    </tr>
-  </table>
+<table id="salesTable">
+  <tr>
+    <th>Customer</th>
+    <th>Qty</th>
+    <th>Total</th>
+    <th>Unit Price</th>
+    <th>Paid</th>
+    <th>Owing</th>
+    <th>Edit</th>
+    <th>🖨</th>
+  </tr>
+</table>
 </div>
 
 
@@ -264,56 +259,46 @@ function settingsPage(){ showSection('settingsPage'); }
 // ====== SALES ======
 const saleQty = document.getElementById('saleQty'),
       saleTotal = document.getElementById('saleTotal'),
-      salePaid = document.getElementById('salePaid');
+      salePaid = document.getElementById('salePaid'),
+      salePrevDebt = document.getElementById('salePrevDebt'); // NEW
 
-function updateSaleCalc() {
+function updateSaleCalc(){
   const q = parseFloat(saleQty.value) || 0,
         t = parseFloat(saleTotal.value) || 0,
-        p = parseFloat(salePaid.value) || 0;
-  document.getElementById('saleUnitPrice').innerText = q ? (t / q).toFixed(2) : 0;
-  document.getElementById('saleOwing').innerText = (t - p).toFixed(2);
+        p = parseFloat(salePaid.value) || 0,
+        prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
+
+  document.getElementById('saleUnitPrice').innerText = q ? (t/q).toFixed(2) : 0;
+  document.getElementById('saleOwing').innerText = (t - p + prevDebt).toFixed(2); // UPDATED
 }
 
-[saleQty, saleTotal, salePaid].forEach(e => e.addEventListener('input', updateSaleCalc));
+// add event listeners including Previous Debt input
+[saleQty, saleTotal, salePaid, salePrevDebt].forEach(e => e.addEventListener('input', updateSaleCalc));
 updateSaleCalc();
 
-function prefillOwing() {
+function prefillOwing(){
   const name = document.getElementById('saleCustomer').value;
   const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
-  if (debt) {
-    const total = parseFloat(saleTotal.value) || 0;
-    salePaid.value = total - debt.owing;
+  if(debt) { 
+    const total = parseFloat(saleTotal.value) || 0; 
+    salePaid.value = total - debt.owing; 
+    salePrevDebt.value = debt.owing; // NEW: auto-fill previous debt if customer exists
   }
   updateSaleCalc();
 }
 
-// ====== CUSTOMER AUTOCOMPLETE ======
-function updateCustomerList() {
-  const datalist = document.getElementById('customerList');
-  datalist.innerHTML = '';
-
-  const historicalCustomers = dailyData.flatMap(d => d.sales.map(s => s.customer));
-  const currentCustomers = salesData.map(s => s.customer);
-  const allCustomers = [...new Set([...historicalCustomers, ...currentCustomers])];
-
-  allCustomers.forEach(name => {
-    const option = document.createElement('option');
-    option.value = name;
-    datalist.appendChild(option);
-  });
-}
-
-// ====== ADD SALE ======
-function addSale() {
+function addSale(){
   const customer = document.getElementById('saleCustomer').value || 'Unknown';
   const qty = parseFloat(saleQty.value) || 0;
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
-  const prevDebt = parseFloat(document.getElementById('salePrevDebt').value) || 0;
+  const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
 
+  // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2);
+  const owing = (total - paid + prevDebt).toFixed(2); // UPDATED
 
+  // Push to sales data
   salesData.push({
     customer,
     qty,
@@ -321,139 +306,40 @@ function addSale() {
     unit: parseFloat(unit),
     paid,
     owing: parseFloat(owing),
+    prevDebt: prevDebt, // NEW: store previous debt
     date: new Date().toLocaleDateString()
   });
 
+  // Update debt data
   const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
   if(debtIndex >= 0){
     debtData[debtIndex].owing += parseFloat(owing);
     debtData[debtIndex].totalPaid += paid;
   } else {
-    debtData.push({ customer, owing: parseFloat(owing), totalPaid: paid });
+    debtData.push({
+      customer,
+      owing: parseFloat(owing),
+      totalPaid: paid
+    });
   }
 
+  // Re-render tables
   renderSalesTable();
   renderDebtors();
 
+  // Reset form
   document.getElementById('saleCustomer').value = '';
   saleQty.value = 10;
   saleTotal.value = 2500;
   salePaid.value = 2000;
-  document.getElementById('salePrevDebt').value = 0;
+  salePrevDebt.value = 0; // RESET previous debt
   updateSaleCalc();
-  updateCustomerList();
 
+  // Save to localStorage
   localStorage.setItem('salesData', JSON.stringify(salesData));
   localStorage.setItem('debtData', JSON.stringify(debtData));
 }
 
-// ====== EDIT SALE ======
-function editSale(index){
-  const s = salesData[index];
-  const newCustomer = prompt("Edit Customer Name:", s.customer);
-  if(newCustomer === null) return;
-
-  const newQty = parseFloat(prompt("Edit Quantity:", s.qty));
-  if(isNaN(newQty)) return;
-
-  const newTotal = parseFloat(prompt("Edit Total Amount:", s.total));
-  if(isNaN(newTotal)) return;
-
-  const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
-  if(isNaN(newPaid)) return;
-
-  const newUnit = newQty ? (newTotal/newQty).toFixed(2) : 0;
-  const newOwing = (newTotal - newPaid).toFixed(2);
-
-  s.customer = newCustomer;
-  s.qty = newQty;
-  s.total = newTotal;
-  s.paid = newPaid;
-  s.unit = parseFloat(newUnit);
-  s.owing = parseFloat(newOwing);
-
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-
-  renderSalesTable();
-  renderDebtors();
-  updateCustomerList();
-}
-
-// Initialize customer list on page load
-updateCustomerList();
-
-// ====== SALES TABLE ======
-function renderSalesTable(){
-  const table = document.getElementById('salesTable');
-  table.innerHTML=`
-    <tr>
-      <th>Customer</th>
-      <th>Qty</th>
-      <th>Total</th>
-      <th>Unit Price</th>
-      <th>Paid</th>
-      <th>Owing</th>
-      <th>Edit</th>
-      <th>🖨</th>
-    </tr>
-  `;
-
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0,unitSum=0;
-
-  salesData.forEach((s,index)=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=s.customer;
-    row.insertCell(1).innerText=s.qty;
-    row.insertCell(2).innerText=s.total;
-    row.insertCell(3).innerText=s.unit;
-    row.insertCell(4).innerText=s.paid;
-    row.insertCell(5).innerText=s.owing;
-
-    const editBtn = document.createElement('button');
-    editBtn.innerText='Edit';
-    editBtn.onclick=()=>editSale(index);
-    row.insertCell(6).appendChild(editBtn);
-
-    const printBtn = document.createElement('button');
-    printBtn.innerText='Print';
-    printBtn.onclick=()=>printInvoice(s);
-    row.insertCell(7).appendChild(printBtn);
-
-    sumQty+=s.qty;
-    sumTotal+=s.total;
-    sumPaid+=s.paid;
-    sumOwing+=s.owing;
-    unitSum+=s.unit;
-  });
-
-  const avgUnit = salesData.length ? (unitSum/salesData.length).toFixed(2) : 0;
-  document.getElementById('sumQty').innerText=sumQty;
-  document.getElementById('sumTotal').innerText=sumTotal;
-  document.getElementById('sumPaid').innerText=sumPaid;
-  document.getElementById('sumOwing').innerText=sumOwing;
-  document.getElementById('avgPrice').innerText=avgUnit;
-  document.getElementById('totalSales').innerText=sumTotal;
-  document.getElementById('totalPaid').innerText=sumPaid;
-
-  const totalDebt = debtData.reduce((acc,d)=>acc+d.owing,0);
-  document.getElementById('debts').innerText=totalDebt.toFixed(2);
-  document.getElementById('avgUnitPrice').innerText=avgUnit;
-}
-
-
-function addSale(){
-  const customer=document.getElementById('saleCustomer').value||'Unknown';
-  const qty=parseFloat(saleQty.value)||0, total=parseFloat(saleTotal.value)||0, paid=parseFloat(salePaid.value)||0;
-  const unit=qty?(total/qty).toFixed(2):0, owing=(total-paid).toFixed(2);
-  salesData.push({customer, qty, total, unit:parseFloat(unit), paid, owing:parseFloat(owing), date: new Date().toLocaleDateString()});
-  const debtIndex = debtData.findIndex(d=>d.customer.toLowerCase()===customer.toLowerCase());
-  if(debtIndex>=0){ debtData[debtIndex].owing += parseFloat(owing); debtData[debtIndex].totalPaid += paid; } 
-  else { debtData.push({customer, owing:parseFloat(owing), totalPaid:paid}); }
-  renderSalesTable(); renderDebtors();
-  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2000; updateSaleCalc();
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-}
 
 function renderSalesTable(){
   const table=document.getElementById('salesTable');
@@ -1004,4 +890,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
