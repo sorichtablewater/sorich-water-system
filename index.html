@@ -73,32 +73,35 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
-<h2>Sales</h2>
-<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
-<label>Qty: <input type="number" id="saleQty" value="10"></label>
-<label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-<label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
-<p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
-<button onclick="addSale()">Add Sale</button>
-<button onclick="printInvoice()">Print Invoice</button>
-<button onclick="backToDashboard()">Back to Dashboard</button>
+  <h2>Sales</h2>
+  <label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+  <label>Qty: <input type="number" id="saleQty" value="10"></label>
+  <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
+  <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
+  <!-- ✅ Previous Debt Input -->
+  <label>Previous Debt: <input type="number" id="salePrevDebt" value="0"></label>
+  <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
+  <button onclick="addSale()">Add Sale</button>
+  <button onclick="printInvoice()">Print Invoice</button>
+  <button onclick="backToDashboard()">Back to Dashboard</button>
 
-<h4>Live Summary:</h4>
-<p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
+  <h4>Live Summary:</h4>
+  <p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
 
-<table id="salesTable">
-  <tr>
-    <th>Customer</th>
-    <th>Qty</th>
-    <th>Total</th>
-    <th>Unit Price</th>
-    <th>Paid</th>
-    <th>Owing</th>
-    <th>Edit</th>
-    <th>🖨</th>
-  </tr>
-</table>
+  <table id="salesTable">
+    <tr>
+      <th>Customer</th>
+      <th>Qty</th>
+      <th>Total</th>
+      <th>Unit Price</th>
+      <th>Paid</th>
+      <th>Owing</th>
+      <th>Edit</th>
+      <th>🖨</th>
+    </tr>
+  </table>
 </div>
+
 
 <!-- DEBTORS PAGE -->
 <div id="debtorsPage" class="section" style="display:none; position: relative;">
@@ -271,18 +274,53 @@ function prefillOwing(){
 }
 
 function addSale(){
-  const customer=document.getElementById('saleCustomer').value||'Unknown';
-  const qty=parseFloat(saleQty.value)||0, total=parseFloat(saleTotal.value)||0, paid=parseFloat(salePaid.value)||0;
-  const unit=qty?(total/qty).toFixed(2):0, owing=(total-paid).toFixed(2);
-  salesData.push({customer, qty, total, unit:parseFloat(unit), paid, owing:parseFloat(owing), date: new Date().toLocaleDateString()});
-  const debtIndex = debtData.findIndex(d=>d.customer.toLowerCase()===customer.toLowerCase());
-  if(debtIndex>=0){ debtData[debtIndex].owing += parseFloat(owing); debtData[debtIndex].totalPaid += paid; } 
-  else { debtData.push({customer, owing:parseFloat(owing), totalPaid:paid}); }
-  renderSalesTable(); renderDebtors();
-  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2000; updateSaleCalc();
+  const customer = document.getElementById('saleCustomer').value || 'Unknown';
+  const qty = parseFloat(saleQty.value) || 0;
+  const total = parseFloat(saleTotal.value) || 0;
+  const paid = parseFloat(salePaid.value) || 0;
+  const prevDebt = parseFloat(document.getElementById('salePrevDebt').value) || 0;
+
+  // Calculate unit price and total owing including previous debt
+  const unit = qty ? (total / qty).toFixed(2) : 0;
+  const owing = (total - paid + prevDebt).toFixed(2);
+
+  // Add sale record
+  salesData.push({
+    customer,
+    qty,
+    total,
+    unit: parseFloat(unit),
+    paid,
+    owing: parseFloat(owing),
+    date: new Date().toLocaleDateString()
+  });
+
+  // Update debt data
+  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
+  if(debtIndex >= 0){
+    debtData[debtIndex].owing += parseFloat(owing);
+    debtData[debtIndex].totalPaid += paid;
+  } else {
+    debtData.push({ customer, owing: parseFloat(owing), totalPaid: paid });
+  }
+
+  // Re-render tables
+  renderSalesTable();
+  renderDebtors();
+
+  // Reset input fields
+  document.getElementById('saleCustomer').value = '';
+  saleQty.value = 10;
+  saleTotal.value = 2500;
+  salePaid.value = 2000;
+  document.getElementById('salePrevDebt').value = 0;
+  updateSaleCalc();
+
+  // Save to localStorage
   localStorage.setItem('salesData', JSON.stringify(salesData));
   localStorage.setItem('debtData', JSON.stringify(debtData));
 }
+
 
 function renderSalesTable(){
   const table=document.getElementById('salesTable');
@@ -833,4 +871,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
