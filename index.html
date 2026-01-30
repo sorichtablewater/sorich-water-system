@@ -74,7 +74,11 @@ body.dark-mode th {background-color:#003366;}
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
   <h2>Sales</h2>
-  <label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+  <label>
+    Customer: 
+    <input list="customerList" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()">
+    <datalist id="customerList"></datalist>
+  </label>
   <label>Qty: <input type="number" id="saleQty" value="10"></label>
   <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
   <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
@@ -101,6 +105,7 @@ body.dark-mode th {background-color:#003366;}
     </tr>
   </table>
 </div>
+
 
 
 <!-- DEBTORS PAGE -->
@@ -256,29 +261,138 @@ function backToDashboard(){ showSection('dashboardPage'); }
 function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
 function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
 function settingsPage(){ showSection('settingsPage'); }
-
 // ====== SALES ======
-const saleQty=document.getElementById('saleQty'), saleTotal=document.getElementById('saleTotal'), salePaid=document.getElementById('salePaid');
-function updateSaleCalc(){
-  const q=parseFloat(saleQty.value)||0, t=parseFloat(saleTotal.value)||0, p=parseFloat(salePaid.value)||0;
-  document.getElementById('saleUnitPrice').innerText=q?(t/q).toFixed(2):0;
-  document.getElementById('saleOwing').innerText=(t-p).toFixed(2);
-}
-[saleQty,saleTotal,salePaid].forEach(e=>e.addEventListener('input',updateSaleCalc)); updateSaleCalc();
+const saleQty = document.getElementById('saleQty'),
+      saleTotal = document.getElementById('saleTotal'),
+      salePaid = document.getElementById('salePaid');
 
-function prefillOwing(){
-  const name=document.getElementById('saleCustomer').value;
-  const debt=debtData.find(d=>d.customer.toLowerCase()===name.toLowerCase());
-  if(debt) { const total=parseFloat(saleTotal.value)||0; salePaid.value = total - debt.owing; }
+function updateSaleCalc() {
+  const q = parseFloat(saleQty.value) || 0,
+        t = parseFloat(saleTotal.value) || 0,
+        p = parseFloat(salePaid.value) || 0;
+  document.getElementById('saleUnitPrice').innerText = q ? (t / q).toFixed(2) : 0;
+  document.getElementById('saleOwing').innerText = (t - p).toFixed(2);
+}
+
+[saleQty, saleTotal, salePaid].forEach(e => e.addEventListener('input', updateSaleCalc));
+updateSaleCalc();
+
+function prefillOwing() {
+  const name = document.getElementById('saleCustomer').value;
+  const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
+  if (debt) {
+    const total = parseFloat(saleTotal.value) || 0;
+    salePaid.value = total - debt.owing;
+  }
   updateSaleCalc();
 }
 
-function addSale(){
+// ====== CUSTOMER AUTOCOMPLETE ======
+function updateCustomerList() {
+  const datalist = document.getElementById('customerList');
+  datalist.innerHTML = '';
+
+  // Combine all customers from sales and dailyData to persist suggestions
+  const historicalCustomers = dailyData.flatMap(d => d.sales.map(s => s.customer));
+  const currentCustomers = salesData.map(s => s.customer);
+  const allCustomers = [...new Set([...historicalCustomers, ...currentCustomers])];
+
+  allCustomers.forEach(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    datalist.appendChild(option);
+  });
+}
+
+// ====== ADD SALE ======
+function addSale() {
   const customer = document.getElementById('saleCustomer').value || 'Unknown';
   const qty = parseFloat(saleQty.value) || 0;
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
   const prevDebt = parseFloat(document.getElementById('salePrevDebt').value) || 0;
+
+  const unit = qty ? (total / qty).toFixed(2) : 0;
+  const owing = (total - paid + prevDebt).toFixed(2);
+
+  // Add sale record
+  salesData.push({
+    customer,
+    qty,
+    total,
+    unit: parseFloat(unit),
+    paid,
+    owing: parseFloat(owing),
+    date: new Date().toLocaleDateString()
+  });
+
+  // Update debt data
+  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
+  if (debtIndex >= 0) {
+    debtData[debtIndex].owing += parseFloat(owing);
+    debtData[debtIndex].totalPaid += paid;
+  } else {
+    debtData.push({ customer, owing: parseFloat(owing), totalPaid: paid });
+  }
+
+  // Re-render tables
+  renderSalesTable();
+  renderDebtors();
+
+  // Reset input fields
+  document.getElementById('saleCustomer').value = '';
+  saleQty.value = 10;
+  saleTotal.value = 2500;
+  salePaid.value = 2000;
+  document.getElementById('salePrevDebt').value = 0;
+  updateSaleCalc();
+
+  // Update customer list
+  updateCustomerList();
+
+  // Save to localStorage
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+}
+
+// ====== EDIT SALE ======
+function editSale(index) {
+  const s = salesData[index];
+
+  const newCustomer = prompt("Edit Customer Name:", s.customer);
+  if (newCustomer === null) return;
+
+  const newQty = parseFloat(prompt("Edit Quantity:", s.qty));
+  if (isNaN(newQty)) return;
+
+  const newTotal = parseFloat(prompt("Edit Total Amount:", s.total));
+  if (isNaN(newTotal)) return;
+
+  const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
+  if (isNaN(newPaid)) return;
+
+  const newUnit = newQty ? (newTotal / newQty).toFixed(2) : 0;
+  const newOwing = (newTotal - newPaid).toFixed(2);
+
+  s.customer = newCustomer;
+  s.qty = newQty;
+  s.total = newTotal;
+  s.paid = newPaid;
+  s.unit = parseFloat(newUnit);
+  s.owing = parseFloat(newOwing);
+
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+
+  renderSalesTable();
+  renderDebtors();
+
+  // Update customer list after edit
+  updateCustomerList();
+}
+
+// Initialize customer list on page load
+updateCustomerList();
+
 
   // Calculate unit price and total owing including previous debt
   const unit = qty ? (total / qty).toFixed(2) : 0;
@@ -871,5 +985,6 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
