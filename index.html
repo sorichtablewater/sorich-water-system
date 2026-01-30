@@ -73,32 +73,69 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
-<h2>Sales</h2>
-<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
-<label>Qty: <input type="number" id="saleQty" value="10"></label>
-<label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-<label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
-<p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
-<button onclick="addSale()">Add Sale</button>
-<button onclick="printInvoice()">Print Invoice</button>
-<button onclick="backToDashboard()">Back to Dashboard</button>
+  <h2>Sales</h2>
 
-<h4>Live Summary:</h4>
-<p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
+  <label>
+    Customer:
+    <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()">
+  </label>
 
-<table id="salesTable">
-  <tr>
-    <th>Customer</th>
-    <th>Qty</th>
-    <th>Total</th>
-    <th>Unit Price</th>
-    <th>Paid</th>
-    <th>Owing</th>
-    <th>Edit</th>
-    <th>🖨</th>
-  </tr>
-</table>
+  <!-- ✅ PREVIOUS DEBT SECTION -->
+  <label>
+    Previous Debt (₦):
+    <input type="number" id="previousDebt" placeholder="Old debt before system">
+  </label>
+  <button onclick="savePreviousDebt()">Save Previous Debt</button>
+
+  <br><br>
+
+  <label>
+    Qty:
+    <input type="number" id="saleQty" value="10">
+  </label>
+
+  <label>
+    Total Amount:
+    <input type="number" id="saleTotal" value="2500">
+  </label>
+
+  <label>
+    Amount Paid:
+    <input type="number" id="salePaid" value="2000">
+  </label>
+
+  <p>
+    Unit Price: ₦<span id="saleUnitPrice">0</span> |
+    Owing: ₦<span id="saleOwing">0</span>
+  </p>
+
+  <button onclick="addSale()">Add Sale</button>
+  <button onclick="printInvoice()">Print Invoice</button>
+  <button onclick="backToDashboard()">Back to Dashboard</button>
+
+  <h4>Live Summary:</h4>
+  <p>
+    Total Qty: <span id="sumQty">0</span> |
+    Total Amount: ₦<span id="sumTotal">0</span> |
+    Total Paid: ₦<span id="sumPaid">0</span> |
+    Total Owing: ₦<span id="sumOwing">0</span> |
+    Avg Unit Price: ₦<span id="avgPrice">0</span>
+  </p>
+
+  <table id="salesTable">
+    <tr>
+      <th>Customer</th>
+      <th>Qty</th>
+      <th>Total</th>
+      <th>Unit Price</th>
+      <th>Paid</th>
+      <th>Owing</th>
+      <th>Edit</th>
+      <th>🖨</th>
+    </tr>
+  </table>
 </div>
+
 
 <!-- DEBTORS PAGE -->
 <div id="debtorsPage" class="section" style="display:none; position: relative;">
@@ -285,8 +322,8 @@ function addSale(){
 }
 
 function renderSalesTable(){
-  const table=document.getElementById('salesTable');
-  table.innerHTML=`
+  const table = document.getElementById('salesTable');
+  table.innerHTML = `
     <tr>
       <th>Customer</th>
       <th>Qty</th>
@@ -299,16 +336,65 @@ function renderSalesTable(){
     </tr>
   `;
 
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0,unitSum=0;
+  let sumQty = 0;
+  let sumTotal = 0;
+  let sumPaid = 0;
+  let salesOwing = 0;
+  let unitSum = 0;
 
-  salesData.forEach((s,index)=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=s.customer;
-    row.insertCell(1).innerText=s.qty;
-    row.insertCell(2).innerText=s.total;
-    row.insertCell(3).innerText=s.unit;
-    row.insertCell(4).innerText=s.paid;
-    row.insertCell(5).innerText=s.owing;
+  // ===== SALES ROWS =====
+  salesData.forEach((s, index) => {
+    const row = table.insertRow();
+
+    row.insertCell(0).innerText = s.customer;
+    row.insertCell(1).innerText = s.qty;
+    row.insertCell(2).innerText = s.total;
+    row.insertCell(3).innerText = s.unit;
+    row.insertCell(4).innerText = s.paid;
+    row.insertCell(5).innerText = s.owing;
+
+    // ✏️ Edit
+    const editBtn = document.createElement('button');
+    editBtn.innerText = 'Edit';
+    editBtn.onclick = () => editSale(index);
+    row.insertCell(6).appendChild(editBtn);
+
+    // 🖨 Print
+    const printBtn = document.createElement('button');
+    printBtn.innerText = 'Print';
+    printBtn.onclick = () => printInvoice(s);
+    row.insertCell(7).appendChild(printBtn);
+
+    sumQty += Number(s.qty);
+    sumTotal += Number(s.total);
+    sumPaid += Number(s.paid);
+    salesOwing += Number(s.owing);
+    unitSum += Number(s.unit);
+  });
+
+  // ===== OPENING / PREVIOUS DEBT =====
+  const openingDebt = debtData.reduce((acc, d) => acc + Number(d.owing || 0), 0);
+
+  // ===== FINAL TOTALS =====
+  const totalOwing = salesOwing + openingDebt;
+  const avgUnit = salesData.length ? (unitSum / salesData.length).toFixed(2) : 0;
+
+  // ===== UPDATE UI =====
+  document.getElementById('sumQty').innerText = sumQty;
+  document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
+  document.getElementById('sumPaid').innerText = sumPaid.toFixed(2);
+  document.getElementById('sumOwing').innerText = totalOwing.toFixed(2);
+  document.getElementById('avgPrice').innerText = avgUnit;
+
+  // Dashboard stats
+  document.getElementById('totalSales').innerText = sumTotal.toFixed(2);
+  document.getElementById('totalPaid').innerText = sumPaid.toFixed(2);
+  document.getElementById('debts').innerText = openingDebt.toFixed(2);
+  document.getElementById('avgUnitPrice').innerText = avgUnit;
+
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+}
+
 
     // ✏️ EDIT BUTTON
     const editBtn=document.createElement('button');
@@ -833,3 +919,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
