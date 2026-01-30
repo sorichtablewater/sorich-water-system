@@ -73,40 +73,32 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
-  <h2>Sales</h2>
-  <label>
-    Customer: 
-    <input list="customerList" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()">
-    <datalist id="customerList"></datalist>
-  </label>
-  <label>Qty: <input type="number" id="saleQty" value="10"></label>
-  <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-  <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
-  <!-- ✅ Previous Debt Input -->
-  <label>Previous Debt: <input type="number" id="salePrevDebt" value="0"></label>
-  <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
-  <button onclick="addSale()">Add Sale</button>
-  <button onclick="printInvoice()">Print Invoice</button>
-  <button onclick="backToDashboard()">Back to Dashboard</button>
+<h2>Sales</h2>
+<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+<label>Qty: <input type="number" id="saleQty" value="10"></label>
+<label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
+<label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
+<p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
+<button onclick="addSale()">Add Sale</button>
+<button onclick="printInvoice()">Print Invoice</button>
+<button onclick="backToDashboard()">Back to Dashboard</button>
 
-  <h4>Live Summary:</h4>
-  <p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
+<h4>Live Summary:</h4>
+<p>Total Qty: <span id="sumQty">0</span> | Total Amount: ₦<span id="sumTotal">0</span> | Total Paid: ₦<span id="sumPaid">0</span> | Total Owing: ₦<span id="sumOwing">0</span> | Avg Unit Price: ₦<span id="avgPrice">0</span></p>
 
-  <table id="salesTable">
-    <tr>
-      <th>Customer</th>
-      <th>Qty</th>
-      <th>Total</th>
-      <th>Unit Price</th>
-      <th>Paid</th>
-      <th>Owing</th>
-      <th>Edit</th>
-      <th>🖨</th>
-    </tr>
-  </table>
+<table id="salesTable">
+  <tr>
+    <th>Customer</th>
+    <th>Qty</th>
+    <th>Total</th>
+    <th>Unit Price</th>
+    <th>Paid</th>
+    <th>Owing</th>
+    <th>Edit</th>
+    <th>🖨</th>
+  </tr>
+</table>
 </div>
-
-
 
 <!-- DEBTORS PAGE -->
 <div id="debtorsPage" class="section" style="display:none; position: relative;">
@@ -241,161 +233,59 @@ let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
 setInterval(updateTime,1000); updateTime();
-// ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
-  username: 'admin',
-  password: 'admin'
-};
 
 // ====== LOGIN ======
 function login(){ 
-  const u = document.getElementById('username').value; 
-  const p = document.getElementById('password').value;
-  if(u === loginCredentials.username && p === loginCredentials.password){ 
-    showSection('enterDashboardPage'); 
-  } 
+  const u=document.getElementById('username').value; 
+  const p=document.getElementById('password').value;
+  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
   else alert('Invalid credentials');
 }
-
 function logout(){ location.reload(); }
-
 function showSection(id){
   ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','settingsPage']
-  .forEach(s => document.getElementById(s).style.display='none');
+  .forEach(s=>document.getElementById(s).style.display='none');
   document.getElementById(id).style.display='block';
   if(id==='chartsPage') renderChart();
   if(id==='debtorsPage') renderDebtors();
 }
-
 function backToDashboard(){ showSection('dashboardPage'); }
 function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
 function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
 function settingsPage(){ showSection('settingsPage'); }
 
 // ====== SALES ======
-const saleQty = document.getElementById('saleQty'),
-      saleTotal = document.getElementById('saleTotal'),
-      salePaid = document.getElementById('salePaid');
-
-function updateSaleCalc() {
-  const q = parseFloat(saleQty.value) || 0,
-        t = parseFloat(saleTotal.value) || 0,
-        p = parseFloat(salePaid.value) || 0;
-  document.getElementById('saleUnitPrice').innerText = q ? (t / q).toFixed(2) : 0;
-  document.getElementById('saleOwing').innerText = (t - p).toFixed(2);
+const saleQty=document.getElementById('saleQty'), saleTotal=document.getElementById('saleTotal'), salePaid=document.getElementById('salePaid');
+function updateSaleCalc(){
+  const q=parseFloat(saleQty.value)||0, t=parseFloat(saleTotal.value)||0, p=parseFloat(salePaid.value)||0;
+  document.getElementById('saleUnitPrice').innerText=q?(t/q).toFixed(2):0;
+  document.getElementById('saleOwing').innerText=(t-p).toFixed(2);
 }
+[saleQty,saleTotal,salePaid].forEach(e=>e.addEventListener('input',updateSaleCalc)); updateSaleCalc();
 
-[saleQty, saleTotal, salePaid].forEach(e => e.addEventListener('input', updateSaleCalc));
-updateSaleCalc();
-
-function prefillOwing() {
-  const name = document.getElementById('saleCustomer').value;
-  const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
-  if (debt) {
-    const total = parseFloat(saleTotal.value) || 0;
-    salePaid.value = total - debt.owing;
-  }
+function prefillOwing(){
+  const name=document.getElementById('saleCustomer').value;
+  const debt=debtData.find(d=>d.customer.toLowerCase()===name.toLowerCase());
+  if(debt) { const total=parseFloat(saleTotal.value)||0; salePaid.value = total - debt.owing; }
   updateSaleCalc();
 }
 
-// ====== CUSTOMER AUTOCOMPLETE ======
-function updateCustomerList() {
-  const datalist = document.getElementById('customerList');
-  datalist.innerHTML = '';
-
-  const historicalCustomers = dailyData.flatMap(d => d.sales.map(s => s.customer));
-  const currentCustomers = salesData.map(s => s.customer);
-  const allCustomers = [...new Set([...historicalCustomers, ...currentCustomers])];
-
-  allCustomers.forEach(name => {
-    const option = document.createElement('option');
-    option.value = name;
-    datalist.appendChild(option);
-  });
-}
-
-// ====== ADD SALE ======
-function addSale() {
-  const customer = document.getElementById('saleCustomer').value || 'Unknown';
-  const qty = parseFloat(saleQty.value) || 0;
-  const total = parseFloat(saleTotal.value) || 0;
-  const paid = parseFloat(salePaid.value) || 0;
-  const prevDebt = parseFloat(document.getElementById('salePrevDebt').value) || 0;
-
-  const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2);
-
-  salesData.push({
-    customer,
-    qty,
-    total,
-    unit: parseFloat(unit),
-    paid,
-    owing: parseFloat(owing),
-    date: new Date().toLocaleDateString()
-  });
-
-  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
-  if(debtIndex >= 0){
-    debtData[debtIndex].owing += parseFloat(owing);
-    debtData[debtIndex].totalPaid += paid;
-  } else {
-    debtData.push({ customer, owing: parseFloat(owing), totalPaid: paid });
-  }
-
-  renderSalesTable();
-  renderDebtors();
-
-  document.getElementById('saleCustomer').value = '';
-  saleQty.value = 10;
-  saleTotal.value = 2500;
-  salePaid.value = 2000;
-  document.getElementById('salePrevDebt').value = 0;
-  updateSaleCalc();
-  updateCustomerList();
-
+function addSale(){
+  const customer=document.getElementById('saleCustomer').value||'Unknown';
+  const qty=parseFloat(saleQty.value)||0, total=parseFloat(saleTotal.value)||0, paid=parseFloat(salePaid.value)||0;
+  const unit=qty?(total/qty).toFixed(2):0, owing=(total-paid).toFixed(2);
+  salesData.push({customer, qty, total, unit:parseFloat(unit), paid, owing:parseFloat(owing), date: new Date().toLocaleDateString()});
+  const debtIndex = debtData.findIndex(d=>d.customer.toLowerCase()===customer.toLowerCase());
+  if(debtIndex>=0){ debtData[debtIndex].owing += parseFloat(owing); debtData[debtIndex].totalPaid += paid; } 
+  else { debtData.push({customer, owing:parseFloat(owing), totalPaid:paid}); }
+  renderSalesTable(); renderDebtors();
+  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2000; updateSaleCalc();
   localStorage.setItem('salesData', JSON.stringify(salesData));
   localStorage.setItem('debtData', JSON.stringify(debtData));
 }
 
-// ====== EDIT SALE ======
-function editSale(index){
-  const s = salesData[index];
-  const newCustomer = prompt("Edit Customer Name:", s.customer);
-  if(newCustomer === null) return;
-
-  const newQty = parseFloat(prompt("Edit Quantity:", s.qty));
-  if(isNaN(newQty)) return;
-
-  const newTotal = parseFloat(prompt("Edit Total Amount:", s.total));
-  if(isNaN(newTotal)) return;
-
-  const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
-  if(isNaN(newPaid)) return;
-
-  const newUnit = newQty ? (newTotal/newQty).toFixed(2) : 0;
-  const newOwing = (newTotal - newPaid).toFixed(2);
-
-  s.customer = newCustomer;
-  s.qty = newQty;
-  s.total = newTotal;
-  s.paid = newPaid;
-  s.unit = parseFloat(newUnit);
-  s.owing = parseFloat(newOwing);
-
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-
-  renderSalesTable();
-  renderDebtors();
-  updateCustomerList();
-}
-
-// Initialize customer list on page load
-updateCustomerList();
-
-// ====== SALES TABLE ======
 function renderSalesTable(){
-  const table = document.getElementById('salesTable');
+  const table=document.getElementById('salesTable');
   table.innerHTML=`
     <tr>
       <th>Customer</th>
@@ -420,12 +310,14 @@ function renderSalesTable(){
     row.insertCell(4).innerText=s.paid;
     row.insertCell(5).innerText=s.owing;
 
-    const editBtn = document.createElement('button');
+    // ✏️ EDIT BUTTON
+    const editBtn=document.createElement('button');
     editBtn.innerText='Edit';
     editBtn.onclick=()=>editSale(index);
     row.insertCell(6).appendChild(editBtn);
 
-    const printBtn = document.createElement('button');
+    // 🖨 PRINT BUTTON
+    const printBtn=document.createElement('button');
     printBtn.innerText='Print';
     printBtn.onclick=()=>printInvoice(s);
     row.insertCell(7).appendChild(printBtn);
@@ -496,20 +388,34 @@ function renderDebtors() {
   });
 }
 
-document.getElementById('debtorSearch').addEventListener('input', renderDebtors);
-
-// ====== PAY & CLEAR DEBT ======
+// ====== PAY DEBT (FIXED) ======
 function payDebt(index) {
   const d = debtData[index];
-  let remainingPayment = parseFloat(prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2)));
-  if (isNaN(remainingPayment) || remainingPayment <= 0) { alert('Invalid payment amount'); return; }
-  if (remainingPayment > d.owing) { alert(`Customer only owes ₦${d.owing.toFixed(2)}`); return; }
+
+  let remainingPayment = parseFloat(
+    prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))
+  );
+
+  if (isNaN(remainingPayment) || remainingPayment <= 0) {
+    alert('Invalid payment amount');
+    return;
+  }
+
+  if (remainingPayment > d.owing) {
+    alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
+    return;
+  }
 
   d.owing -= remainingPayment;
   d.totalPaid += remainingPayment;
 
+  // Update corresponding sales entries
   salesData.forEach(sale => {
-    if (remainingPayment > 0 && sale.customer.toLowerCase() === d.customer.toLowerCase() && sale.owing > 0) {
+    if (
+      remainingPayment > 0 &&
+      sale.customer.toLowerCase() === d.customer.toLowerCase() &&
+      sale.owing > 0
+    ) {
       const deduction = Math.min(sale.owing, remainingPayment);
       sale.paid += deduction;
       sale.owing -= deduction;
@@ -522,14 +428,6 @@ function payDebt(index) {
   localStorage.setItem('debtData', JSON.stringify(debtData));
   localStorage.setItem('salesData', JSON.stringify(salesData));
 
-  renderDebtors();
-  renderSalesTable();
-}
-
-function clearDebtor(index) {
-  if (!confirm('Remove this cleared debtor from the list?')) return;
-  debtData.splice(index, 1);
-  localStorage.setItem('debtData', JSON.stringify(debtData));
   renderDebtors();
   renderSalesTable();
 }
@@ -567,8 +465,8 @@ function printInvoice(sale){
   const win=window.open('','PRINT','width=600,height=800');
   for(let i=0;i<copies;i++){
     const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
-    win.document.write(<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>);
-    win.document.write(<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>);
+    win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
+    win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
   }
   win.document.close(); win.focus(); win.print(); win.close();
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
@@ -761,8 +659,8 @@ function renderDailyRecordInvoice(d) {
             `);
         });
 
-        win.document.write(</table>);
-        win.document.write(<p><strong>Total Quantity Sold: ${totalQty}</strong></p>);
+        win.document.write(`</table>`);
+        win.document.write(`<p><strong>Total Quantity Sold: ${totalQty}</strong></p>`);
 
         win.document.write(`
             <h4>EXPENSES</h4>
@@ -781,7 +679,7 @@ function renderDailyRecordInvoice(d) {
             `);
         });
 
-        win.document.write(</table>);
+        win.document.write(`</table>`);
         win.document.write(`
             <p>Total Sales: ₦${d.totalSales.toFixed(2)}</p>
             <p>Total Expenses: ₦${d.totalExpenses.toFixed(2)}</p>
@@ -879,7 +777,7 @@ function renderChart() {
   sorted.forEach(([name, qty], index) => {
     const barLength = Math.round((qty / maxQty) * maxBarLength);
     const bar = '█'.repeat(barLength); // full block character
-    output += ${index + 1}. ${name.padEnd(15)} | ${bar} ${qty}\n;
+    output += `${index + 1}. ${name.padEnd(15)} | ${bar} ${qty}\n`;
   });
 
   chartEl.textContent = output;
@@ -919,6 +817,12 @@ function editSale(index){
   renderDebtors();
 }
 
+// ====== INITIAL LOGIN CREDENTIALS ======
+let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
+  username: 'admin',
+  password: 'admin'
+};
+
 
 // ====== INIT ======
 renderSalesTable();
@@ -929,4 +833,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
