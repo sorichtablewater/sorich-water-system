@@ -74,11 +74,18 @@ body.dark-mode th {background-color:#003366;}
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
 <h2>Sales</h2>
-<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+
+<!-- Added datalist for customer suggestions -->
+<label>Customer: 
+  <input type="text" id="saleCustomer" placeholder="New or select customer" list="customerList" oninput="prefillOwing()">
+</label>
+<datalist id="customerList"></datalist>
+
 <label>Qty: <input type="number" id="saleQty" value="10"></label>
 <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
 <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
 <label>Previous Debt: <input type="number" id="salePrevDebt" value="0"></label> <!-- NEW FIELD -->
+
 <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
 <button onclick="addSale()">Add Sale</button>
 <button onclick="printInvoice()">Print Invoice</button>
@@ -100,6 +107,7 @@ body.dark-mode th {background-color:#003366;}
   </tr>
 </table>
 </div>
+
 
 
 <!-- DEBTORS PAGE -->
@@ -287,12 +295,62 @@ function prefillOwing(){
   updateSaleCalc();
 }
 
-function addSale(){
+function addSale() {
   const customer = document.getElementById('saleCustomer').value || 'Unknown';
   const qty = parseFloat(saleQty.value) || 0;
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
   const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
+
+  // Calculate unit price and owing
+  const unit = qty ? (total / qty).toFixed(2) : 0;
+  const owing = (total - paid + prevDebt).toFixed(2);
+
+  // Add sale to salesData
+  salesData.push({
+    customer,
+    qty,
+    total,
+    unit: parseFloat(unit),
+    paid,
+    owing: parseFloat(owing),
+    prevDebt: prevDebt,
+    date: new Date().toLocaleDateString()
+  });
+
+  // Update or add debtor info
+  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
+  if (debtIndex >= 0) {
+    debtData[debtIndex].owing += parseFloat(owing);
+    debtData[debtIndex].totalPaid += paid;
+  } else {
+    debtData.push({
+      customer,
+      owing: parseFloat(owing),
+      totalPaid: paid
+    });
+  }
+
+  // Re-render tables
+  renderSalesTable();
+  renderDebtors();
+
+  // Reset form fields
+  document.getElementById('saleCustomer').value = '';
+  saleQty.value = 10;
+  saleTotal.value = 2500;
+  salePaid.value = 2000;
+  salePrevDebt.value = 0;
+  updateSaleCalc();
+
+  // Save to localStorage
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+
+  // ====== Update customer suggestions in datalist ======
+  updateCustomerSuggestions();
+}
+
 
   // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
@@ -336,9 +394,23 @@ function addSale(){
   updateSaleCalc();
 
   // Save to localStorage
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
+localStorage.setItem('salesData', JSON.stringify(salesData));
+localStorage.setItem('debtData', JSON.stringify(debtData));
+
+// ====== Update Customer Suggestions for Datalist ======
+function updateCustomerSuggestions() {
+  const list = document.getElementById('customerList');
+  const customers = [...new Set(salesData.map(s => s.customer))];
+  list.innerHTML = '';
+  customers.forEach(c => {
+    const option = document.createElement('option');
+    option.value = c;
+    list.appendChild(option);
+  });
 }
+
+// Refresh suggestions
+updateCustomerSuggestions();
 
 
 function renderSalesTable(){
@@ -367,11 +439,43 @@ function renderSalesTable(){
     row.insertCell(4).innerText=s.paid;
     row.insertCell(5).innerText=s.owing;
 
-    // ✏️ EDIT BUTTON
-    const editBtn=document.createElement('button');
-    editBtn.innerText='Edit';
-    editBtn.onclick=()=>editSale(index);
-    row.insertCell(6).appendChild(editBtn);
+   function editSale(index) {
+  const s = salesData[index];
+
+  const newCustomer = prompt("Edit Customer Name:", s.customer);
+  if (newCustomer === null) return;
+
+  const newQty = parseFloat(prompt("Edit Quantity:", s.qty));
+  if (isNaN(newQty)) return;
+
+  const newTotal = parseFloat(prompt("Edit Total Amount:", s.total));
+  if (isNaN(newTotal)) return;
+
+  const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
+  if (isNaN(newPaid)) return;
+
+  const newUnit = newQty ? (newTotal / newQty).toFixed(2) : 0;
+  const newOwing = (newTotal - newPaid).toFixed(2);
+
+  // Update sale record
+  s.customer = newCustomer;
+  s.qty = newQty;
+  s.total = newTotal;
+  s.paid = newPaid;
+  s.unit = parseFloat(newUnit);
+  s.owing = parseFloat(newOwing);
+
+  // Save changes to localStorage
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+
+  // ✅ Update datalist suggestions after editing
+  updateCustomerSuggestions();
+
+  // Re-render tables
+  renderSalesTable();
+  renderDebtors();
+}
+
 
     // 🖨 PRINT BUTTON
     const printBtn=document.createElement('button');
@@ -890,3 +994,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
