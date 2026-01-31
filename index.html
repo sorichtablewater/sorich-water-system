@@ -757,21 +757,20 @@ function endOfDay() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Filter only today's expenses
+    // 1️⃣ Filter only today's expenses for daily record
     const todaysExpenses = expenseData.filter(e => {
-        // Convert expense date to YYYY-MM-DD format
         const expDate = new Date(e.date).toISOString().split('T')[0];
         return expDate === todayStr;
     });
 
-    // Calculate totals only for today
+    // 2️⃣ Calculate totals for today's sales and expenses
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
     const totalExpenses = todaysExpenses.reduce((acc, e) => acc + Number(e.amount), 0);
     const avgUnitPrice = salesData.length 
         ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
 
-    // Archive daily data
+    // 3️⃣ Archive today's data into dailyData
     dailyData.push({
         date: todayStr,
         totalSales,
@@ -796,17 +795,18 @@ function endOfDay() {
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Clear only today's sales for a new day
+    // 4️⃣ Clear only today's sales for new day
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // Leave all expenses and debts intact
-    renderSalesTable();
-    renderExpenses();
+    // 5️⃣ Do NOT clear expenses or debts; overall totals remain
+    renderSalesTable();   // Sales reset
+    renderExpenses();    // Expenses unchanged, totals remain
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales and expenses archived. Expenses and debtors remain unchanged.");
+    alert("End of day completed! Today's sales archived. Expenses and debtors remain intact.");
 }
+
 // ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
@@ -896,4 +896,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
