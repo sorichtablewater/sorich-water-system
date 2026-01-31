@@ -757,10 +757,32 @@ function endOfDay() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
-    const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
-    const avgUnitPrice = salesData.length 
-        ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
+    // Filter today's sales
+    const todaySales = salesData.map(s => ({
+        customer: s.customer,
+        qty: Number(s.qty),
+        total: Number(s.total),
+        unit: Number(s.unit),
+        paid: Number(s.paid),
+        owing: Number(s.owing)
+    }));
+
+    // Filter today's expenses
+    const todayExpenses = expenseData.filter(e => {
+        const expenseDate = new Date(e.date).toISOString().split('T')[0];
+        return expenseDate === todayStr;
+    }).map(e => ({
+        type: e.type,
+        desc: e.desc,
+        amount: Number(e.amount),
+        paidTo: e.paidTo
+    }));
+
+    // Calculate totals and averages
+    const totalSales = todaySales.reduce((acc, s) => acc + s.total, 0);
+    const totalExpenses = todayExpenses.reduce((acc, e) => acc + e.amount, 0);
+    const avgUnitPrice = todaySales.length 
+        ? todaySales.reduce((acc, s) => acc + s.unit, 0) / todaySales.length 
         : 0;
 
     // Archive daily data
@@ -770,20 +792,8 @@ function endOfDay() {
         totalExpenses,
         net: totalSales - totalExpenses,
         avgUnitPrice,
-        sales: salesData.map(s => ({
-            customer: s.customer,
-            qty: Number(s.qty),
-            total: Number(s.total),
-            unit: Number(s.unit),
-            paid: Number(s.paid),
-            owing: Number(s.owing)
-        })),
-        expenses: expenseData.map(e => ({
-            type: e.type,
-            desc: e.desc,
-            amount: Number(e.amount),
-            paidTo: e.paidTo
-        }))
+        sales: todaySales,
+        expenses: todayExpenses
     });
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
@@ -792,16 +802,18 @@ function endOfDay() {
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // Leave expenseData and debtData intact
-    // expenseData and debtData remain unchanged
+    // Optionally, remove today's expenses from expenseData if you want a fresh start each day
+    // expenseData = expenseData.filter(e => new Date(e.date).toISOString().split('T')[0] !== todayStr);
+    // localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
-    // Reset dashboard
+    // Refresh dashboard
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
-}// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
+    alert("End of day completed! Today's sales and expenses archived. Debtors remain unchanged.");
+}
+// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
   if (!chartEl) return;
@@ -890,3 +902,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
