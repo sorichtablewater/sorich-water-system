@@ -226,11 +226,14 @@ body.dark-mode th {background-color:#003366;}
 </div>
 <script>
 // ====== Offline JS Logic ======
-let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
-let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
-let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
-let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
-let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
+let salesData = JSON.parse(localStorage.getItem('salesData')) || [];
+let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
+let expenseData = JSON.parse(localStorage.getItem('expenseData')) || [];
+let dailyData = JSON.parse(localStorage.getItem('dailyData')) || [];
+let invoiceNumber = parseInt(localStorage.getItem('invoiceNumber')) || 1;
+
+// Step 1: cumulative all-time expenses
+let cumulativeExpenses = parseFloat(localStorage.getItem('cumulativeExpenses')) || 0;
 
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
@@ -539,27 +542,42 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}
-function renderExpenses(){
-  const table=document.getElementById('expensesTable');
-  table.innerHTML='<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
-  let totalExpense=0;
-  expenseData.forEach(e=>{
-    const row=table.insertRow();
-    row.insertCell(0).innerText=e.type;
-    row.insertCell(1).innerText=e.desc;
-    row.insertCell(2).innerText=e.amount;
-    row.insertCell(3).innerText=e.paidTo;
-    row.insertCell(4).innerText=e.date;
-    totalExpense+=e.amount;
+}function renderExpenses() {
+  const table = document.getElementById('expensesTable');
+  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+
+  let totalExpense = 0;
+
+  // Render daily expenses
+  expenseData.forEach(e => {
+    const row = table.insertRow();
+    row.insertCell(0).innerText = e.type;
+    row.insertCell(1).innerText = e.desc;
+    row.insertCell(2).innerText = e.amount;
+    row.insertCell(3).innerText = e.paidTo;
+    row.insertCell(4).innerText = e.date;
+
+    totalExpense += e.amount;
   });
-  document.getElementById('expenses').innerText=totalExpense;
-  const totalSales = salesData.reduce((acc,s)=>acc+s.total,0);
-  document.getElementById('expenseTotalSales').innerText=totalSales;
-  document.getElementById('expenseTotal').innerText=totalExpense;
-  document.getElementById('expenseProfit').innerText=(totalSales-totalExpense).toFixed(2);
+
+  // Dashboard: show cumulative all-time expenses
+  document.getElementById('expenses').innerText = (cumulativeExpenses + totalExpense).toFixed(2);
+
+  // Total sales for profit calculation
+  const totalSales = salesData.reduce((acc, s) => acc + s.total, 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales;
+  document.getElementById('expenseTotal').innerText = totalExpense;
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
 }
-function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData=[]; localStorage.setItem('expenseData','[]'); renderExpenses(); }}
+
+function clearMonthlyExpenses() {
+  if (confirm('Clear all expenses?')) {
+    expenseData = [];
+    localStorage.setItem('expenseData', '[]');
+    renderExpenses();
+  }
+}
+
 
 // ====== DAILY RECORDS ======
 function renderDailyRecords() {
@@ -750,7 +768,6 @@ function renderDailyRecordInvoice(d) {
     win.focus();
     win.print();
     win.close();
-}
 function endOfDay() {
     if (!confirm("Close the day? Today's sales will be archived.")) return;
 
@@ -788,19 +805,28 @@ function endOfDay() {
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Clear only sales for a new day
+    // Update cumulative all-time expenses
+    cumulativeExpenses += totalExpenses;
+    localStorage.setItem('cumulativeExpenses', cumulativeExpenses);
+
+    // Clear daily sales and expenses for new day
     salesData = [];
+    expenseData = [];
+
     localStorage.setItem('salesData', JSON.stringify(salesData));
+    localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
-    // Leave expenseData and debtData intact
-    // expenseData and debtData remain unchanged
-
-    // Reset dashboard
+    // Refresh dashboard
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
+    alert("End of day completed! Today's sales archived. Daily expenses reset, cumulative expenses updated.");
+}
+
+
+
+
 }// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
@@ -890,3 +916,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
