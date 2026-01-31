@@ -226,14 +226,11 @@ body.dark-mode th {background-color:#003366;}
 </div>
 <script>
 // ====== Offline JS Logic ======
-let salesData = JSON.parse(localStorage.getItem('salesData')) || [];
-let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
-let expenseData = JSON.parse(localStorage.getItem('expenseData')) || [];
-let dailyData = JSON.parse(localStorage.getItem('dailyData')) || [];
-let invoiceNumber = parseInt(localStorage.getItem('invoiceNumber')) || 1;
-
-// Step 1: cumulative all-time expenses
-let cumulativeExpenses = parseFloat(localStorage.getItem('cumulativeExpenses')) || 0;
+let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
+let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
+let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
+let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
+let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
 
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
@@ -542,42 +539,27 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}function renderExpenses() {
-  const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
-
-  let totalExpense = 0;
-
-  // Render daily expenses
-  expenseData.forEach(e => {
-    const row = table.insertRow();
-    row.insertCell(0).innerText = e.type;
-    row.insertCell(1).innerText = e.desc;
-    row.insertCell(2).innerText = e.amount;
-    row.insertCell(3).innerText = e.paidTo;
-    row.insertCell(4).innerText = e.date;
-
-    totalExpense += e.amount;
+}
+function renderExpenses(){
+  const table=document.getElementById('expensesTable');
+  table.innerHTML='<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+  let totalExpense=0;
+  expenseData.forEach(e=>{
+    const row=table.insertRow();
+    row.insertCell(0).innerText=e.type;
+    row.insertCell(1).innerText=e.desc;
+    row.insertCell(2).innerText=e.amount;
+    row.insertCell(3).innerText=e.paidTo;
+    row.insertCell(4).innerText=e.date;
+    totalExpense+=e.amount;
   });
-
-  // Dashboard: show cumulative all-time expenses
-  document.getElementById('expenses').innerText = (cumulativeExpenses + totalExpense).toFixed(2);
-
-  // Total sales for profit calculation
-  const totalSales = salesData.reduce((acc, s) => acc + s.total, 0);
-  document.getElementById('expenseTotalSales').innerText = totalSales;
-  document.getElementById('expenseTotal').innerText = totalExpense;
-  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+  document.getElementById('expenses').innerText=totalExpense;
+  const totalSales = salesData.reduce((acc,s)=>acc+s.total,0);
+  document.getElementById('expenseTotalSales').innerText=totalSales;
+  document.getElementById('expenseTotal').innerText=totalExpense;
+  document.getElementById('expenseProfit').innerText=(totalSales-totalExpense).toFixed(2);
 }
-
-function clearMonthlyExpenses() {
-  if (confirm('Clear all expenses?')) {
-    expenseData = [];
-    localStorage.setItem('expenseData', '[]');
-    renderExpenses();
-  }
-}
-
+function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData=[]; localStorage.setItem('expenseData','[]'); renderExpenses(); }}
 
 // ====== DAILY RECORDS ======
 function renderDailyRecords() {
@@ -768,58 +750,57 @@ function renderDailyRecordInvoice(d) {
     win.focus();
     win.print();
     win.close();
-} // <-- properly close renderDailyRecordInvoice
-
-
-// ====== END OF DAY FUNCTION ======
+}
 function endOfDay() {
     if (!confirm("Close the day? Today's sales will be archived.")) return;
 
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Calculate totals
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
     const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
     const avgUnitPrice = salesData.length 
         ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
 
-    // Archive today's data
+    // Archive daily data
     dailyData.push({
         date: todayStr,
         totalSales,
         totalExpenses,
         net: totalSales - totalExpenses,
         avgUnitPrice,
-        sales: [...salesData],    // copy sales
-        expenses: [...expenseData] // copy expenses
+        sales: salesData.map(s => ({
+            customer: s.customer,
+            qty: Number(s.qty),
+            total: Number(s.total),
+            unit: Number(s.unit),
+            paid: Number(s.paid),
+            owing: Number(s.owing)
+        })),
+        expenses: expenseData.map(e => ({
+            type: e.type,
+            desc: e.desc,
+            amount: Number(e.amount),
+            paidTo: e.paidTo
+        }))
     });
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Update cumulative expenses
-    cumulativeExpenses += totalExpenses;
-    localStorage.setItem('cumulativeExpenses', cumulativeExpenses);
-
-    // Clear daily sales and expenses
+    // Clear only sales for a new day
     salesData = [];
-    expenseData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
-    // Refresh dashboard
+    // Leave expenseData and debtData intact
+    // expenseData and debtData remain unchanged
+
+    // Reset dashboard
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Daily sales and expenses reset.");
-}
-
-
-
-
-
+    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
 }// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
@@ -909,6 +890,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
-
-
