@@ -906,11 +906,53 @@ function editSale(index){
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
-  username: 'admin',
-  password: 'admin'
-};
+let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials'));
 
+// If no credentials exist in localStorage, set default admin/admin
+if (!loginCredentials || !loginCredentials.username || !loginCredentials.password) {
+  loginCredentials = { username: 'admin', password: 'admin' };
+  localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
+}
+
+// ====== CHANGE LOGIN CREDENTIALS FUNCTION ======
+function changeCredentials() {
+  const oldPwd = document.getElementById('oldPassword').value;
+  const newUser = document.getElementById('newUsername').value.trim();
+  const newPwd = document.getElementById('newPassword').value.trim();
+  const confirmPwd = document.getElementById('confirmPassword').value.trim();
+
+  if (oldPwd !== loginCredentials.password) {
+    alert('Old password is incorrect');
+    return;
+  }
+
+  if (!newUser || !newPwd) {
+    alert('Enter both new username and password');
+    return;
+  }
+
+  if (newPwd !== confirmPwd) {
+    alert('Passwords do not match');
+    return;
+  }
+
+  loginCredentials.username = newUser;
+  loginCredentials.password = newPwd;
+
+  localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
+
+  // Optional: update login input field immediately
+  const loginInput = document.getElementById('username');
+  if (loginInput) loginInput.value = newUser;
+
+  alert('Credentials updated successfully');
+  
+  // Clear fields
+  document.getElementById('oldPassword').value = '';
+  document.getElementById('newUsername').value = '';
+  document.getElementById('newPassword').value = '';
+  document.getElementById('confirmPassword').value = '';
+}
 
 // ====== INIT ======
 renderSalesTable();
@@ -925,8 +967,10 @@ if (localStorage.getItem('isLoggedIn') === 'true') {
   showSection('loginPage');           // not logged in
 }
 
+
 </script>
 </body>
 </html>
+
 
 
