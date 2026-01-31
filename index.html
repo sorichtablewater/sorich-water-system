@@ -50,14 +50,51 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- DASHBOARD -->
 <div id="dashboardPage" class="section" style="display:none;">
-<h2>Main Dashboard</h2>
-<div class="stat-boxes">
-<div class="stat-box">💰 Total Sales: ₦<span id="totalSales">0</span></div>
-<div class="stat-box">✅ Total Paid: ₦<span id="totalPaid">0</span></div>
-<div class="stat-box">💲 Expenses: ₦<span id="expenses">0</span></div>
-<div class="stat-box">❌ Debts: ₦<span id="debts">0</span></div>
-<div class="stat-box">📈 Avg Unit Price: ₦<span id="avgUnitPrice">0</span></div>
+  <h2>Main Dashboard</h2>
+  <div class="stat-boxes">
+    <div class="stat-box">💰 Total Sales: ₦<span id="totalSales">0</span></div>
+    <div class="stat-box">✅ Total Paid: ₦<span id="totalPaid">0</span></div>
+    <div class="stat-box">💲 Expenses: ₦<span id="expenses">0</span></div>
+    <div class="stat-box">❌ Debts: ₦<span id="debts">0</span></div>
+    <div class="stat-box">📈 Avg Unit Price: ₦<span id="avgUnitPrice">0</span></div>
+  </div>
+
+  <!-- MONTHLY STATEMENT SECTION -->
+  <div style="margin-bottom:15px; margin-top:10px;">
+    <label for="monthSelect">Month:</label>
+    <select id="monthSelect">
+      <option value="1">January</option>
+      <option value="2">February</option>
+      <option value="3">March</option>
+      <option value="4">April</option>
+      <option value="5">May</option>
+      <option value="6">June</option>
+      <option value="7">July</option>
+      <option value="8">August</option>
+      <option value="9">September</option>
+      <option value="10">October</option>
+      <option value="11">November</option>
+      <option value="12">December</option>
+    </select>
+
+    <label for="yearSelect">Year:</label>
+    <select id="yearSelect"></select>
+
+    <button onclick="printMonthlyStatement()">🗓️ Print Monthly Statement</button>
+  </div>
+
+  <div class="dashboard-buttons">
+    <button onclick="showSection('salesPage')">🛒 Sales</button>
+    <button onclick="showSection('debtorsPage')">💳 Debtors</button>
+    <button onclick="showSection('expensesPage')">💰 Expenses</button>
+    <button onclick="endOfDay()">📅 End of Day</button>
+    <button onclick="showSection('dailyRecordsPage')">📋 Daily Records</button>
+    <button onclick="showSection('chartsPage')">📊 Charts</button>
+    <button onclick="settingsPage()">⚙ Settings</button>
+    <button onclick="logout()">Logout</button>
+  </div>
 </div>
+
 
 <div class="dashboard-buttons">
 <button onclick="showSection('salesPage')">🛒 Sales</button>
@@ -958,12 +995,117 @@ let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
 };
 
 
+// ====== POPULATE YEAR DROPDOWN (last 5 years) ======
+const yearSelect = document.getElementById('yearSelect');
+const currentYear = new Date().getFullYear();
+for (let y = currentYear; y >= currentYear - 5; y--) {
+    const option = document.createElement('option');
+    option.value = y;
+    option.text = y;
+    yearSelect.appendChild(option);
+}
+
+// ====== PRINT MONTHLY STATEMENT ======
+function printMonthlyStatement() {
+    if (!dailyData || dailyData.length === 0) {
+        alert("No daily records available to generate monthly statement.");
+        return;
+    }
+
+    const month = parseInt(document.getElementById('monthSelect').value);
+    const year = parseInt(document.getElementById('yearSelect').value);
+
+    // Filter daily records for selected month/year
+    const filteredDays = dailyData.filter(d => {
+        const dateObj = new Date(d.date);
+        return (dateObj.getMonth() + 1) === month && dateObj.getFullYear() === year;
+    });
+
+    if (filteredDays.length === 0) {
+        alert(`No records found for ${month}/${year}`);
+        return;
+    }
+
+    // Aggregate totals
+    let totalQty = 0, totalSalesAmount = 0, totalPaidAmount = 0, totalExpenses = 0;
+    let unitSum = 0, totalUnitsCount = 0;
+    let salesEntries = [];
+
+    filteredDays.forEach(d => {
+        d.sales.forEach(s => {
+            salesEntries.push(s);
+            totalQty += s.qty;
+            totalSalesAmount += s.total;
+            totalPaidAmount += s.paid;
+            unitSum += s.unit;
+            totalUnitsCount++;
+        });
+        d.expenses.forEach(e => totalExpenses += e.amount);
+    });
+
+    const avgUnitPrice = totalUnitsCount ? (unitSum / totalUnitsCount).toFixed(2) : 0;
+    const netProfit = (totalSalesAmount - totalExpenses).toFixed(2);
+
+    const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
+    const manager = document.getElementById('managerName').value || 'Manager';
+    const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+
+    const win = window.open('', '', 'width=800,height=900');
+    if (!win) { alert("Pop-up blocked! Please allow pop-ups."); return; }
+
+    for (let i = 0; i < copies; i++) {
+        const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+        win.document.write(`<h2>SORICH TABLE WATER SYSTEM</h2>`);
+        win.document.write(`<h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>`);
+        win.document.write(`<p>Month: ${month}/${year} | Issuer: ${manager}</p><hr>`);
+
+        // SALES TABLE
+        win.document.write(`<h4>SALES</h4>`);
+        win.document.write(`<table border="1" cellpadding="5" cellspacing="0">
+            <tr>
+                <th>Customer</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Total</th>
+                <th>Paid</th>
+                <th>Owing</th>
+            </tr>`);
+        salesEntries.forEach(s => {
+            win.document.write(`<tr>
+                <td>${s.customer}</td>
+                <td>${s.qty}</td>
+                <td>${s.unit}</td>
+                <td>${s.total}</td>
+                <td>${s.paid}</td>
+                <td>${s.owing}</td>
+            </tr>`);
+        });
+        win.document.write(`</table>`);
+        win.document.write(`<p><strong>Total Quantity: ${totalQty}</strong></p>`);
+        win.document.write(`<p><strong>Total Sales: ₦${totalSalesAmount.toFixed(2)}</strong></p>`);
+        win.document.write(`<p><strong>Average Unit Price: ₦${avgUnitPrice}</strong></p>`);
+
+        // EXPENSES & PROFIT
+        win.document.write(`<h4>EXPENSES</h4>`);
+        win.document.write(`<p><strong>Total Expenses: ₦${totalExpenses.toFixed(2)}</strong></p>`);
+        win.document.write(`<p><strong>Net Profit: ₦${netProfit}</strong></p>`);
+        win.document.write(`<p>${footer}</p><hr>`);
+    }
+
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+}
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
 renderExpenses();
 renderDailyRecords();
 
+
 </script>
 </body>
 </html>
+
