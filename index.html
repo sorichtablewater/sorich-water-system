@@ -757,7 +757,7 @@ function endOfDay() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Filter today's sales
+    // Archive today's sales
     const todaySales = salesData.map(s => ({
         customer: s.customer,
         qty: Number(s.qty),
@@ -767,7 +767,7 @@ function endOfDay() {
         owing: Number(s.owing)
     }));
 
-    // Filter today's expenses
+    // Archive today's expenses
     const todayExpenses = expenseData.filter(e => {
         const expenseDate = new Date(e.date).toISOString().split('T')[0];
         return expenseDate === todayStr;
@@ -778,14 +778,12 @@ function endOfDay() {
         paidTo: e.paidTo
     }));
 
-    // Calculate totals and averages
     const totalSales = todaySales.reduce((acc, s) => acc + s.total, 0);
     const totalExpenses = todayExpenses.reduce((acc, e) => acc + e.amount, 0);
-    const avgUnitPrice = todaySales.length 
-        ? todaySales.reduce((acc, s) => acc + s.unit, 0) / todaySales.length 
+    const avgUnitPrice = todaySales.length
+        ? todaySales.reduce((acc, s) => acc + s.unit, 0) / todaySales.length
         : 0;
 
-    // Archive daily data
     dailyData.push({
         date: todayStr,
         totalSales,
@@ -798,13 +796,13 @@ function endOfDay() {
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Clear only sales for a new day
+    // Clear today's sales
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // Optionally, remove today's expenses from expenseData if you want a fresh start each day
-    // expenseData = expenseData.filter(e => new Date(e.date).toISOString().split('T')[0] !== todayStr);
-    // localStorage.setItem('expenseData', JSON.stringify(expenseData));
+    // OPTIONAL: clear today’s expenses
+    expenseData = expenseData.filter(e => new Date(e.date).toISOString().split('T')[0] !== todayStr);
+    localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
     // Refresh dashboard
     renderSalesTable();
@@ -813,6 +811,7 @@ function endOfDay() {
 
     alert("End of day completed! Today's sales and expenses archived. Debtors remain unchanged.");
 }
+
 // ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
@@ -902,4 +901,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
