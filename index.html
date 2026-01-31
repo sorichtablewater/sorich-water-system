@@ -774,45 +774,33 @@ function endOfDay() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
+    // Calculate totals
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
     const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
     const avgUnitPrice = salesData.length 
         ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
 
-    // Archive daily data
+    // Archive today's data
     dailyData.push({
         date: todayStr,
         totalSales,
         totalExpenses,
         net: totalSales - totalExpenses,
         avgUnitPrice,
-        sales: salesData.map(s => ({
-            customer: s.customer,
-            qty: Number(s.qty),
-            total: Number(s.total),
-            unit: Number(s.unit),
-            paid: Number(s.paid),
-            owing: Number(s.owing)
-        })),
-        expenses: expenseData.map(e => ({
-            type: e.type,
-            desc: e.desc,
-            amount: Number(e.amount),
-            paidTo: e.paidTo
-        }))
+        sales: [...salesData],    // copy sales
+        expenses: [...expenseData] // copy expenses
     });
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Update cumulative all-time expenses
+    // Update cumulative expenses
     cumulativeExpenses += totalExpenses;
     localStorage.setItem('cumulativeExpenses', cumulativeExpenses);
 
-    // Clear daily sales and expenses for new day
+    // Clear daily sales and expenses
     salesData = [];
     expenseData = [];
-
     localStorage.setItem('salesData', JSON.stringify(salesData));
     localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
@@ -821,8 +809,9 @@ function endOfDay() {
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Daily expenses reset, cumulative expenses updated.");
+    alert("End of day completed! Today's sales archived. Daily sales and expenses reset.");
 }
+
 
 
 
@@ -916,4 +905,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
