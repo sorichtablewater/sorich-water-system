@@ -172,57 +172,7 @@ body.dark-mode th {background-color:#003366;}
 <!-- DAILY RECORDS PAGE -->
 <div id="dailyRecordsPage" class="section" style="display:none; position: relative;">
   <h2>Daily Records</h2>
-
-  <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
-  <button onclick="backToDashboard()" style="
-    position: absolute;
-    top: 0;
-    right: 0;
-    margin: 10px;
-    padding: 8px 12px;
-    background: #0066cc;
-    color: #fff;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-    transition: 0.3s;
-  " onmouseover="this.style.background='#004999'" onmouseout="this.style.background='#0066cc'">
-    ⬅ Back to Dashboard
-  </button>
-
-  <!-- DATE FILTER -->
-  <label>From: <input type="date" id="fromDate"></label>
-  <label>To: <input type="date" id="toDate"></label>
-  <button onclick="filterDailyRecords()">Filter</button>
-  <button onclick="clearFilter()">Clear Filter</button>
-
-  <!-- PRINT MONTHLY STATEMENT BUTTON -->
-  <button onclick="printMonthlyStatement()" style="
-    margin-left: 10px;
-    padding: 8px 12px;
-    background: #28a745;
-    color: #fff;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-    transition: 0.3s;
-  " onmouseover="this.style.background='#1e7e34'" onmouseout="this.style.background='#28a745'">
-    🖨 Print Monthly Statement
-  </button>
-
-  <table id="dailyTable">
-    <tr>
-      <th>Date</th>
-      <th>Total Sales</th>
-      <th>Total Expenses</th>
-      <th>Net Balance</th>
-      <th>Avg Unit Price</th>
-      <th>Total Qty</th>
-      <th>View</th>
-      <th>Clear</th>
-    </tr>
-  </table>
-</div>
+  <button onclick="printMonthlyStatement()">🖨 Print Monthly Statement</button>
 
   <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
   <button onclick="backToDashboard()" style="
@@ -1009,82 +959,92 @@ let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
 };
 
 
-// ====== PRINT MONTHLY STATEMENT ======
+// ====== MONTHLY STATEMENT FUNCTION ======
 function printMonthlyStatement() {
-    // Ask user for month and year
-    const monthInput = prompt("Enter month (1-12):");
-    const yearInput = prompt("Enter year (YYYY):");
+    if (!dailyData.length) { alert("No daily records available."); return; }
 
-    const month = parseInt(monthInput);
-    const year = parseInt(yearInput);
+    let month = prompt("Enter month number (1-12) to print statement for:", new Date().getMonth() + 1);
+    let year = prompt("Enter year (YYYY):", new Date().getFullYear());
+    if (!month || !year) return;
 
-    if(isNaN(month) || isNaN(year) || month < 1 || month > 12) {
-        alert("Invalid month or year");
+    month = parseInt(month);
+    year = parseInt(year);
+
+    if (isNaN(month) || month < 1 || month > 12 || isNaN(year)) {
+        alert("Invalid month or year."); 
         return;
     }
 
-    // Filter dailyData for that month
-    const monthlyData = dailyData.filter(d => {
-        const dateObj = new Date(d.date);
-        return dateObj.getMonth() + 1 === month && dateObj.getFullYear() === year;
+    const monthRecords = dailyData.filter(d => {
+        const [y, m] = d.date.split('-').map(Number);
+        return y === year && m === month;
     });
 
-    if(monthlyData.length === 0){
-        alert("No records for this month.");
-        return;
+    if (!monthRecords.length) { alert("No records for this month."); return; }
+
+    const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
+    const manager = document.getElementById('managerName').value || 'Manager';
+    const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+
+    let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0, unitSum = 0, unitCount = 0;
+
+    monthRecords.forEach(d => {
+        totalSales += d.totalSales;
+        totalExpenses += d.totalExpenses;
+        totalNet += d.net;
+        d.sales.forEach(s => { totalQty += s.qty; unitSum += s.unit; unitCount++; });
+    });
+
+    const avgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
+
+    const win = window.open('', '', 'width=800,height=800');
+    if (!win) { alert("Pop-up blocked! Allow pop-ups."); return; }
+
+    for (let i = 0; i < copies; i++) {
+        const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+
+        win.document.write(`
+            <h2>SORICH CLASSY SERVICES</h2>
+            <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+            <p>08164084402, 07012623006, 08067338211</p>
+            <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
+            <p>Month: ${month}/${year}</p>
+            <p>ISSUER: ${manager}</p>
+            <hr>
+            <h4>SALES & EXPENSES</h4>
+            <table border="1" cellpadding="5" cellspacing="0">
+                <tr>
+                    <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net</th><th>Total Qty</th><th>Avg Unit Price</th>
+                </tr>
+        `);
+
+        monthRecords.forEach(d => {
+            const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+            const dailyAvgUnit = d.sales.length ? (d.sales.reduce((acc, s) => acc + s.unit, 0) / d.sales.length).toFixed(2) : 0;
+
+            win.document.write(`
+                <tr>
+                    <td>${d.date}</td>
+                    <td>₦${d.totalSales.toFixed(2)}</td>
+                    <td>₦${d.totalExpenses.toFixed(2)}</td>
+                    <td>₦${d.net.toFixed(2)}</td>
+                    <td>${dailyQty}</td>
+                    <td>₦${dailyAvgUnit}</td>
+                </tr>
+            `);
+        });
+
+        win.document.write(`
+            <tr style="font-weight:bold;">
+                <td>Total</td>
+                <td>₦${totalSales.toFixed(2)}</td>
+                <td>₦${totalExpenses.toFixed(2)}</td>
+                <td>₦${totalNet.toFixed(2)}</td>
+                <td>${totalQty}</td>
+                <td>₦${avgUnitPrice}</td>
+            </tr>
+        </table><p>${footer}</p><hr>`);
     }
-
-    // Open print window
-    const win = window.open('', '', 'width=800,height=900');
-    if(!win){ alert("Pop-up blocked! Please allow pop-ups for this site."); return; }
-
-    win.document.write(`<h2>SORICH CLASSY SERVICES</h2>
-        <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-        <h3>MONTHLY STATEMENT - ${month}/${year}</h3>
-        <hr>`);
-
-    monthlyData.forEach(d => {
-        win.document.write(`<h4>Date: ${d.date}</h4>
-            <strong>Sales:</strong>
-            <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse: collapse;">
-                <tr><th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th></tr>
-        `);
-        d.sales.forEach(s => {
-            win.document.write(`<tr>
-                <td>${s.customer}</td>
-                <td>${s.qty}</td>
-                <td>${s.unit}</td>
-                <td>${s.total}</td>
-                <td>${s.paid}</td>
-                <td>${s.owing}</td>
-            </tr>`);
-        });
-        win.document.write(`</table>`);
-
-        win.document.write(`<strong>Expenses:</strong>
-            <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse: collapse;">
-                <tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>
-        `);
-        d.expenses.forEach(e => {
-            win.document.write(`<tr>
-                <td>${e.type}</td>
-                <td>${e.desc}</td>
-                <td>${e.amount}</td>
-                <td>${e.paidTo}</td>
-            </tr>`);
-        });
-        win.document.write(`</table><hr>`);
-    });
-
-    // Totals for the month
-    const totalSales = monthlyData.reduce((acc, d) => acc + d.totalSales, 0);
-    const totalExpenses = monthlyData.reduce((acc, d) => acc + d.totalExpenses, 0);
-    const net = totalSales - totalExpenses;
-
-    win.document.write(`<p><strong>Monthly Total Sales:</strong> ₦${totalSales.toFixed(2)}</p>`);
-    win.document.write(`<p><strong>Monthly Total Expenses:</strong> ₦${totalExpenses.toFixed(2)}</p>`);
-    win.document.write(`<p><strong>Net Balance:</strong> ₦${net.toFixed(2)}</p>`);
-    win.document.write(`<hr><p>Drink It. Love It.</p>`);
 
     win.document.close();
     win.focus();
@@ -1102,4 +1062,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
