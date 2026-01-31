@@ -768,6 +768,10 @@ function renderDailyRecordInvoice(d) {
     win.focus();
     win.print();
     win.close();
+} // <-- properly close renderDailyRecordInvoice
+
+
+// ====== END OF DAY FUNCTION ======
 function endOfDay() {
     if (!confirm("Close the day? Today's sales will be archived.")) return;
 
@@ -905,5 +909,6 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
