@@ -292,13 +292,13 @@ function addSale(){
   const qty = parseFloat(saleQty.value) || 0;
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
-  const prevDebt = parseFloat(salePrevDebt.value) || 0; // store previous debt
+  const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
 
   // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2);
+  const owing = (total - paid + prevDebt).toFixed(2); // UPDATED
 
-  // Push to sales data with ISO date
+  // Push to sales data
   salesData.push({
     customer,
     qty,
@@ -306,40 +306,9 @@ function addSale(){
     unit: parseFloat(unit),
     paid,
     owing: parseFloat(owing),
-    prevDebt: prevDebt,
-    date: new Date().toISOString().split('T')[0] // ISO format YYYY-MM-DD
+    prevDebt: prevDebt, // NEW: store previous debt
+    date: new Date().toLocaleDateString()
   });
-
-  // Update debt data
-  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
-  if(debtIndex >= 0){
-    debtData[debtIndex].owing += parseFloat(owing);
-    debtData[debtIndex].totalPaid += paid;
-  } else {
-    debtData.push({
-      customer,
-      owing: parseFloat(owing),
-      totalPaid: paid
-    });
-  }
-
-  // Re-render tables
-  renderSalesTable();
-  renderDebtors();
-
-  // Reset form
-  document.getElementById('saleCustomer').value = '';
-  saleQty.value = 10;
-  saleTotal.value = 2500;
-  salePaid.value = 2000;
-  salePrevDebt.value = 0;
-  updateSaleCalc();
-
-  // Save to localStorage
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-}
-
 
   // Update debt data
   const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
@@ -782,86 +751,57 @@ function renderDailyRecordInvoice(d) {
     win.print();
     win.close();
 }
-// ====== ADD EXPENSE (STORE DATE IN ISO FORMAT) ======
-function addExpense(){
-  const type = document.getElementById('expenseType').value || 'General';
-  const desc = document.getElementById('expenseDesc').value || 'No description';
-  const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
-  const paidTo = document.getElementById('expensePaidTo').value || 'Unknown';
-
-  // Use ISO date (YYYY-MM-DD) for reliable EOD comparison
-  const date = new Date().toISOString().split('T')[0];
-
-  expenseData.push({ type, desc, amount, paidTo, date });
-  localStorage.setItem('expenseData', JSON.stringify(expenseData));
-  renderExpenses();
-}
-
-// ====== END OF DAY FUNCTION (ARCHIVE TODAY ONLY) ======
 function endOfDay() {
-    if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
+    if (!confirm("Close the day? Today's sales will be archived.")) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
 
-    // === Archive today's sales ===
-    const todaySales = salesData.map(s => ({
-        customer: s.customer,
-        qty: Number(s.qty),
-        total: Number(s.total),
-        unit: Number(s.unit),
-        paid: Number(s.paid),
-        owing: Number(s.owing),
-        prevDebt: Number(s.prevDebt || 0),
-        date: s.date // optional
-    }));
-
-    // === Archive today's expenses ===
-    const todayExpenses = expenseData.filter(e => e.date === todayStr)
-        .map(e => ({
-            type: e.type,
-            desc: e.desc,
-            amount: Number(e.amount),
-            paidTo: e.paidTo
-        }));
-
-    // === Compute totals ===
-    const totalSales = todaySales.reduce((acc, s) => acc + s.total, 0);
-    const totalExpenses = todayExpenses.reduce((acc, e) => acc + e.amount, 0);
-    const avgUnitPrice = todaySales.length
-        ? todaySales.reduce((acc, s) => acc + s.unit, 0) / todaySales.length
+    const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+    const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
+    const avgUnitPrice = salesData.length 
+        ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
 
-    // === Save to dailyData ===
+    // Archive daily data
     dailyData.push({
         date: todayStr,
         totalSales,
         totalExpenses,
         net: totalSales - totalExpenses,
         avgUnitPrice,
-        sales: todaySales,
-        expenses: todayExpenses
+        sales: salesData.map(s => ({
+            customer: s.customer,
+            qty: Number(s.qty),
+            total: Number(s.total),
+            unit: Number(s.unit),
+            paid: Number(s.paid),
+            owing: Number(s.owing)
+        })),
+        expenses: expenseData.map(e => ({
+            type: e.type,
+            desc: e.desc,
+            amount: Number(e.amount),
+            paidTo: e.paidTo
+        }))
     });
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // === Clear today's sales ===
+    // Clear only sales for a new day
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // === Remove only today's expenses ===
-    expenseData = expenseData.filter(e => e.date !== todayStr);
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
+    // Leave expenseData and debtData intact
+    // expenseData and debtData remain unchanged
 
-    // === Refresh dashboard ===
+    // Reset dashboard
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales and expenses archived. Debtors remain unchanged.");
-}
-
-
-// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
+    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
+}// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
   if (!chartEl) return;
@@ -950,7 +890,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
-
-
-
