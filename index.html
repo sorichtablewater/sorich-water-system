@@ -292,13 +292,13 @@ function addSale(){
   const qty = parseFloat(saleQty.value) || 0;
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
-  const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
+  const prevDebt = parseFloat(salePrevDebt.value) || 0; // store previous debt
 
   // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2); // UPDATED
+  const owing = (total - paid + prevDebt).toFixed(2);
 
-  // Push to sales data
+  // Push to sales data with ISO date
   salesData.push({
     customer,
     qty,
@@ -306,9 +306,40 @@ function addSale(){
     unit: parseFloat(unit),
     paid,
     owing: parseFloat(owing),
-    prevDebt: prevDebt, // NEW: store previous debt
-    date: new Date().toLocaleDateString()
+    prevDebt: prevDebt,
+    date: new Date().toISOString().split('T')[0] // ISO format YYYY-MM-DD
   });
+
+  // Update debt data
+  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
+  if(debtIndex >= 0){
+    debtData[debtIndex].owing += parseFloat(owing);
+    debtData[debtIndex].totalPaid += paid;
+  } else {
+    debtData.push({
+      customer,
+      owing: parseFloat(owing),
+      totalPaid: paid
+    });
+  }
+
+  // Re-render tables
+  renderSalesTable();
+  renderDebtors();
+
+  // Reset form
+  document.getElementById('saleCustomer').value = '';
+  saleQty.value = 10;
+  saleTotal.value = 2500;
+  salePaid.value = 2000;
+  salePrevDebt.value = 0;
+  updateSaleCalc();
+
+  // Save to localStorage
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+}
+
 
   // Update debt data
   const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
@@ -919,6 +950,7 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
 
