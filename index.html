@@ -757,8 +757,16 @@ function endOfDay() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
+    // Filter only today's expenses
+    const todaysExpenses = expenseData.filter(e => {
+        // Convert expense date to YYYY-MM-DD format
+        const expDate = new Date(e.date).toISOString().split('T')[0];
+        return expDate === todayStr;
+    });
+
+    // Calculate totals only for today
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
-    const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
+    const totalExpenses = todaysExpenses.reduce((acc, e) => acc + Number(e.amount), 0);
     const avgUnitPrice = salesData.length 
         ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
@@ -778,7 +786,7 @@ function endOfDay() {
             paid: Number(s.paid),
             owing: Number(s.owing)
         })),
-        expenses: expenseData.map(e => ({
+        expenses: todaysExpenses.map(e => ({
             type: e.type,
             desc: e.desc,
             amount: Number(e.amount),
@@ -788,20 +796,18 @@ function endOfDay() {
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Clear only sales for a new day
+    // Clear only today's sales for a new day
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // Leave expenseData and debtData intact
-    // expenseData and debtData remain unchanged
-
-    // Reset dashboard
+    // Leave all expenses and debts intact
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
-}// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
+    alert("End of day completed! Today's sales and expenses archived. Expenses and debtors remain unchanged.");
+}
+// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
   if (!chartEl) return;
@@ -890,3 +896,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
