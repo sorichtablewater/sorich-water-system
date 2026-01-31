@@ -226,11 +226,12 @@ body.dark-mode th {background-color:#003366;}
 </div>
 <script>
 // ====== Offline JS Logic ======
-let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
-let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
-let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
-let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
-let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
+let salesData = JSON.parse(localStorage.getItem('salesData')) || [];
+let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
+let expenseData = JSON.parse(localStorage.getItem('expenseData')) || [];
+let totalExpensesAllTime = JSON.parse(localStorage.getItem('totalExpensesAllTime')) || 0;  // 👈 added
+let dailyData = JSON.parse(localStorage.getItem('dailyData')) || [];
+let invoiceNumber = parseInt(localStorage.getItem('invoiceNumber')) || 1;
 
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
@@ -528,7 +529,6 @@ function printInvoice(sale){
   win.document.close(); win.focus(); win.print(); win.close();
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
 }
-
 // ====== EXPENSES ======
 function addExpense(){
   const type=document.getElementById('expenseType').value||'General';
@@ -536,13 +536,22 @@ function addExpense(){
   const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
   const paidTo=document.getElementById('expensePaidTo').value||'Unknown';
   const date=new Date().toLocaleString();
+
   expenseData.push({type,desc,amount,paidTo,date});
+
+  // 🔹 accumulate all-time expenses
+  totalExpensesAllTime += amount;
+
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  localStorage.setItem('totalExpensesAllTime', JSON.stringify(totalExpensesAllTime));
+
   renderExpenses();
 }
+
 function renderExpenses(){
   const table=document.getElementById('expensesTable');
   table.innerHTML='<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+
   let totalExpense=0;
   expenseData.forEach(e=>{
     const row=table.insertRow();
@@ -553,13 +562,24 @@ function renderExpenses(){
     row.insertCell(4).innerText=e.date;
     totalExpense+=e.amount;
   });
-  document.getElementById('expenses').innerText=totalExpense;
+
+  // 🔹 Dashboard shows ALL-TIME expenses
+  document.getElementById('expenses').innerText = totalExpensesAllTime.toFixed(2);
+
   const totalSales = salesData.reduce((acc,s)=>acc+s.total,0);
   document.getElementById('expenseTotalSales').innerText=totalSales;
   document.getElementById('expenseTotal').innerText=totalExpense;
   document.getElementById('expenseProfit').innerText=(totalSales-totalExpense).toFixed(2);
 }
-function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData=[]; localStorage.setItem('expenseData','[]'); renderExpenses(); }}
+
+function clearMonthlyExpenses(){
+  if(confirm('Clear all expenses?')){
+    expenseData=[];
+    localStorage.setItem('expenseData','[]');
+    renderExpenses();
+  }
+}
+
 
 // ====== DAILY RECORDS ======
 function renderDailyRecords() {
@@ -788,28 +808,22 @@ function endOfDay() {
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Clear only sales for a new day
+    // Clear sales for new day
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // Leave expenseData and debtData intact
-    // expenseData and debtData remain unchanged
+    // 🔹 Reset today's expenses for new day (dashboard total remains)
+    expenseData = [];
+    localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
-    // Reset dashboard
+    // Refresh dashboard & tables
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
-}// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
-function renderChart() {
-  const chartEl = document.getElementById('chartText');
-  if (!chartEl) return;
+    alert("End of day completed! Today's sales archived. Expenses reset for new day. Dashboard total preserved.");
+}
 
-  if (!dailyData || dailyData.length === 0) {
-    chartEl.textContent = "No historical sales data available.";
-    return;
-  }
 
   // Aggregate total quantities per customer
   const totals = {};
@@ -890,3 +904,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
