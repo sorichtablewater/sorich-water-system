@@ -226,38 +226,31 @@ body.dark-mode th {background-color:#003366;}
 </div>
 <script>
 // ====== Offline JS Logic ======
-let salesData = JSON.parse(localStorage.getItem('salesData')) || [];
-let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
-let expenseData = JSON.parse(localStorage.getItem('expenseData')) || [];
-let totalExpensesAllTime = JSON.parse(localStorage.getItem('totalExpensesAllTime')) || 0;  // 👈 added
-let dailyData = JSON.parse(localStorage.getItem('dailyData')) || [];
-let invoiceNumber = parseInt(localStorage.getItem('invoiceNumber')) || 1;
+let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
+let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
+let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
+let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
+let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
 
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
 setInterval(updateTime,1000); updateTime();
+
 // ====== LOGIN ======
-
-
-function logout(){ 
-  localStorage.removeItem('isLoggedIn');          // clear login state
-  showSection('loginPage');                      // back to login
+function login(){ 
+  const u=document.getElementById('username').value; 
+  const p=document.getElementById('password').value;
+  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
+  else alert('Invalid credentials');
 }
-
+function logout(){ location.reload(); }
 function showSection(id){
   ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','settingsPage']
-  .forEach(s=>{
-    const el = document.getElementById(s);
-    if(el) el.style.display = 'none';
-  });
-
-  const active = document.getElementById(id);
-  if(active) active.style.display = 'block';
-
-  if(id === 'chartsPage') renderChart();
-  if(id === 'debtorsPage') renderDebtors();
+  .forEach(s=>document.getElementById(s).style.display='none');
+  document.getElementById(id).style.display='block';
+  if(id==='chartsPage') renderChart();
+  if(id==='debtorsPage') renderDebtors();
 }
-
 function backToDashboard(){ showSection('dashboardPage'); }
 function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
 function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
@@ -535,6 +528,7 @@ function printInvoice(sale){
   win.document.close(); win.focus(); win.print(); win.close();
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
 }
+
 // ====== EXPENSES ======
 function addExpense(){
   const type=document.getElementById('expenseType').value||'General';
@@ -542,22 +536,13 @@ function addExpense(){
   const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
   const paidTo=document.getElementById('expensePaidTo').value||'Unknown';
   const date=new Date().toLocaleString();
-
   expenseData.push({type,desc,amount,paidTo,date});
-
-  // 🔹 accumulate all-time expenses
-  totalExpensesAllTime += amount;
-
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
-  localStorage.setItem('totalExpensesAllTime', JSON.stringify(totalExpensesAllTime));
-
   renderExpenses();
 }
-
 function renderExpenses(){
   const table=document.getElementById('expensesTable');
   table.innerHTML='<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
-
   let totalExpense=0;
   expenseData.forEach(e=>{
     const row=table.insertRow();
@@ -568,24 +553,13 @@ function renderExpenses(){
     row.insertCell(4).innerText=e.date;
     totalExpense+=e.amount;
   });
-
-  // 🔹 Dashboard shows ALL-TIME expenses
-  document.getElementById('expenses').innerText = totalExpensesAllTime.toFixed(2);
-
+  document.getElementById('expenses').innerText=totalExpense;
   const totalSales = salesData.reduce((acc,s)=>acc+s.total,0);
   document.getElementById('expenseTotalSales').innerText=totalSales;
   document.getElementById('expenseTotal').innerText=totalExpense;
   document.getElementById('expenseProfit').innerText=(totalSales-totalExpense).toFixed(2);
 }
-
-function clearMonthlyExpenses(){
-  if(confirm('Clear all expenses?')){
-    expenseData=[];
-    localStorage.setItem('expenseData','[]');
-    renderExpenses();
-  }
-}
-
+function clearMonthlyExpenses(){ if(confirm('Clear all expenses?')){ expenseData=[]; localStorage.setItem('expenseData','[]'); renderExpenses(); }}
 
 // ====== DAILY RECORDS ======
 function renderDailyRecords() {
@@ -814,22 +788,28 @@ function endOfDay() {
 
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
-    // Clear sales for new day
+    // Clear only sales for a new day
     salesData = [];
     localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // 🔹 Reset today's expenses for new day (dashboard total remains)
-    expenseData = [];
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
+    // Leave expenseData and debtData intact
+    // expenseData and debtData remain unchanged
 
-    // Refresh dashboard & tables
+    // Reset dashboard
     renderSalesTable();
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales archived. Expenses reset for new day. Dashboard total preserved.");
-}
+    alert("End of day completed! Today's sales archived. Expenses and debtors remain unchanged.");
+}// ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
+function renderChart() {
+  const chartEl = document.getElementById('chartText');
+  if (!chartEl) return;
 
+  if (!dailyData || dailyData.length === 0) {
+    chartEl.textContent = "No historical sales data available.";
+    return;
+  }
 
   // Aggregate total quantities per customer
   const totals = {};
@@ -895,78 +875,11 @@ function editSale(index){
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials;
+let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
+  username: 'admin',
+  password: 'admin'
+};
 
-try {
-  loginCredentials = JSON.parse(localStorage.getItem('loginCredentials'));
-} catch(e) {
-  loginCredentials = null;
-}
-
-// If no credentials exist or are invalid, set default admin/admin
-if (!loginCredentials || !loginCredentials.username || !loginCredentials.password) {
-  loginCredentials = { username: 'admin', password: 'admin' };
-  localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
-}
-
-// ====== LOGIN FUNCTION ======
-function login() {
-  const u = document.getElementById('username').value.trim();
-  const p = document.getElementById('password').value.trim();
-
-  if (u === loginCredentials.username && p === loginCredentials.password) {
-    localStorage.setItem('isLoggedIn', 'true');   // remember login
-    showSection('enterDashboardPage');            // go to enter page
-  } else {
-    alert('Invalid credentials');
-  }
-}
-
-// ====== LOGOUT FUNCTION ======
-function logout() {
-  localStorage.removeItem('isLoggedIn');         // clear login state
-  showSection('loginPage');                       // back to login
-}
-
-// ====== CHANGE LOGIN CREDENTIALS FUNCTION ======
-function changeCredentials() {
-  const oldPwd = document.getElementById('oldPassword').value;
-  const newUser = document.getElementById('newUsername').value.trim();
-  const newPwd = document.getElementById('newPassword').value.trim();
-  const confirmPwd = document.getElementById('confirmPassword').value.trim();
-
-  if (oldPwd !== loginCredentials.password) {
-    alert('Old password is incorrect');
-    return;
-  }
-
-  if (!newUser || !newPwd) {
-    alert('Enter both new username and password');
-    return;
-  }
-
-  if (newPwd !== confirmPwd) {
-    alert('Passwords do not match');
-    return;
-  }
-
-  loginCredentials.username = newUser;
-  loginCredentials.password = newPwd;
-
-  localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
-
-  // Update login input field immediately
-  const loginInput = document.getElementById('username');
-  if (loginInput) loginInput.value = newUser;
-
-  alert('Credentials updated successfully');
-
-  // Clear input fields
-  document.getElementById('oldPassword').value = '';
-  document.getElementById('newUsername').value = '';
-  document.getElementById('newPassword').value = '';
-  document.getElementById('confirmPassword').value = '';
-}
 
 // ====== INIT ======
 renderSalesTable();
@@ -974,20 +887,6 @@ renderDebtors();
 renderExpenses();
 renderDailyRecords();
 
-// Check login state and show the correct page
-if (localStorage.getItem('isLoggedIn') === 'true') {
-  showSection('enterDashboardPage');  // user already logged in
-} else {
-  showSection('loginPage');           // not logged in
-}
-
-
-
 </script>
 </body>
 </html>
-
-
-
-
-
