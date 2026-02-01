@@ -150,23 +150,25 @@ body.dark-mode th {background-color:#003366;}
   <button onclick="clearMonthlyExpenses()">Clear All Expenses</button>
   <button onclick="backToDashboard()">Back to Dashboard</button>
 
-  <h4>Expenses Table:</h4>
-  <table id="expensesTable">
-    <tr>
-      <th>Type</th>
-      <th>Description</th>
-      <th>Amount</th>
-      <th>Paid To</th>
-      <th>Date</th>
-    </tr>
-  </table>
+<h4>Expenses Table:</h4>
+<table id="expensesTable">
+  <tr>
+    <th>Type</th>
+    <th>Description</th>
+    <th>Amount</th>
+    <th>Paid To</th>
+    <th>Date</th>
+    <th>Edit</th>
+    <th>Delete</th>
+  </tr>
+</table>
 
-  <p>
-    Total Sales: ₦<span id="expenseTotalSales">0</span> | 
-    Total Expenses: ₦<span id="expenseTotal">0</span> | 
-    Profit: ₦<span id="expenseProfit">0</span>
-  </p>
-</div>
+<p>
+  Total Sales: ₦<span id="expenseTotalSales">0</span> | 
+  Total Expenses: ₦<span id="expenseTotal">0</span> | 
+  Profit: ₦<span id="expenseProfit">0</span>
+</p>
+
 
 
 <!-- DAILY RECORDS PAGE -->
@@ -555,12 +557,23 @@ function addExpense(){
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
 }// ====== RENDER EXPENSES ======
-function renderExpenses(){
+function renderExpenses() {
   const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+  table.innerHTML = `
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Paid To</th>
+      <th>Date</th>
+      <th>Edit</th>
+      <th>Delete</th>
+    </tr>
+  `;
 
   let totalExpense = 0;
-  expenseData.forEach(e => {
+
+  expenseData.forEach((e, index) => {
     const row = table.insertRow();
     row.insertCell(0).innerText = e.type;
     row.insertCell(1).innerText = e.desc;
@@ -568,7 +581,55 @@ function renderExpenses(){
     row.insertCell(3).innerText = e.paidTo;
     row.insertCell(4).innerText = e.date;
     totalExpense += Number(e.amount);
+
+    // ✏️ Edit Button
+    const editCell = row.insertCell(5);
+    const editBtn = document.createElement('button');
+    editBtn.innerText = 'Edit';
+    editBtn.onclick = () => {
+      const newType = prompt("Edit Expense Type:", e.type);
+      if (newType === null) return;
+      const newDesc = prompt("Edit Description:", e.desc);
+      if (newDesc === null) return;
+      const newAmount = parseFloat(prompt("Edit Amount:", e.amount));
+      if (isNaN(newAmount)) return;
+      const newPaidTo = prompt("Edit Paid To:", e.paidTo);
+      if (newPaidTo === null) return;
+
+      e.type = newType;
+      e.desc = newDesc;
+      e.amount = newAmount;
+      e.paidTo = newPaidTo;
+
+      localStorage.setItem('expenseData', JSON.stringify(expenseData));
+      renderExpenses();
+    };
+    editCell.appendChild(editBtn);
+
+    // 🗑 Delete Button
+    const delCell = row.insertCell(6);
+    const delBtn = document.createElement('button');
+    delBtn.innerText = 'Delete';
+    delBtn.style.background = 'red';
+    delBtn.style.color = '#fff';
+    delBtn.onclick = () => {
+      if (confirm('Delete this expense?')) {
+        expenseData.splice(index, 1);
+        localStorage.setItem('expenseData', JSON.stringify(expenseData));
+        renderExpenses();
+      }
+    };
+    delCell.appendChild(delBtn);
   });
+
+  // Update dashboard stats
+  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
+  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
+  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+}
+
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
@@ -1169,3 +1230,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
