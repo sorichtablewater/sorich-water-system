@@ -1093,13 +1093,20 @@ function printWeeklyStatement() {
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
   let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0;
+  let unitSum = 0, unitCount = 0;
 
   weekRecords.forEach(d => {
     totalSales += d.totalSales;
     totalExpenses += d.totalExpenses;
     totalNet += d.net;
-    d.sales.forEach(s => totalQty += s.qty);
+    d.sales.forEach(s => {
+      totalQty += s.qty;
+      unitSum += Number(s.unit);
+      unitCount++;
+    });
   });
+
+  const weeklyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
 
   const win = window.open('', '', 'width=800,height=800');
   if (!win) { alert("Pop-up blocked! Allow pop-ups."); return; }
@@ -1122,11 +1129,16 @@ function printWeeklyStatement() {
           <th>Total Expenses</th>
           <th>Net</th>
           <th>Total Qty</th>
+          <th>Avg Unit Price</th>
         </tr>
     `);
 
     weekRecords.forEach(d => {
       const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+      const dailyAvgUnit = d.sales.length
+        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
+        : 0;
+
       win.document.write(`
         <tr>
           <td>${d.date}</td>
@@ -1134,6 +1146,7 @@ function printWeeklyStatement() {
           <td>₦${d.totalExpenses.toFixed(2)}</td>
           <td>₦${d.net.toFixed(2)}</td>
           <td>${dailyQty}</td>
+          <td>₦${dailyAvgUnit}</td>
         </tr>
       `);
     });
@@ -1145,6 +1158,7 @@ function printWeeklyStatement() {
           <td>₦${totalExpenses.toFixed(2)}</td>
           <td>₦${totalNet.toFixed(2)}</td>
           <td>${totalQty}</td>
+          <td>₦${weeklyAvgUnitPrice}</td>
         </tr>
       </table>
       <p>${footer}</p>
@@ -1159,6 +1173,7 @@ function printWeeklyStatement() {
 }
 
 
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
@@ -1169,3 +1184,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
