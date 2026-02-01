@@ -1188,6 +1188,15 @@ function printWeeklyStatement() {
 
 
 // ====== INIT ======
+
+// ====== INITIAL LOGIN CREDENTIALS ======
+let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials'));
+if (!loginCredentials) {
+    loginCredentials = { username: 'admin', password: 'admin' };
+    localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
+}
+
+// Render initial data
 renderSalesTable();
 renderDebtors();
 renderExpenses();
@@ -1197,3 +1206,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
