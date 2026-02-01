@@ -554,7 +554,7 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES ======
+}// ====== RENDER EXPENSES WITH DELETE BUTTON ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
   table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Delete</th></tr>';
@@ -568,15 +568,12 @@ function renderExpenses(){
     row.insertCell(3).innerText = e.paidTo;
     row.insertCell(4).innerText = e.date;
 
-    // ===== DELETE BUTTON =====
+    // DELETE BUTTON
     const delCell = row.insertCell(5);
     const delBtn = document.createElement('button');
     delBtn.innerText = '🗑 Delete';
     delBtn.style.background = 'red';
     delBtn.style.color = '#fff';
-    delBtn.style.padding = '5px 10px';
-    delBtn.style.border = 'none';
-    delBtn.style.borderRadius = '5px';
     delBtn.style.cursor = 'pointer';
     delBtn.onclick = () => deleteExpense(index);
     delCell.appendChild(delBtn);
@@ -592,16 +589,14 @@ function renderExpenses(){
   document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
 }
 
-// ====== DELETE EXPENSE FUNCTION ======
+// ====== DELETE SINGLE EXPENSE ======
 function deleteExpense(index){
-  if(confirm("Are you sure you want to delete this expense?")) {
+  if(confirm('Are you sure you want to delete this expense?')){
     expenseData.splice(index, 1);
     localStorage.setItem('expenseData', JSON.stringify(expenseData));
     renderExpenses();
-    alert('Expense deleted successfully.');
   }
 }
-
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
