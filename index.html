@@ -137,36 +137,38 @@ body.dark-mode th {background-color:#003366;}
   </table>
 </div>
 
+function editExpense(index) {
+  const e = expenseData[index];
 
-<!-- EXPENSES PAGE -->
-<div id="expensesPage" class="section" style="display:none;">
-  <h2>Expenses & Profit</h2>
-  <label>Type: <input type="text" id="expenseType"></label>
-  <label>Description: <input type="text" id="expenseDesc"></label>
-  <label>Amount: <input type="number" id="expenseAmount"></label>
-  <label>Paid To: <input type="text" id="expensePaidTo"></label>
-  <button onclick="addExpense()">Add Expense</button>
-  <button onclick="clearDailyExpenses()">Clear Today’s Expenses</button>
-  <button onclick="clearMonthlyExpenses()">Clear All Expenses</button>
-  <button onclick="backToDashboard()">Back to Dashboard</button>
+  const newType = prompt("Edit Type:", e.type);
+  if (newType === null) return;
 
-  <h4>Expenses Table:</h4>
-  <table id="expensesTable">
-    <tr>
-      <th>Type</th>
-      <th>Description</th>
-      <th>Amount</th>
-      <th>Paid To</th>
-      <th>Date</th>
-    </tr>
-  </table>
+  const newDesc = prompt("Edit Description:", e.desc);
+  if (newDesc === null) return;
 
-  <p>
-    Total Sales: ₦<span id="expenseTotalSales">0</span> | 
-    Total Expenses: ₦<span id="expenseTotal">0</span> | 
-    Profit: ₦<span id="expenseProfit">0</span>
-  </p>
-</div>
+  const newAmount = parseFloat(prompt("Edit Amount:", e.amount));
+  if (isNaN(newAmount)) return alert("Invalid amount");
+
+  const newPaidTo = prompt("Edit Paid To:", e.paidTo);
+  if (newPaidTo === null) return;
+
+  e.type = newType;
+  e.desc = newDesc;
+  e.amount = newAmount;
+  e.paidTo = newPaidTo;
+
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
+function deleteExpense(index) {
+  if (!confirm("Delete this expense?")) return;
+
+  expenseData.splice(index, 1);
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
 
 
 <!-- DAILY RECORDS PAGE -->
@@ -546,29 +548,102 @@ function printInvoice(sale){
 
 // ====== EXPENSES ======
 function addExpense(){
-  const type=document.getElementById('expenseType').value||'General';
-  const desc=document.getElementById('expenseDesc').value||'No description';
-  const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
-  const paidTo=document.getElementById('expensePaidTo').value||'Unknown';
-  const date=new Date().toLocaleString();
-  expenseData.push({type,desc,amount,paidTo,date});
+  const type = document.getElementById('expenseType').value || 'General';
+  const desc = document.getElementById('expenseDesc').value || 'No description';
+  const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
+  const paidTo = document.getElementById('expensePaidTo').value || 'Unknown';
+  const date = new Date().toLocaleString();
+
+  expenseData.push({ type, desc, amount, paidTo, date });
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES ======
+}
+
+// ====== RENDER EXPENSES ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+  table.innerHTML = `
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Paid To</th>
+      <th>Date</th>
+      <th>Edit</th>
+      <th>Delete</th>
+    </tr>
+  `;
 
   let totalExpense = 0;
-  expenseData.forEach(e => {
+
+  expenseData.forEach((e, index) => {
     const row = table.insertRow();
     row.insertCell(0).innerText = e.type;
     row.insertCell(1).innerText = e.desc;
     row.insertCell(2).innerText = e.amount.toFixed(2);
     row.insertCell(3).innerText = e.paidTo;
     row.insertCell(4).innerText = e.date;
+
+    // ✏️ Edit button
+    const editBtn = document.createElement('button');
+    editBtn.innerText = 'Edit';
+    editBtn.onclick = () => editExpense(index);
+    row.insertCell(5).appendChild(editBtn);
+
+    // 🗑 Delete button
+    const delBtn = document.createElement('button');
+    delBtn.innerText = 'Delete';
+    delBtn.style.background = 'red';
+    delBtn.style.color = '#fff';
+    delBtn.onclick = () => deleteExpense(index);
+    row.insertCell(6).appendChild(delBtn);
+
     totalExpense += Number(e.amount);
   });
+
+  // Update totals
+  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
+
+  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
+  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+}
+
+// ====== EDIT EXPENSE ======
+function editExpense(index) {
+  const e = expenseData[index];
+
+  const newType = prompt("Edit Type:", e.type);
+  if (newType === null) return;
+
+  const newDesc = prompt("Edit Description:", e.desc);
+  if (newDesc === null) return;
+
+  const newAmount = parseFloat(prompt("Edit Amount:", e.amount));
+  if (isNaN(newAmount)) return alert("Invalid amount");
+
+  const newPaidTo = prompt("Edit Paid To:", e.paidTo);
+  if (newPaidTo === null) return;
+
+  e.type = newType;
+  e.desc = newDesc;
+  e.amount = newAmount;
+  e.paidTo = newPaidTo;
+
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
+// ====== DELETE EXPENSE ======
+function deleteExpense(index) {
+  if (!confirm("Delete this expense?")) return;
+
+  expenseData.splice(index, 1);
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
@@ -1169,4 +1244,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
