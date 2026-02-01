@@ -554,7 +554,7 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES ======
+}// ====== RENDER EXPENSES WITH EDIT BUTTON ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
   table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Edit</th></tr>';
@@ -570,11 +570,10 @@ function renderExpenses(){
     totalExpense += Number(e.amount);
 
     // ✏️ EDIT BUTTON
-    const editCell = row.insertCell(5);
     const editBtn = document.createElement('button');
     editBtn.innerText = 'Edit';
     editBtn.onclick = () => editExpense(index);
-    editCell.appendChild(editBtn);
+    row.insertCell(5).appendChild(editBtn);
   });
 
   // Update dashboard stats
@@ -586,9 +585,8 @@ function renderExpenses(){
 }
 
 // ====== EDIT EXPENSE FUNCTION ======
-function editExpense(index){
+function editExpense(index) {
   const e = expenseData[index];
-
   const newType = prompt("Edit Expense Type:", e.type);
   if(newType === null) return;
 
@@ -601,14 +599,12 @@ function editExpense(index){
   const newPaidTo = prompt("Edit Paid To:", e.paidTo);
   if(newPaidTo === null) return;
 
-  // update expense
   e.type = newType;
   e.desc = newDesc;
   e.amount = newAmount;
   e.paidTo = newPaidTo;
 
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
-
   renderExpenses();
 }
 
@@ -1212,4 +1208,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
