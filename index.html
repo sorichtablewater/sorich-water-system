@@ -968,96 +968,123 @@ let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
 
 // ====== MONTHLY STATEMENT FUNCTION ======
 function printMonthlyStatement() {
-    if (!dailyData.length) { alert("No daily records available."); return; }
+  if (!dailyData.length) {
+    alert("No daily records available.");
+    return;
+  }
 
-    let month = prompt("Enter month number (1-12) to print statement for:", new Date().getMonth() + 1);
-    let year = prompt("Enter year (YYYY):", new Date().getFullYear());
-    if (!month || !year) return;
+  let month = prompt("Enter month number (1-12):", new Date().getMonth() + 1);
+  let year = prompt("Enter year (YYYY):", new Date().getFullYear());
+  if (!month || !year) return;
 
-    month = parseInt(month);
-    year = parseInt(year);
+  month = parseInt(month);
+  year = parseInt(year);
 
-    if (isNaN(month) || month < 1 || month > 12 || isNaN(year)) {
-        alert("Invalid month or year."); 
-        return;
-    }
+  if (isNaN(month) || month < 1 || month > 12 || isNaN(year)) {
+    alert("Invalid month or year.");
+    return;
+  }
 
-    const monthRecords = dailyData.filter(d => {
-        const [y, m] = d.date.split('-').map(Number);
-        return y === year && m === month;
+  const monthStr = String(month).padStart(2, '0');
+
+  const monthRecords = dailyData.filter(d => {
+    const [y, m] = d.date.split('-');
+    return parseInt(y) === year && m === monthStr;
+  });
+
+  if (!monthRecords.length) {
+    alert("No records found for this month.");
+    return;
+  }
+
+  const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
+  const manager = document.getElementById('managerName').value || 'Manager';
+  const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+
+  let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0;
+  let unitSum = 0, unitCount = 0;
+
+  monthRecords.forEach(d => {
+    totalSales += d.totalSales;
+    totalExpenses += d.totalExpenses;
+    totalNet += d.net;
+
+    d.sales.forEach(s => {
+      totalQty += s.qty;
+      unitSum += Number(s.unit);
+      unitCount++;
     });
+  });
 
-    if (!monthRecords.length) { alert("No records for this month."); return; }
+  const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
 
-    const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
-    const manager = document.getElementById('managerName').value || 'Manager';
-    const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+  const win = window.open('', '', 'width=800,height=800');
+  if (!win) {
+    alert("Pop-up blocked! Allow pop-ups.");
+    return;
+  }
 
-    let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0, unitSum = 0, unitCount = 0;
+  for (let i = 0; i < copies; i++) {
+    const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+
+    win.document.write(`
+      <h2>SORICH CLASSY SERVICES</h2>
+      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+      <p>08164084402, 07012623006, 08067338211</p>
+      <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
+      <p>Period: ${year}-${monthStr}</p>
+      <p>ISSUER: ${manager}</p>
+      <hr>
+      <table border="1" cellpadding="5" cellspacing="0" width="100%">
+        <tr>
+          <th>Date</th>
+          <th>Total Sales</th>
+          <th>Total Expenses</th>
+          <th>Net</th>
+          <th>Total Qty</th>
+          <th>Avg Unit Price</th>
+        </tr>
+    `);
 
     monthRecords.forEach(d => {
-        totalSales += d.totalSales;
-        totalExpenses += d.totalExpenses;
-        totalNet += d.net;
-        d.sales.forEach(s => { totalQty += s.qty; unitSum += s.unit; unitCount++; });
+      const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+      const dailyAvgUnit = d.sales.length
+        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
+        : 0;
+
+      win.document.write(`
+        <tr>
+          <td>${d.date}</td>
+          <td>₦${d.totalSales.toFixed(2)}</td>
+          <td>₦${d.totalExpenses.toFixed(2)}</td>
+          <td>₦${d.net.toFixed(2)}</td>
+          <td>${dailyQty}</td>
+          <td>₦${dailyAvgUnit}</td>
+        </tr>
+      `);
     });
 
-    const avgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
+    win.document.write(`
+        <tr style="font-weight:bold;">
+          <td>TOTAL</td>
+          <td>₦${totalSales.toFixed(2)}</td>
+          <td>₦${totalExpenses.toFixed(2)}</td>
+          <td>₦${totalNet.toFixed(2)}</td>
+          <td>${totalQty}</td>
+          <td>₦${monthlyAvgUnitPrice}</td>
+        </tr>
+      </table>
+      <p>${footer}</p>
+      <hr>
+    `);
+  }
 
-    const win = window.open('', '', 'width=800,height=800');
-    if (!win) { alert("Pop-up blocked! Allow pop-ups."); return; }
-
-    for (let i = 0; i < copies; i++) {
-        const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
-
-        win.document.write(`
-            <h2>SORICH CLASSY SERVICES</h2>
-            <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-            <p>08164084402, 07012623006, 08067338211</p>
-            <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
-            <p>Month: ${month}/${year}</p>
-            <p>ISSUER: ${manager}</p>
-            <hr>
-            <h4>SALES & EXPENSES</h4>
-            <table border="1" cellpadding="5" cellspacing="0">
-                <tr>
-                    <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net</th><th>Total Qty</th><th>Avg Unit Price</th>
-                </tr>
-        `);
-
-        monthRecords.forEach(d => {
-            const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
-            const dailyAvgUnit = d.sales.length ? (d.sales.reduce((acc, s) => acc + s.unit, 0) / d.sales.length).toFixed(2) : 0;
-
-            win.document.write(`
-                <tr>
-                    <td>${d.date}</td>
-                    <td>₦${d.totalSales.toFixed(2)}</td>
-                    <td>₦${d.totalExpenses.toFixed(2)}</td>
-                    <td>₦${d.net.toFixed(2)}</td>
-                    <td>${dailyQty}</td>
-                    <td>₦${dailyAvgUnit}</td>
-                </tr>
-            `);
-        });
-
-        win.document.write(`
-            <tr style="font-weight:bold;">
-                <td>Total</td>
-                <td>₦${totalSales.toFixed(2)}</td>
-                <td>₦${totalExpenses.toFixed(2)}</td>
-                <td>₦${totalNet.toFixed(2)}</td>
-                <td>${totalQty}</td>
-                <td>₦${avgUnitPrice}</td>
-            </tr>
-        </table><p>${footer}</p><hr>`);
-    }
-
-    win.document.close();
-    win.focus();
-    win.print();
-    win.close();
+  win.document.close();
+  win.focus();
+  win.print();
+  win.close();
 }
+
 
 
 // ====== WEEKLY STATEMENT FUNCTION (MONDAY - SATURDAY) ======
@@ -1190,5 +1217,6 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
