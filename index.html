@@ -640,7 +640,7 @@ function clearDailyExpenses() {
 }
 
 
-// ====== DAILY RECORDS ======
+// ====== DAILY RECORDS (NEWEST FIRST) ======
 function renderDailyRecords() {
     const table = document.getElementById('dailyTable');
     table.innerHTML = `
@@ -655,7 +655,12 @@ function renderDailyRecords() {
 <th>Clear</th>
 </tr>`;
 
-    dailyData.forEach((d, index) => {
+    // clone + reverse so newest records appear first
+    const sortedData = [...dailyData].reverse();
+
+    sortedData.forEach((d) => {
+        const index = dailyData.indexOf(d); // keep correct index for delete
+
         const row = table.insertRow();
         row.insertCell(0).innerText = d.date;
         row.insertCell(1).innerText = d.totalSales.toFixed(2);
@@ -666,14 +671,14 @@ function renderDailyRecords() {
         const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
         row.insertCell(5).innerText = totalQty;
 
-        // Create View button in its own cell
+        // View button
         const viewCell = row.insertCell(6);
         const viewBtn = document.createElement('button');
         viewBtn.innerText = 'View';
         viewBtn.onclick = function() { renderDailyRecordInvoice(d); };
         viewCell.appendChild(viewBtn);
 
-        // Create Clear button in its own cell
+        // Clear button
         const clearCell = row.insertCell(7);
         const clearBtn = document.createElement('button');
         clearBtn.innerText = 'Clear';
@@ -687,6 +692,7 @@ function renderDailyRecords() {
         clearCell.appendChild(clearBtn);
     });
 }
+
 
 // ====== FILTER DAILY RECORDS ======
 function filterDailyRecords() {
@@ -1184,4 +1190,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
