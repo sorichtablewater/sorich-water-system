@@ -561,22 +561,41 @@ function printInvoice(sale){
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
 }
 
-// ====== EXPENSES ======
-function addExpense(){
-  const type=document.getElementById('expenseType').value||'General';
-  const desc=document.getElementById('expenseDesc').value||'No description';
-  const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
-  const paidTo=document.getElementById('expensePaidTo').value||'Unknown';
-  const date=new Date().toLocaleString();
-  expenseData.push({type,desc,amount,paidTo,date});
+// ====== ADD EXPENSE ======
+function addExpense() {
+  const type = document.getElementById('expenseType').value || 'General';
+  const desc = document.getElementById('expenseDesc').value || 'No description';
+  const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
+  const paidTo = document.getElementById('expensePaidTo').value || 'Unknown';
+  const date = new Date().toLocaleString();
+
+  expenseData.push({ type, desc, amount, paidTo, date });
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES ======
-function renderExpenses(){
+
+  // Clear form
+  document.getElementById('expenseType').value = '';
+  document.getElementById('expenseDesc').value = '';
+  document.getElementById('expenseAmount').value = '';
+  document.getElementById('expensePaidTo').value = '';
+}
+
+// ====== RENDER EXPENSES WITH DELETE BUTTON ======
+function renderExpenses() {
   const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>🗑</th></tr>';
+  table.innerHTML = `
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Paid To</th>
+      <th>Date</th>
+      <th>Action</th>
+    </tr>
+  `;
 
   let totalExpense = 0;
+
   expenseData.forEach((e, index) => {
     const row = table.insertRow();
     row.insertCell(0).innerText = e.type;
@@ -586,14 +605,14 @@ function renderExpenses(){
     row.insertCell(4).innerText = e.date;
     totalExpense += Number(e.amount);
 
-    // 🗑 DELETE BUTTON
+    // DELETE BUTTON
     const deleteCell = row.insertCell(5);
     const deleteBtn = document.createElement('button');
     deleteBtn.innerText = 'Delete';
     deleteBtn.style.background = 'red';
     deleteBtn.style.color = '#fff';
     deleteBtn.onclick = () => {
-      if(confirm('Delete this expense?')) {
+      if (confirm('Delete this expense?')) {
         expenseData.splice(index, 1);
         localStorage.setItem('expenseData', JSON.stringify(expenseData));
         renderExpenses();
@@ -610,14 +629,6 @@ function renderExpenses(){
   document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
 }
 
-
-  // Update dashboard stats
-  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
-  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
-  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
-  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
-  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
-}
 
 // ====== CLEAR MONTHLY EXPENSES ======
 function clearMonthlyExpenses() {
@@ -1258,4 +1269,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
