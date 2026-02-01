@@ -1,3 +1,32 @@
+Skip to content
+sorichtablewater
+sorich-water-system
+Repository navigation
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+2
+ (2)
+Insights
+Settings
+sorich-water-system
+/index.html
+Go to file
+t
+sorichtablewater
+sorichtablewater
+Update index.html
+b9e8fc8
+ · 
+10 minutes ago
+
+Code
+
+Blame
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -252,102 +281,24 @@ function updateTime(){ document.getElementById('liveTime').innerText=new Date().
 setInterval(updateTime,1000); updateTime();
 
 // ====== LOGIN ======
-function login() { 
-    const u = document.getElementById('username').value.trim(); 
-    const p = document.getElementById('password').value;
-
-    // Clear previous error
-    const loginError = document.getElementById('loginError');
-    if (loginError) loginError.remove();
-
-    // Validate input
-    if (!u || !p) {
-        showLoginError("Please enter both username and password.");
-        return;
-    }
-
-    // Check credentials
-    if (u === loginCredentials.username && p === loginCredentials.password) { 
-        showSection('enterDashboardPage'); 
-    } else {
-        showLoginError("Invalid username or password.");
-    }
+function login(){ 
+  const u=document.getElementById('username').value; 
+  const p=document.getElementById('password').value;
+  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
+  else alert('Invalid credentials');
 }
-
-function logout() { 
-    if (confirm("Are you sure you want to log out?")) {
-        location.reload(); 
-    }
+function logout(){ location.reload(); }
+function showSection(id){
+  ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','settingsPage']
+  .forEach(s=>document.getElementById(s).style.display='none');
+  document.getElementById(id).style.display='block';
+  if(id==='chartsPage') renderChart();
+  if(id==='debtorsPage') renderDebtors();
 }
-
-// Show a specific section and hide others
-function showSection(id) {
-    const sections = [
-        'loginPage',
-        'enterDashboardPage',
-        'dashboardPage',
-        'salesPage',
-        'debtorsPage',
-        'expensesPage',
-        'dailyRecordsPage',
-        'chartsPage',
-        'settingsPage'
-    ];
-    sections.forEach(s => {
-        const el = document.getElementById(s);
-        if (el) el.style.display = 'none';
-    });
-
-    const target = document.getElementById(id);
-    if (!target) {
-        console.error(`Section "${id}" not found`);
-        return;
-    }
-    target.style.display = 'block';
-
-    if (id === 'chartsPage') renderChart();
-    if (id === 'debtorsPage') renderDebtors();
-}
-
-function backToDashboard() { 
-    showSection('dashboardPage'); 
-}
-
-// Toggle dark mode
-function toggleDarkMode() { 
-    document.body.classList.toggle('dark-mode'); 
-}
-
-// Update background color from settings
-function updateBgColor() {
-    const colorPicker = document.getElementById('bgColorPicker');
-    if (colorPicker && colorPicker.value) {
-        document.body.style.background = colorPicker.value;
-    } else {
-        console.warn("Background color not set.");
-    }
-}
-
-// Go to settings page
-function settingsPage() { 
-    showSection('settingsPage'); 
-}
-
-// ====== HELPERS ======
-// Display inline login error
-function showLoginError(message) {
-    const loginPage = document.getElementById('loginPage');
-    if (!loginPage) return;
-
-    const errorEl = document.createElement('div');
-    errorEl.id = 'loginError';
-    errorEl.style.color = 'red';
-    errorEl.style.marginTop = '10px';
-    errorEl.innerText = message;
-
-    loginPage.appendChild(errorEl);
-}
-
+function backToDashboard(){ showSection('dashboardPage'); }
+function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
+function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
+function settingsPage(){ showSection('settingsPage'); }
 
 // ====== SALES ======
 const saleQty = document.getElementById('saleQty'),
@@ -380,54 +331,28 @@ function prefillOwing(){
   updateSaleCalc();
 }
 
-// ====== ADD SALE ======
-function addSale() {
-    // Get form values
-    const customer = document.getElementById('saleCustomer').value.trim() || 'Unknown';
-    const qty = parseFloat(document.getElementById('saleQty').value) || 0;
-    const total = parseFloat(document.getElementById('saleTotal').value) || 0;
-    const paid = parseFloat(document.getElementById('salePaid').value) || 0;
-    const prevDebt = parseFloat(document.getElementById('salePrevDebt').value) || 0; // Previous debt
+function addSale(){
+  const customer = document.getElementById('saleCustomer').value || 'Unknown';
+  const qty = parseFloat(saleQty.value) || 0;
+  const total = parseFloat(saleTotal.value) || 0;
+  const paid = parseFloat(salePaid.value) || 0;
+  const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
 
-    // Validation
-    if (qty <= 0) {
-        alert("Quantity must be greater than 0");
-        return;
-    }
-    if (total < 0 || paid < 0 || prevDebt < 0) {
-        alert("Amounts cannot be negative");
-        return;
-    }
+  // Include previous debt in owing
+  const unit = qty ? (total / qty).toFixed(2) : 0;
+  const owing = (total - paid + prevDebt).toFixed(2); // UPDATED
 
-    // Calculate unit price
-    const unit = qty ? (total / qty).toFixed(2) : 0;
-
-    // Calculate owing including previous debt
-    const owing = (total - paid + prevDebt).toFixed(2);
-
-    // Push to salesData
-    salesData.push({
-        customer,
-        qty,
-        total,
-        unit: parseFloat(unit),
-        paid,
-        owing: parseFloat(owing),
-        prevDebt, // store previous debt
-        date: new Date().toLocaleDateString()
-    });
-
-    // Reset form fields
-    document.getElementById('saleCustomer').value = '';
-    document.getElementById('saleQty').value = '';
-    document.getElementById('saleTotal').value = '';
-    document.getElementById('salePaid').value = '';
-    document.getElementById('salePrevDebt').value = '';
-
-    // Re-render sales table
-    renderSalesTable();
-}
-
+  // Push to sales data
+  salesData.push({
+    customer,
+    qty,
+    total,
+    unit: parseFloat(unit),
+    paid,
+    owing: parseFloat(owing),
+    prevDebt: prevDebt, // NEW: store previous debt
+    date: new Date().toLocaleDateString()
+  });
 
   // Update debt data
   const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
@@ -472,6 +397,7 @@ function renderSalesTable(){
       <th>Owing</th>
       <th>Edit</th>
       <th>🖨</th>
+      <th>🗑</th>
     </tr>
   `;
 
@@ -498,6 +424,21 @@ function renderSalesTable(){
     printBtn.onclick=()=>printInvoice(s);
     row.insertCell(7).appendChild(printBtn);
 
+    // 🗑 DELETE BUTTON
+    const deleteBtn=document.createElement('button');
+    deleteBtn.innerText='Delete';
+    deleteBtn.style.background='red';
+    deleteBtn.style.color='#fff';
+    deleteBtn.onclick=()=>{
+      if(confirm('Delete this sale?')){
+        salesData.splice(index,1);
+        localStorage.setItem('salesData', JSON.stringify(salesData));
+        renderSalesTable();
+        renderDebtors(); // Update debts if needed
+      }
+    };
+    row.insertCell(8).appendChild(deleteBtn);
+
     sumQty+=s.qty;
     sumTotal+=s.total;
     sumPaid+=s.paid;
@@ -518,6 +459,7 @@ function renderSalesTable(){
   document.getElementById('debts').innerText=totalDebt.toFixed(2);
   document.getElementById('avgUnitPrice').innerText=avgUnit;
 }
+
 
 // ====== DEBTORS ======
 function renderDebtors() {
@@ -564,59 +506,49 @@ function renderDebtors() {
   });
 }
 
-// ====== PAY DEBT (FIXED & IMPROVED) ======
+// ====== PAY DEBT (FIXED) ======
 function payDebt(index) {
-    const d = debtData[index];
+  const d = debtData[index];
 
-    let remainingPayment = parseFloat(
-        prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))
-    );
+  let remainingPayment = parseFloat(
+    prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))
+  );
 
-    // Validation
-    if (isNaN(remainingPayment) || remainingPayment <= 0) {
-        alert('Invalid payment amount');
-        return;
+  if (isNaN(remainingPayment) || remainingPayment <= 0) {
+    alert('Invalid payment amount');
+    return;
+  }
+
+  if (remainingPayment > d.owing) {
+    alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
+    return;
+  }
+
+  d.owing -= remainingPayment;
+  d.totalPaid += remainingPayment;
+
+  // Update corresponding sales entries
+  salesData.forEach(sale => {
+    if (
+      remainingPayment > 0 &&
+      sale.customer.toLowerCase() === d.customer.toLowerCase() &&
+      sale.owing > 0
+    ) {
+      const deduction = Math.min(sale.owing, remainingPayment);
+      sale.paid += deduction;
+      sale.owing -= deduction;
+      remainingPayment -= deduction;
     }
+  });
 
-    if (remainingPayment > d.owing) {
-        alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
-        return;
-    }
+  if (d.owing <= 0) d.owing = 0;
 
-    // Deduct from customer debt
-    d.owing = parseFloat((d.owing - remainingPayment).toFixed(2));
-    d.totalPaid = parseFloat((d.totalPaid + remainingPayment).toFixed(2));
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+  localStorage.setItem('salesData', JSON.stringify(salesData));
 
-    // Update corresponding sales entries (oldest first)
-    for (let sale of salesData) {
-        if (
-            remainingPayment <= 0
-        ) break;
-
-        if (
-            sale.customer.toLowerCase() === d.customer.toLowerCase() &&
-            sale.owing > 0
-        ) {
-            const deduction = Math.min(sale.owing, remainingPayment);
-            sale.paid = parseFloat((sale.paid + deduction).toFixed(2));
-            sale.owing = parseFloat((sale.owing - deduction).toFixed(2));
-            remainingPayment -= deduction;
-            remainingPayment = parseFloat(remainingPayment.toFixed(2));
-        }
-    }
-
-    // Safety check
-    if (d.owing < 0) d.owing = 0;
-
-    // Persist to localStorage
-    localStorage.setItem('debtData', JSON.stringify(debtData));
-    localStorage.setItem('salesData', JSON.stringify(salesData));
-
-    // Refresh UI
-    renderDebtors();
-    renderSalesTable();
+  renderDebtors();
+  renderSalesTable();
 }
-
 
 // ====== CLEAR CLEARED DEBTOR ======
 function clearDebtor(index) {
@@ -658,36 +590,16 @@ function printInvoice(sale){
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
 }
 
-// ====== EXPENSES (ADD) ======
-function addExpense() {
-    const type = document.getElementById('expenseType').value || 'General';
-    const desc = document.getElementById('expenseDesc').value || 'No description';
-    const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
-    const paidTo = document.getElementById('expensePaidTo').value || 'Unknown';
-    const date = new Date().toLocaleString();
-
-    // Push new expense with rounded amount
-    expenseData.push({
-        type,
-        desc,
-        amount: parseFloat(amount.toFixed(2)),
-        paidTo,
-        date
-    });
-
-    // Save to localStorage
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
-
-    // Refresh the table
-    renderExpenses();
-
-    // Clear input fields for convenience
-    document.getElementById('expenseType').value = '';
-    document.getElementById('expenseDesc').value = '';
-    document.getElementById('expenseAmount').value = '';
-    document.getElementById('expensePaidTo').value = '';
-}
-
+// ====== EXPENSES ======
+function addExpense(){
+  const type=document.getElementById('expenseType').value||'General';
+  const desc=document.getElementById('expenseDesc').value||'No description';
+  const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
+  const paidTo=document.getElementById('expensePaidTo').value||'Unknown';
+  const date=new Date().toLocaleString();
+  expenseData.push({type,desc,amount,paidTo,date});
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
 }// ====== RENDER EXPENSES ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
@@ -843,17 +755,17 @@ function filterDailyRecords() {
     const table = document.getElementById('dailyTable');
     table.innerHTML = `
 <tr>
-    <th>Date</th>
-    <th>Total Sales</th>
-    <th>Total Expenses</th>
-    <th>Net Balance</th>
-    <th>Avg Unit Price</th>
-    <th>Total Qty</th>
-    <th>View</th>
-    <th>Clear</th>
+<th>Date</th>
+<th>Total Sales</th>
+<th>Total Expenses</th>
+<th>Net Balance</th>
+<th>Avg Unit Price</th>
+<th>Total Qty</th>
+<th>View</th>
+<th>Clear</th>
 </tr>`;
 
-    filteredData.forEach((d, index) => {
+    filteredData.forEach(d => {
         const row = table.insertRow();
         row.insertCell(0).innerText = d.date;
         row.insertCell(1).innerText = d.totalSales.toFixed(2);
@@ -863,29 +775,6 @@ function filterDailyRecords() {
 
         const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
         row.insertCell(5).innerText = totalQty;
-
-        // View button
-        const viewBtn = document.createElement('button');
-        viewBtn.innerText = 'View';
-        viewBtn.onclick = () => {
-            alert(JSON.stringify(d, null, 2)); // Simple view popup
-        };
-        row.insertCell(6).appendChild(viewBtn);
-
-        // Clear button
-        const clearBtn = document.createElement('button');
-        clearBtn.innerText = 'Clear';
-        clearBtn.onclick = () => {
-            if (confirm(`Clear record for ${d.date}?`)) {
-                dailyData.splice(dailyData.indexOf(d), 1);
-                localStorage.setItem('dailyData', JSON.stringify(dailyData));
-                filterDailyRecords(); // Refresh table
-            }
-        };
-        row.insertCell(7).appendChild(clearBtn);
-    });
-}
-
 
         // View button
         const viewCell = row.insertCell(6);
@@ -993,7 +882,6 @@ function renderDailyRecordInvoice(d) {
     win.print();
     win.close();
 }
-// ====== END OF DAY ======
 function endOfDay() {
     if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
 
@@ -1006,35 +894,6 @@ function endOfDay() {
     const avgUnitPrice = salesData.length 
         ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
-
-    // Archive today's record
-    const dayRecord = {
-        date: todayStr,
-        totalSales,
-        totalExpenses,
-        net: totalSales - totalExpenses,
-        avgUnitPrice: avgUnitPrice.toFixed(2),
-        sales: [...salesData],    // store a copy of today's sales
-        expenses: [...expenseData] // store a copy of today's expenses
-    };
-
-    dailyData.push(dayRecord);
-    localStorage.setItem('dailyData', JSON.stringify(dailyData));
-
-    // Reset daily sales and expenses for a new day
-    salesData = [];
-    expenseData = [];
-    localStorage.setItem('salesData', JSON.stringify(salesData));
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
-
-    alert("Day closed and archived successfully!");
-
-    // Refresh tables
-    renderSalesTable();
-    renderExpenses();
-    renderDailyRecords();
-}
-
 
     // Archive today's data
     dailyData.push({
@@ -1404,4 +1263,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
