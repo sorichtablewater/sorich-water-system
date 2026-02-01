@@ -554,7 +554,7 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES WITH DELETE BUTTON ======
+}// ====== RENDER EXPENSES ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
   table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Delete</th></tr>';
@@ -567,18 +567,20 @@ function renderExpenses(){
     row.insertCell(2).innerText = e.amount.toFixed(2);
     row.insertCell(3).innerText = e.paidTo;
     row.insertCell(4).innerText = e.date;
+    totalExpense += Number(e.amount);
 
     // DELETE BUTTON
-    const delCell = row.insertCell(5);
-    const delBtn = document.createElement('button');
-    delBtn.innerText = '🗑 Delete';
-    delBtn.style.background = 'red';
-    delBtn.style.color = '#fff';
-    delBtn.style.cursor = 'pointer';
-    delBtn.onclick = () => deleteExpense(index);
-    delCell.appendChild(delBtn);
-
-    totalExpense += Number(e.amount);
+    const deleteCell = row.insertCell(5);
+    const deleteBtn = document.createElement('button');
+    deleteBtn.innerText = '🗑 Delete';
+    deleteBtn.style.background = 'red';
+    deleteBtn.style.color = '#fff';
+    deleteBtn.style.border = 'none';
+    deleteBtn.style.padding = '5px 10px';
+    deleteBtn.style.borderRadius = '5px';
+    deleteBtn.style.cursor = 'pointer';
+    deleteBtn.onclick = () => deleteExpense(index);
+    deleteCell.appendChild(deleteBtn);
   });
 
   // Update dashboard stats
@@ -589,14 +591,14 @@ function renderExpenses(){
   document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
 }
 
-// ====== DELETE SINGLE EXPENSE ======
+// ====== DELETE EXPENSE FUNCTION ======
 function deleteExpense(index){
-  if(confirm('Are you sure you want to delete this expense?')){
-    expenseData.splice(index, 1);
-    localStorage.setItem('expenseData', JSON.stringify(expenseData));
-    renderExpenses();
-  }
+  if(!confirm('Delete this expense?')) return;
+  expenseData.splice(index, 1);
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
 }
+
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
@@ -1188,15 +1190,6 @@ function printWeeklyStatement() {
 
 
 // ====== INIT ======
-
-// ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials'));
-if (!loginCredentials) {
-    loginCredentials = { username: 'admin', password: 'admin' };
-    localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
-}
-
-// Render initial data
 renderSalesTable();
 renderDebtors();
 renderExpenses();
@@ -1206,4 +1199,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
