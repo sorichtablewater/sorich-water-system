@@ -574,10 +574,10 @@ function addExpense(){
 }// ====== RENDER EXPENSES ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
+  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>🗑</th></tr>';
 
   let totalExpense = 0;
-  expenseData.forEach(e => {
+  expenseData.forEach((e, index) => {
     const row = table.insertRow();
     row.insertCell(0).innerText = e.type;
     row.insertCell(1).innerText = e.desc;
@@ -585,7 +585,31 @@ function renderExpenses(){
     row.insertCell(3).innerText = e.paidTo;
     row.insertCell(4).innerText = e.date;
     totalExpense += Number(e.amount);
+
+    // 🗑 DELETE BUTTON
+    const deleteCell = row.insertCell(5);
+    const deleteBtn = document.createElement('button');
+    deleteBtn.innerText = 'Delete';
+    deleteBtn.style.background = 'red';
+    deleteBtn.style.color = '#fff';
+    deleteBtn.onclick = () => {
+      if(confirm('Delete this expense?')) {
+        expenseData.splice(index, 1);
+        localStorage.setItem('expenseData', JSON.stringify(expenseData));
+        renderExpenses();
+      }
+    };
+    deleteCell.appendChild(deleteBtn);
   });
+
+  // Update dashboard stats
+  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
+  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
+  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+}
+
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
@@ -1234,3 +1258,4 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
