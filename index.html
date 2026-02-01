@@ -1159,6 +1159,48 @@ function printWeeklyStatement() {
 }
 
 
+// ====== RENDER EXPENSES WITH DELETE BUTTON ======
+function renderExpenses() {
+  const table = document.getElementById('expensesTable');
+  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Action</th></tr>';
+
+  let totalExpense = 0;
+  expenseData.forEach((e, index) => {
+    const row = table.insertRow();
+    row.insertCell(0).innerText = e.type;
+    row.insertCell(1).innerText = e.desc;
+    row.insertCell(2).innerText = e.amount.toFixed(2);
+    row.insertCell(3).innerText = e.paidTo;
+    row.insertCell(4).innerText = e.date;
+    totalExpense += Number(e.amount);
+
+    // ✅ ADD DELETE BUTTON
+    const delCell = row.insertCell(5);
+    const delBtn = document.createElement('button');
+    delBtn.innerText = 'Delete';
+    delBtn.style.background = 'red';
+    delBtn.style.color = 'white';
+    delBtn.style.cursor = 'pointer';
+    delBtn.onclick = () => deleteExpense(index);
+    delCell.appendChild(delBtn);
+  });
+
+  // Update dashboard stats
+  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
+  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
+  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
+}
+
+// ====== DELETE EXPENSE FUNCTION ======
+function deleteExpense(index) {
+  if (!confirm('Delete this expense?')) return;
+  expenseData.splice(index, 1);
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
@@ -1166,6 +1208,8 @@ renderExpenses();
 renderDailyRecords();
 
 
+
 </script>
 </body>
 </html>
+
