@@ -220,9 +220,25 @@ body.dark-mode th {background-color:#003366;}
   <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 
-backupData()
-restoreData()
+<!-- SETTINGS PAGE -->
+<div id="settingsPage" class="section" style="display:none;">
+  <h2>Settings</h2>
+  <label>Dark Mode: <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"></label><br>
+  <label>Background Color: <input type="color" id="bgColorPicker" onchange="updateBgColor()"></label><br>
+  <label>Manager Name: <input type="text" id="managerName"></label><br>
+  <label>Contact Phone 1: <input type="text" id="contact1"></label><br>
+  <label>Invoice Footer: <input type="text" id="invoiceFooter" value="Drink It. Love It."></label><br>
+  <label>Invoice Copies: <input type="number" id="invoiceCopies" value="4"></label><br><br>
 
+  <h3>Change Login Credentials</h3>
+  <label>Old Password: <input type="password" id="oldPassword"></label><br>
+  <label>New Username: <input type="text" id="newUsername"></label><br>
+  <label>New Password: <input type="password" id="newPassword"></label><br>
+  <label>Confirm New Password: <input type="password" id="confirmPassword"></label><br>
+  <button onclick="changeCredentials()">Update Credentials</button><br><br>
+
+  <button onclick="backToDashboard()">Back to Dashboard</button>
+</div>
 <script>
 // ====== Offline JS Logic ======
 let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
@@ -909,90 +925,6 @@ function renderChart() {
   chartEl.textContent = output;
 }
 
-// ====== BACKUP & RESTORE ======
-
-// Backup data to JSON file
-function backupData() {
-  const data = {
-    sales: salesData || [],
-    debtors: debtorsData || [],
-    expenses: expenseData || [],
-    dailyRecords: dailyData || [],
-    settings: {
-      darkMode: document.getElementById('darkModeToggle').checked,
-      bgColor: document.getElementById('bgColorPicker').value,
-      managerName: document.getElementById('managerName').value,
-      contact1: document.getElementById('contact1').value,
-      invoiceFooter: document.getElementById('invoiceFooter').value,
-      invoiceCopies: document.getElementById('invoiceCopies').value
-    }
-  };
-
-  const dataStr = JSON.stringify(data, null, 2);
-  const blob = new Blob([dataStr], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `sorich_backup_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-
-  alert("Backup completed successfully!");
-}
-
-// Restore data from JSON file
-function restoreData() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "application/json";
-
-  input.onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = event => {
-      try {
-        const data = JSON.parse(event.target.result);
-
-        // Restore arrays
-        salesData = data.sales || [];
-        debtorsData = data.debtors || [];
-        expenseData = data.expenses || [];
-        dailyData = data.dailyRecords || [];
-
-        // Restore settings
-        if (data.settings) {
-          document.getElementById('darkModeToggle').checked = data.settings.darkMode || false;
-          document.getElementById('bgColorPicker').value = data.settings.bgColor || "#ffffff";
-          document.getElementById('managerName').value = data.settings.managerName || "";
-          document.getElementById('contact1').value = data.settings.contact1 || "";
-          document.getElementById('invoiceFooter').value = data.settings.invoiceFooter || "Drink It. Love It.";
-          document.getElementById('invoiceCopies').value = data.settings.invoiceCopies || 4;
-
-          updateBgColor();
-          toggleDarkMode();
-        }
-
-        // Re-render tables
-        renderSalesTable();
-        renderDebtors();
-        renderExpenses();
-        renderDailyRecords();
-
-        alert("Data restored successfully!");
-      } catch (err) {
-        alert("Error restoring data: " + err);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  input.click();
-}
-
-
 
 // ====== EDIT SALE FUNCTION ======
 function editSale(index){
@@ -1285,7 +1217,3 @@ renderDailyRecords();
 </script>
 </body>
 </html>
-
-
-
-
