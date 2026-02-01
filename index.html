@@ -554,21 +554,7 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES ======
-function renderExpenses(){
-  const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
-
-  let totalExpense = 0;
-  expenseData.forEach(e => {
-    const row = table.insertRow();
-    row.insertCell(0).innerText = e.type;
-    row.insertCell(1).innerText = e.desc;
-    row.insertCell(2).innerText = e.amount.toFixed(2);
-    row.insertCell(3).innerText = e.paidTo;
-    row.insertCell(4).innerText = e.date;
-    totalExpense += Number(e.amount);
-  });
+}
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
@@ -1212,4 +1198,5 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
