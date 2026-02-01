@@ -554,13 +554,13 @@ function addExpense(){
   expenseData.push({type,desc,amount,paidTo,date});
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
-}// ====== RENDER EXPENSES WITH EDIT BUTTON ======
+}// ====== RENDER EXPENSES ======
 function renderExpenses(){
   const table = document.getElementById('expensesTable');
-  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Edit</th></tr>';
+  table.innerHTML = '<tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th></tr>';
 
   let totalExpense = 0;
-  expenseData.forEach((e, index) => {
+  expenseData.forEach(e => {
     const row = table.insertRow();
     row.insertCell(0).innerText = e.type;
     row.insertCell(1).innerText = e.desc;
@@ -568,46 +568,7 @@ function renderExpenses(){
     row.insertCell(3).innerText = e.paidTo;
     row.insertCell(4).innerText = e.date;
     totalExpense += Number(e.amount);
-
-    // ✏️ EDIT BUTTON
-    const editBtn = document.createElement('button');
-    editBtn.innerText = 'Edit';
-    editBtn.onclick = () => editExpense(index);
-    row.insertCell(5).appendChild(editBtn);
   });
-
-  // Update dashboard stats
-  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
-  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
-  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
-  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
-  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
-}
-
-// ====== EDIT EXPENSE FUNCTION ======
-function editExpense(index) {
-  const e = expenseData[index];
-  const newType = prompt("Edit Expense Type:", e.type);
-  if(newType === null) return;
-
-  const newDesc = prompt("Edit Description:", e.desc);
-  if(newDesc === null) return;
-
-  const newAmount = parseFloat(prompt("Edit Amount:", e.amount));
-  if(isNaN(newAmount)) return;
-
-  const newPaidTo = prompt("Edit Paid To:", e.paidTo);
-  if(newPaidTo === null) return;
-
-  e.type = newType;
-  e.desc = newDesc;
-  e.amount = newAmount;
-  e.paidTo = newPaidTo;
-
-  localStorage.setItem('expenseData', JSON.stringify(expenseData));
-  renderExpenses();
-}
-
 
   // Update dashboard stats
   document.getElementById('expenses').innerText = totalExpense.toFixed(2);
