@@ -891,8 +891,13 @@ function renderDailyRecordInvoice(d) {
 function endOfDay() {
     if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
 
+    // Default to TODAY (even if it's past midnight)
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
+
+    // Allow you to edit the date if you're finishing yesterday's work
+    let chosenDate = prompt("Confirm date for End of Day record (YYYY-MM-DD):", todayStr);
+    if (!chosenDate) return;
 
     // Calculate totals
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
@@ -901,9 +906,9 @@ function endOfDay() {
         ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
         : 0;
 
-    // Archive today's data
+    // Archive data with chosen date
     dailyData.push({
-        date: todayStr,
+        date: chosenDate,
         totalSales,
         totalExpenses,
         net: totalSales - totalExpenses,
@@ -923,6 +928,7 @@ function endOfDay() {
             paidTo: e.paidTo
         }))
     });
+
     localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
     // Clear today's sales and expenses for a fresh day
@@ -936,8 +942,9 @@ function endOfDay() {
     renderExpenses();
     renderDailyRecords();
 
-    alert("End of day completed! Today's sales and expenses archived. Debtors remain unchanged.");
+    alert("End of day completed! Record saved for " + chosenDate);
 }
+
 // ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
   const chartEl = document.getElementById('chartText');
@@ -1269,5 +1276,6 @@ renderDailyRecords();
 </script>
 </body>
 </html>
+
 
 
