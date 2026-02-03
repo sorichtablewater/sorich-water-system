@@ -74,7 +74,12 @@ body.dark-mode th {background-color:#003366;}
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
 <h2>Sales</h2>
-<label>Customer: <input type="text" id="saleCustomer" placeholder="New or select customer" oninput="prefillOwing()"></label>
+
+<label>Customer: 
+  <input type="text" id="saleCustomer" list="customerList" placeholder="New or select customer" oninput="prefillOwing()">
+</label>
+<datalist id="customerList"></datalist>
+
 <label>Qty: <input type="number" id="saleQty" value="10"></label>
 <label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
 <label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
@@ -100,6 +105,7 @@ body.dark-mode th {background-color:#003366;}
   </tr>
 </table>
 </div>
+
 
 
 <!-- DEBTORS PAGE -->
@@ -1266,13 +1272,39 @@ function printWeeklyStatement() {
 
 
 
+function updateCustomerSuggestions() {
+  const list = document.getElementById('customerList');
+  if (!list) return;
+
+  const names = new Set();
+
+  // collect names from sales
+  salesData.forEach(s => {
+    if (s.customer) names.add(s.customer);
+  });
+
+  // collect names from debtors
+  debtData.forEach(d => {
+    if (d.customer) names.add(d.customer);
+  });
+
+  list.innerHTML = '';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    list.appendChild(opt);
+  });
+}
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
 renderExpenses();
 renderDailyRecords();
+updateCustomerSuggestions();
 
 
 </script>
 </body>
 </html>
+
