@@ -455,33 +455,43 @@ function renderDebtors() {
   `;
 
   debtData.forEach((d, index) => {
+
+    // ✅ ONLY SHOW CUSTOMERS THAT STILL OWE
+    if (Number(d.owing) <= 0) return;
+
     if (!d.customer.toLowerCase().includes(search)) return;
 
     const row = table.insertRow();
     row.insertCell(0).innerText = d.customer;
-    row.insertCell(1).innerText = (d.totalPaid + d.owing).toFixed(2);
-    row.insertCell(2).innerText = d.totalPaid.toFixed(2);
-    row.insertCell(3).innerText = d.owing.toFixed(2);
-    row.insertCell(4).innerText = d.owing > 0 ? '❌ Owing' : '✅ Cleared';
+    row.insertCell(1).innerText = (Number(d.totalPaid) + Number(d.owing)).toFixed(2);
+    row.insertCell(2).innerText = Number(d.totalPaid).toFixed(2);
+    row.insertCell(3).innerText = Number(d.owing).toFixed(2);
+    row.insertCell(4).innerText = '❌ Owing';
 
     const actionCell = row.insertCell(5);
-    actionCell.innerHTML = '';
 
-    if (d.owing > 0) {
-      const payBtn = document.createElement('button');
-      payBtn.innerText = 'Pay';
-      payBtn.onclick = () => payDebt(index);
-      actionCell.appendChild(payBtn);
-    } else {
-      const clearBtn = document.createElement('button');
-      clearBtn.innerText = '🗑 Clear';
-      clearBtn.style.background = 'green';
-      clearBtn.style.color = '#fff';
-      clearBtn.onclick = () => clearDebtor(index);
-      actionCell.appendChild(clearBtn);
-    }
+    // Pay button
+    const payBtn = document.createElement('button');
+    payBtn.innerText = 'Pay';
+    payBtn.onclick = () => payDebt(index);
+    actionCell.appendChild(payBtn);
+
+    // Clear button
+    const clearBtn = document.createElement('button');
+    clearBtn.innerText = '🗑 Clear';
+    clearBtn.style.background = 'red';
+    clearBtn.style.color = '#fff';
+    clearBtn.style.marginLeft = '5px';
+    clearBtn.onclick = () => {
+      if (confirm(`Clear debtor "${d.customer}"?`)) {
+        clearDebtor(index); // Make sure you have a clearDebtor function
+        renderDebtors(); // Refresh table after clearing
+      }
+    };
+    actionCell.appendChild(clearBtn);
   });
 }
+
 
 // ====== PAY DEBT (FIXED) ======
 function payDebt(index) {
@@ -1307,4 +1317,5 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
