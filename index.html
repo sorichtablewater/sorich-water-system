@@ -1076,22 +1076,74 @@ function printMonthlyStatement() {
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0;
-  let unitSum = 0, unitCount = 0;
+  let totalSales = 0,
+      totalExpenses = 0,
+      totalNet = 0,
+      totalQty = 0,
+      unitSum = 0,
+      unitCount = 0;
+
+  // ✅ NEW MATERIAL & PACKING BAG TRACKING
+  let materialTotal = 0;
+  let packingBagTotal = 0;
+  let materialRows = "";
+  let packingRows = "";
 
   monthRecords.forEach(d => {
     totalSales += d.totalSales;
     totalExpenses += d.totalExpenses;
     totalNet += d.net;
 
+    // SALES SUMMARY
     d.sales.forEach(s => {
       totalQty += s.qty;
       unitSum += Number(s.unit);
       unitCount++;
     });
+
+    // ===== READ EXPENSES =====
+    if (d.expenses) {
+      d.expenses.forEach(e => {
+
+        const type = (e.type || "").toLowerCase();
+        const desc = (e.desc || "").toLowerCase();
+
+        // MATERIALS
+        if (type.includes("material") || desc.includes("material")) {
+          materialTotal += Number(e.amount);
+
+          materialRows += `
+            <tr>
+              <td>${d.date}</td>
+              <td>${e.desc}</td>
+              <td>₦${Number(e.amount).toFixed(2)}</td>
+            </tr>
+          `;
+        }
+
+        // PACKING BAG
+        if (
+          type.includes("packing") ||
+          desc.includes("packing") ||
+          desc.includes("bag")
+        ) {
+          packingBagTotal += Number(e.amount);
+
+          packingRows += `
+            <tr>
+              <td>${d.date}</td>
+              <td>${e.desc}</td>
+              <td>₦${Number(e.amount).toFixed(2)}</td>
+            </tr>
+          `;
+        }
+      });
+    }
   });
 
-  const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
+  const monthlyAvgUnitPrice = unitCount
+    ? (unitSum / unitCount).toFixed(2)
+    : 0;
 
   const win = window.open('', '', 'width=800,height=800');
   if (!win) {
@@ -1100,6 +1152,7 @@ function printMonthlyStatement() {
   }
 
   for (let i = 0; i < copies; i++) {
+
     const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
@@ -1110,6 +1163,8 @@ function printMonthlyStatement() {
       <p>Period: ${year}-${monthStr}</p>
       <p>ISSUER: ${manager}</p>
       <hr>
+
+      <h4>MONTH SUMMARY</h4>
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
           <th>Date</th>
@@ -1122,7 +1177,9 @@ function printMonthlyStatement() {
     `);
 
     monthRecords.forEach(d => {
+
       const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+
       const dailyAvgUnit = d.sales.length
         ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
@@ -1149,6 +1206,27 @@ function printMonthlyStatement() {
           <td>₦${monthlyAvgUnitPrice}</td>
         </tr>
       </table>
+
+      <br><h4>MATERIAL EXPENSES</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+        ${materialRows || '<tr><td colspan="3">No material expenses</td></tr>'}
+        <tr style="font-weight:bold;">
+          <td colspan="2">TOTAL MATERIAL COST</td>
+          <td>₦${materialTotal.toFixed(2)}</td>
+        </tr>
+      </table>
+
+      <br><h4>PACKING BAG EXPENSES</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+        ${packingRows || '<tr><td colspan="3">No packing bag expenses</td></tr>'}
+        <tr style="font-weight:bold;">
+          <td colspan="2">TOTAL PACKING BAG COST</td>
+          <td>₦${packingBagTotal.toFixed(2)}</td>
+        </tr>
+      </table>
+
       <p>${footer}</p>
       <hr>
     `);
@@ -1159,6 +1237,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1317,5 +1396,6 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
