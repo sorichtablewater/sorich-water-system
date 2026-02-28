@@ -1062,6 +1062,7 @@ function printMonthlyStatement() {
 
   const monthStr = String(month).padStart(2, '0');
 
+  // Filter dailyData for the selected month
   const monthRecords = dailyData.filter(d => {
     const [y, m] = d.date.split('-');
     return parseInt(y) === year && m === monthStr;
@@ -1083,35 +1084,38 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  // ✅ MATERIAL & PACKING BAG TRACKING
+  // MATERIAL & PACKING BAG TRACKING
   let materialTotal = 0;
   let packingBagTotal = 0;
   let materialRows = "";
   let packingRows = "";
 
-  // ✅ PERSON EXPENSE TRACKING
+  // PEOPLE TRACKING
   const people = ["Forcados Richard", "Forcados Precious", "Forcados Blessing", "Mummy"];
   const personTotals = {};
   people.forEach(p => personTotals[p] = 0);
 
+  // Loop through each daily record
   monthRecords.forEach(d => {
-    totalSales += d.totalSales;
-    totalExpenses += d.totalExpenses;
-    totalNet += d.net;
+    totalSales += Number(d.totalSales) || 0;
+    totalExpenses += Number(d.totalExpenses) || 0;
+    totalNet += Number(d.net) || 0;
 
-    // SALES SUMMARY
-    d.sales.forEach(s => {
-      totalQty += s.qty;
-      unitSum += Number(s.unit);
-      unitCount++;
-    });
+    // Sales summary
+    if (d.sales) {
+      d.sales.forEach(s => {
+        totalQty += s.qty;
+        unitSum += Number(s.unit) || 0;
+        unitCount++;
+      });
+    }
 
-    // ===== READ EXPENSES =====
+    // Expenses
     if (d.expenses) {
       d.expenses.forEach(e => {
-        const type = (e.type || "").toLowerCase();
-        const desc = (e.desc || "").toLowerCase();
         const amount = Number(e.amount) || 0;
+        const type = (e.type || "").toLowerCase().trim();
+        const desc = (e.desc || "").toLowerCase().trim();
 
         // MATERIALS
         if (type.includes("material") || desc.includes("material")) {
@@ -1137,9 +1141,9 @@ function printMonthlyStatement() {
           `;
         }
 
-        // PEOPLE
+        // PEOPLE TOTALS
         people.forEach(p => {
-          if (e.desc && e.desc.toLowerCase().includes(p.toLowerCase())) {
+          if (desc.includes(p.toLowerCase())) {
             personTotals[p] += amount;
           }
         });
@@ -1147,9 +1151,7 @@ function printMonthlyStatement() {
     }
   });
 
-  const monthlyAvgUnitPrice = unitCount
-    ? (unitSum / unitCount).toFixed(2)
-    : 0;
+  const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
 
   const win = window.open('', '', 'width=800,height=800');
   if (!win) {
@@ -1182,17 +1184,17 @@ function printMonthlyStatement() {
     `);
 
     monthRecords.forEach(d => {
-      const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
-      const dailyAvgUnit = d.sales.length
+      const dailyQty = d.sales ? d.sales.reduce((acc, s) => acc + s.qty, 0) : 0;
+      const dailyAvgUnit = d.sales && d.sales.length
         ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
 
       win.document.write(`
         <tr>
           <td>${d.date}</td>
-          <td>₦${d.totalSales.toFixed(2)}</td>
-          <td>₦${d.totalExpenses.toFixed(2)}</td>
-          <td>₦${d.net.toFixed(2)}</td>
+          <td>₦${(Number(d.totalSales) || 0).toFixed(2)}</td>
+          <td>₦${(Number(d.totalExpenses) || 0).toFixed(2)}</td>
+          <td>₦${(Number(d.net) || 0).toFixed(2)}</td>
           <td>${dailyQty}</td>
           <td>₦${dailyAvgUnit}</td>
         </tr>
@@ -1251,6 +1253,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1411,3 +1414,4 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
