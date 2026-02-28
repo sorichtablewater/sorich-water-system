@@ -1048,17 +1048,9 @@ function printMonthlyStatement() {
     return;
   }
 
-  let month = prompt("Enter month number (1-12):", new Date().getMonth() + 1);
-  let year = prompt("Enter year (YYYY):", new Date().getFullYear());
+  let month = parseInt(prompt("Enter month number (1-12):", new Date().getMonth() + 1));
+  let year = parseInt(prompt("Enter year (YYYY):", new Date().getFullYear()));
   if (!month || !year) return;
-
-  month = parseInt(month);
-  year = parseInt(year);
-
-  if (isNaN(month) || month < 1 || month > 12 || isNaN(year)) {
-    alert("Invalid month or year.");
-    return;
-  }
 
   const monthStr = String(month).padStart(2, '0');
 
@@ -1090,10 +1082,8 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // PEOPLE TRACKING
-  const people = ["Forcados Richard", "Forcados Precious", "Forcados Blessing", "Mummy"];
-  const personTotals = {};
-  people.forEach(p => personTotals[p] = 0);
+  // MUMMY TOTAL
+  let mummyTotal = 0;
 
   // Loop through each daily record
   monthRecords.forEach(d => {
@@ -1114,10 +1104,10 @@ function printMonthlyStatement() {
     if (d.expenses) {
       d.expenses.forEach(e => {
         const amount = Number(e.amount) || 0;
-
-        // MATERIALS
         const type = (e.type || "").toLowerCase().trim();
         const desc = (e.desc || "").toLowerCase().trim();
+
+        // MATERIALS
         if (type.includes("material") || desc.includes("material")) {
           materialTotal += amount;
           materialRows += `
@@ -1141,15 +1131,10 @@ function printMonthlyStatement() {
           `;
         }
 
-        // PEOPLE TOTALS: check all fields
-        people.forEach(p => {
-          for (const key in e) {
-            if (typeof e[key] === "string" && e[key].toLowerCase().includes(p.toLowerCase())) {
-              personTotals[p] += amount;
-              break; // stop after first match in any field
-            }
-          }
-        });
+        // MUMMY TOTAL: check only type and desc fields
+        if (type.includes("mummy") || desc.includes("mummy")) {
+          mummyTotal += amount;
+        }
       });
     }
   });
@@ -1235,15 +1220,13 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
-      <br><h4>MONEY RECEIVED BY PERSON</h4>
+      <br><h4>MONEY RECEIVED BY MUMMY</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Person</th><th>Total Received</th></tr>
-        ${people.map(p => `
-          <tr>
-            <td>${p}</td>
-            <td>₦${personTotals[p].toFixed(2)}</td>
-          </tr>
-        `).join('')}
+        <tr>
+          <td>Mummy</td>
+          <td>₦${mummyTotal.toFixed(2)}</td>
+        </tr>
       </table>
 
       <p>${footer}</p>
@@ -1256,6 +1239,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1418,5 +1402,6 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
