@@ -1082,8 +1082,9 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // MUMMY TOTAL
+  // PEOPLE TOTALS
   let mummyTotal = 0;
+  let forcadosRichardTotal = 0;
 
   // Loop through each daily record
   monthRecords.forEach(d => {
@@ -1131,9 +1132,12 @@ function printMonthlyStatement() {
           `;
         }
 
-        // MUMMY TOTAL: check only type and desc fields
+        // PEOPLE TOTALS: check only type and desc fields
         if (type.includes("mummy") || desc.includes("mummy")) {
           mummyTotal += amount;
+        }
+        if (type.includes("forcados richard") || desc.includes("forcados richard")) {
+          forcadosRichardTotal += amount;
         }
       });
     }
@@ -1220,12 +1224,16 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
-      <br><h4>MONEY RECEIVED BY MUMMY</h4>
+      <br><h4>MONEY RECEIVED BY PERSON</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Person</th><th>Total Received</th></tr>
         <tr>
           <td>Mummy</td>
           <td>₦${mummyTotal.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>Forcados Richard CEO</td>
+          <td>₦${forcadosRichardTotal.toFixed(2)}</td>
         </tr>
       </table>
 
@@ -1239,6 +1247,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1402,6 +1411,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
