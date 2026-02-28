@@ -1086,6 +1086,10 @@ function printMonthlyStatement() {
     blessing: {}
   };
 
+  // BORROW ENTRIES
+  let borrowRows = "";
+  let totalBorrow = 0;
+
   // Process each daily record
   monthRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
@@ -1143,6 +1147,17 @@ function printMonthlyStatement() {
             type.includes("forcados blessing") || desc.includes("forcados blessing")) {
           if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
           payments.blessing[d.date].push({desc: e.desc, amount});
+        }
+
+        // BORROW
+        if (type.includes("borrow") || desc.includes("borrow")) {
+          borrowRows += `<tr>
+            <td>${d.date}</td>
+            <td>${e.type || "-"}</td>
+            <td>${e.desc || "-"}</td>
+            <td>₦${amount.toFixed(2)}</td>
+          </tr>`;
+          totalBorrow += amount;
         }
       });
     }
@@ -1219,7 +1234,7 @@ function printMonthlyStatement() {
       </table>
     `);
 
-    // Function to render individual person table
+    // Render PEOPLE tables
     const renderPersonTable = (personName, personPayments) => {
       win.document.write(`<br><h4>${personName.toUpperCase()} RECEIVED</h4>
         <table border="1" width="100%" cellpadding="5">
@@ -1254,6 +1269,18 @@ function printMonthlyStatement() {
     renderPersonTable("FORCADOS PRECIOUS", payments.precious);
     renderPersonTable("FORCADOS BLESSING", payments.blessing);
 
+    // Render BORROW table
+    win.document.write(`<br><h4>BORROW</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr>
+        ${borrowRows || '<tr><td colspan="4">No borrow entries</td></tr>'}
+        <tr style="font-weight:bold;">
+          <td colspan="3">TOTAL BORROW</td>
+          <td>₦${totalBorrow.toFixed(2)}</td>
+        </tr>
+      </table>
+    `);
+
     win.document.write(`<p>${footer}</p><hr>`);
   }
 
@@ -1262,6 +1289,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1432,6 +1460,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
