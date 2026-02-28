@@ -1089,14 +1089,16 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // ===== SALARY TRACKING BY KEYWORDS =====
-  const salaryKeywords = ["forcados", "mummy", "precious", "blessing"];
-  let salaryData = {
-    "FORCADOS": { rows: "", total: 0 },
-    "MUMMY": { rows: "", total: 0 },
-    "PRECIOUS": { rows: "", total: 0 },
-    "BLESSING": { rows: "", total: 0 },
-  };
+  // ===== SALARY TRACKING PER PERSON =====
+  const salaryNames = [
+    "FORCADOS RICHARD",
+    "MUMMY",
+    "FORCADOS PRECIOUS",
+    "FORCADOS BLESSING"
+  ];
+
+  let salaryData = {};
+  salaryNames.forEach(name => salaryData[name] = { rows: "", total: 0 });
 
   monthRecords.forEach(d => {
 
@@ -1111,33 +1113,33 @@ function printMonthlyStatement() {
       unitCount++;
     });
 
+    // ===== READ EXPENSES =====
     if (d.expenses) {
       d.expenses.forEach(e => {
 
-        const type = (e.type || "").toLowerCase();
-        const desc = (e.desc || "").toLowerCase();
+        const type = (e.type || "").toUpperCase();
+        const desc = (e.desc || "").toUpperCase();
         const amount = Number(e.amount) || 0;
 
         const fullText = `${type} ${desc}`;
 
         // MATERIALS
-        if (type.includes("material") || desc.includes("material")) {
+        if (type.includes("MATERIAL") || desc.includes("MATERIAL")) {
           materialTotal += amount;
           materialRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
         // PACKING BAG
-        if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
+        if (type.includes("PACKING") || desc.includes("PACKING") || desc.includes("BAG")) {
           packingBagTotal += amount;
           packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // ===== SALARY EXPENSES BASED ON KEYWORDS =====
-        salaryKeywords.forEach(keyword => {
-          if (fullText.includes(keyword)) {
-            const key = keyword.toUpperCase();
-            salaryData[key].rows += `<tr><td>${d.date}</td><td>${key}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-            salaryData[key].total += amount;
+        // ===== SALARY EXPENSES FOR SPECIFIC NAMES =====
+        salaryNames.forEach(name => {
+          if (fullText.includes(name)) {
+            salaryData[name].rows += `<tr><td>${d.date}</td><td>${name}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
+            salaryData[name].total += amount;
           }
         });
 
@@ -1218,18 +1220,19 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
-      <br><h4>SALARY PAYMENTS BY KEYWORD</h4>
+      <br><h4>SALARY PAYMENTS PER PERSON</h4>
     `);
 
-    Object.keys(salaryData).forEach(person => {
+    // Loop through each person and show table with description
+    salaryNames.forEach(name => {
       win.document.write(`
-        <h5>${person}</h5>
+        <h5>${name}</h5>
         <table border="1" width="100%" cellpadding="5">
-          <tr><th>Date</th><th>Name</th><th>Amount</th></tr>
-          ${salaryData[person].rows || '<tr><td colspan="3">No payments</td></tr>'}
+          <tr><th>Date</th><th>Name</th><th>Description</th><th>Amount</th></tr>
+          ${salaryData[name].rows || '<tr><td colspan="4">No payments</td></tr>'}
           <tr style="font-weight:bold;">
-            <td colspan="2">TOTAL ${person}</td>
-            <td>₦${salaryData[person].total.toFixed(2)}</td>
+            <td colspan="3">TOTAL ${name}</td>
+            <td>₦${salaryData[name].total.toFixed(2)}</td>
           </tr>
         </table>
       `);
@@ -1243,6 +1246,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1406,6 +1410,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
