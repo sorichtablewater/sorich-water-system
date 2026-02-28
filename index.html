@@ -1089,7 +1089,7 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // ✅ SALARY TRACKING
+  // ✅ STAFF LIST
   const staff = [
     "FORCADOS RICHARD",
     "MUMMY",
@@ -1097,10 +1097,15 @@ function printMonthlyStatement() {
     "FORCADOS BLESSING"
   ];
 
+  // ✅ SALARY SUMMARY
   const salarySummary = {};
   staff.forEach(s => salarySummary[s] = 0);
-
   let totalSalary = 0;
+
+  // ✅ BORROWERS SUMMARY (FROM EXPENSES)
+  const borrowerSummary = {};
+  staff.forEach(b => borrowerSummary[b] = 0);
+  let totalBorrowed = 0;
 
   monthRecords.forEach(d => {
     totalSales += d.totalSales;
@@ -1118,8 +1123,9 @@ function printMonthlyStatement() {
 
         const type = (e.type || "").toLowerCase();
         const desc = (e.desc || "").toLowerCase();
+        const paidName = (e.paidTo || "").toUpperCase();
 
-        // MATERIAL
+        // ✅ MATERIAL
         if (type.includes("material") || desc.includes("material")) {
           materialTotal += Number(e.amount);
 
@@ -1131,7 +1137,7 @@ function printMonthlyStatement() {
             </tr>`;
         }
 
-        // PACKING BAG
+        // ✅ PACKING BAG
         if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
           packingBagTotal += Number(e.amount);
 
@@ -1145,13 +1151,18 @@ function printMonthlyStatement() {
 
         // ✅ SALARY
         if (type.includes("salary")) {
-          const name = (e.paidTo || "").toUpperCase();
-
-          if (salarySummary[name] !== undefined) {
-            salarySummary[name] += Number(e.amount);
+          if (salarySummary[paidName] !== undefined) {
+            salarySummary[paidName] += Number(e.amount);
             totalSalary += Number(e.amount);
           }
         }
+
+        // ✅ BORROWERS (ANY MONEY GIVEN TO STAFF)
+        if (borrowerSummary[paidName] !== undefined) {
+          borrowerSummary[paidName] += Number(e.amount);
+          totalBorrowed += Number(e.amount);
+        }
+
       });
     }
   });
@@ -1256,19 +1267,22 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
-      <br><h4>BORROWERS REPORT</h4>
+      <br><h4>BORROWERS REPORT (FROM EXPENSES)</h4>
       <table border="1" width="100%" cellpadding="5">
-        <tr><th>Borrower</th><th>Total Paid</th><th>Balance</th></tr>
-        ${
-          (debtData && debtData.length)
-          ? debtData.map(d=>`
-              <tr>
-                <td>${d.customer}</td>
-                <td>₦${Number(d.totalPaid||0).toFixed(2)}</td>
-                <td>₦${Number(d.owing||0).toFixed(2)}</td>
-              </tr>`).join('')
-          : '<tr><td colspan="3">No borrowers</td></tr>'
-        }
+        <tr>
+          <th>Borrower</th>
+          <th>Total Collected</th>
+        </tr>
+        ${staff.map(name=>`
+          <tr>
+            <td>${name}</td>
+            <td>₦${borrowerSummary[name].toFixed(2)}</td>
+          </tr>
+        `).join('')}
+        <tr style="font-weight:bold;">
+          <td>TOTAL MONEY GIVEN OUT</td>
+          <td>₦${totalBorrowed.toFixed(2)}</td>
+        </tr>
       </table>
 
       <p>${footer}</p>
@@ -1281,6 +1295,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1441,6 +1456,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
