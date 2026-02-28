@@ -1068,29 +1068,23 @@ function printMonthlyStatement() {
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  let totalSales = 0,
-      totalExpenses = 0,
-      totalNet = 0,
-      totalQty = 0,
-      unitSum = 0,
-      unitCount = 0;
-
+  let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0, unitSum = 0, unitCount = 0;
   let materialTotal = 0, packingBagTotal = 0;
   let materialRows = "", packingRows = "";
 
   // PEOPLE PAYMENTS PER DATE
-  const payments = {
-    mummy: {},
-    richard: {},
-    precious: {},
-    blessing: {}
-  };
+  const payments = { mummy: {}, richard: {}, precious: {}, blessing: {} };
 
-  // BORROW ENTRIES
-  let borrowRows = "";
-  let totalBorrow = 0;
+  // BORROW
+  let borrowRows = "", totalBorrow = 0;
 
-  // Process each daily record
+  // SUPPLY MONEY PER PERSON
+  const supplyPayments = { papa: {}, austine: {}, felix: {} };
+
+  // DIESEL
+  let dieselRows = "", totalDiesel = 0;
+
+  // Process daily records
   monthRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
@@ -1122,49 +1116,56 @@ function printMonthlyStatement() {
           packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // MUMMY
+        // PEOPLE PAYMENTS
         if (type.includes("mummy") || desc.includes("mummy")) {
           if (!payments.mummy[d.date]) payments.mummy[d.date] = [];
-          payments.mummy[d.date].push({desc: e.desc, amount});
+          payments.mummy[d.date].push({ desc: e.desc, amount });
         }
-
-        // RICHARD FORCADOS
         if ((type.includes("richard") && type.includes("forcados")) || 
             (desc.includes("richard") && desc.includes("forcados"))) {
           if (!payments.richard[d.date]) payments.richard[d.date] = [];
-          payments.richard[d.date].push({desc: e.desc, amount});
+          payments.richard[d.date].push({ desc: e.desc, amount });
         }
-
-        // FORCADOS PRECIOUS
-        if (type.includes("precious") || desc.includes("precious") ||
-            type.includes("forcados precious") || desc.includes("forcados precious")) {
+        if (type.includes("precious") || desc.includes("precious")) {
           if (!payments.precious[d.date]) payments.precious[d.date] = [];
-          payments.precious[d.date].push({desc: e.desc, amount});
+          payments.precious[d.date].push({ desc: e.desc, amount });
         }
-
-        // FORCADOS BLESSING
-        if (type.includes("blessing") || desc.includes("blessing") ||
-            type.includes("forcados blessing") || desc.includes("forcados blessing")) {
+        if (type.includes("blessing") || desc.includes("blessing")) {
           if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
-          payments.blessing[d.date].push({desc: e.desc, amount});
+          payments.blessing[d.date].push({ desc: e.desc, amount });
         }
 
         // BORROW
         if (type.includes("borrow") || desc.includes("borrow")) {
-          borrowRows += `<tr>
-            <td>${d.date}</td>
-            <td>${e.type || "-"}</td>
-            <td>${e.desc || "-"}</td>
-            <td>₦${amount.toFixed(2)}</td>
-          </tr>`;
+          borrowRows += `<tr><td>${d.date}</td><td>${e.type||"-"}</td><td>${e.desc||"-"}</td><td>₦${amount.toFixed(2)}</td></tr>`;
           totalBorrow += amount;
+        }
+
+        // SUPPLY MONEY
+        if (type.includes("papa") || desc.includes("papa")) {
+          if (!supplyPayments.papa[d.date]) supplyPayments.papa[d.date] = [];
+          supplyPayments.papa[d.date].push({ desc: e.desc, amount });
+        }
+        if (type.includes("austine") || desc.includes("austine")) {
+          if (!supplyPayments.austine[d.date]) supplyPayments.austine[d.date] = [];
+          supplyPayments.austine[d.date].push({ desc: e.desc, amount });
+        }
+        if (type.includes("felix") || desc.includes("felix")) {
+          if (!supplyPayments.felix[d.date]) supplyPayments.felix[d.date] = [];
+          supplyPayments.felix[d.date].push({ desc: e.desc, amount });
+        }
+
+        // DIESEL
+        if (type.includes("diesel") || desc.includes("diesel")) {
+          dieselRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
+          totalDiesel += amount;
         }
       });
     }
   });
 
   const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
-  const win = window.open('', '', 'width=1000,height=800');
+  const win = window.open('', '', 'width=1200,height=800');
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
     return;
@@ -1181,7 +1182,10 @@ function printMonthlyStatement() {
       <p>Period: ${year}-${monthStr}</p>
       <p>ISSUER: ${manager}</p>
       <hr>
+    `);
 
+    // Monthly summary table
+    win.document.write(`
       <h4>MONTH SUMMARY</h4>
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
@@ -1189,36 +1193,33 @@ function printMonthlyStatement() {
           <th>Net</th><th>Total Qty</th><th>Avg Unit Price</th>
         </tr>
     `);
-
     monthRecords.forEach(d => {
-      const dailyQty = d.sales ? d.sales.reduce((acc, s) => acc + s.qty, 0) : 0;
+      const dailyQty = d.sales ? d.sales.reduce((acc,s)=>acc+s.qty,0) : 0;
       const dailyAvgUnit = d.sales && d.sales.length
-        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
+        ? (d.sales.reduce((acc,s)=>acc+Number(s.unit),0)/d.sales.length).toFixed(2)
         : 0;
-
       win.document.write(`
         <tr>
           <td>${d.date}</td>
-          <td>₦${(Number(d.totalSales) || 0).toFixed(2)}</td>
-          <td>₦${(Number(d.totalExpenses) || 0).toFixed(2)}</td>
-          <td>₦${(Number(d.net) || 0).toFixed(2)}</td>
+          <td>₦${(Number(d.totalSales)||0).toFixed(2)}</td>
+          <td>₦${(Number(d.totalExpenses)||0).toFixed(2)}</td>
+          <td>₦${(Number(d.net)||0).toFixed(2)}</td>
           <td>${dailyQty}</td>
           <td>₦${dailyAvgUnit}</td>
         </tr>
       `);
     });
+    win.document.write(`<tr style="font-weight:bold;">
+      <td>TOTAL</td>
+      <td>₦${totalSales.toFixed(2)}</td>
+      <td>₦${totalExpenses.toFixed(2)}</td>
+      <td>₦${totalNet.toFixed(2)}</td>
+      <td>${totalQty}</td>
+      <td>₦${monthlyAvgUnitPrice}</td>
+    </tr></table>`);
 
+    // Material & Packing tables
     win.document.write(`
-        <tr style="font-weight:bold;">
-          <td>TOTAL</td>
-          <td>₦${totalSales.toFixed(2)}</td>
-          <td>₦${totalExpenses.toFixed(2)}</td>
-          <td>₦${totalNet.toFixed(2)}</td>
-          <td>${totalQty}</td>
-          <td>₦${monthlyAvgUnitPrice}</td>
-        </tr>
-      </table>
-
       <br><h4>MATERIAL EXPENSES</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
@@ -1234,34 +1235,19 @@ function printMonthlyStatement() {
       </table>
     `);
 
-    // Render PEOPLE tables
-    const renderPersonTable = (personName, personPayments) => {
-      win.document.write(`<br><h4>${personName.toUpperCase()} RECEIVED</h4>
+    // PEOPLE tables
+    const renderPersonTable = (name, personPayments) => {
+      win.document.write(`<br><h4>${name.toUpperCase()} RECEIVED</h4>
         <table border="1" width="100%" cellpadding="5">
           <tr><th>Date</th><th>Description</th><th>Amount</th></tr>`);
-
-      const dates = Object.keys(personPayments).sort();
       let total = 0;
-      dates.forEach(date => {
-        personPayments[date].forEach(entry => {
-          win.document.write(`
-            <tr>
-              <td>${date}</td>
-              <td>${entry.desc}</td>
-              <td>₦${entry.amount.toFixed(2)}</td>
-            </tr>
-          `);
-          total += entry.amount;
+      Object.keys(personPayments).sort().forEach(date => {
+        personPayments[date].forEach(e => {
+          win.document.write(`<tr><td>${date}</td><td>${e.desc}</td><td>₦${e.amount.toFixed(2)}</td></tr>`);
+          total += e.amount;
         });
       });
-
-      win.document.write(`
-          <tr style="font-weight:bold;">
-            <td colspan="2">TOTAL</td>
-            <td>₦${total.toFixed(2)}</td>
-          </tr>
-        </table>
-      `);
+      win.document.write(`<tr style="font-weight:bold;"><td colspan="2">TOTAL</td><td>₦${total.toFixed(2)}</td></tr></table>`);
     };
 
     renderPersonTable("Mummy", payments.mummy);
@@ -1269,15 +1255,26 @@ function printMonthlyStatement() {
     renderPersonTable("FORCADOS PRECIOUS", payments.precious);
     renderPersonTable("FORCADOS BLESSING", payments.blessing);
 
-    // Render BORROW table
+    // BORROW table
     win.document.write(`<br><h4>BORROW</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr>
         ${borrowRows || '<tr><td colspan="4">No borrow entries</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="3">TOTAL BORROW</td>
-          <td>₦${totalBorrow.toFixed(2)}</td>
-        </tr>
+        <tr style="font-weight:bold;"><td colspan="3">TOTAL BORROW</td><td>₦${totalBorrow.toFixed(2)}</td></tr>
+      </table>
+    `);
+
+    // SUPPLY MONEY per person
+    renderPersonTable("Papa Supply Money", supplyPayments.papa);
+    renderPersonTable("Austine Supply Money", supplyPayments.austine);
+    renderPersonTable("Felix Supply Money", supplyPayments.felix);
+
+    // DIESEL table
+    win.document.write(`<br><h4>DIESEL</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+        ${dieselRows || '<tr><td colspan="3">No diesel entries</td></tr>'}
+        <tr style="font-weight:bold;"><td colspan="2">TOTAL DIESEL</td><td>₦${totalDiesel.toFixed(2)}</td></tr>
       </table>
     `);
 
@@ -1289,6 +1286,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1460,6 +1458,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
