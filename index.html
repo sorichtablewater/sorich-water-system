@@ -1054,7 +1054,6 @@ function printMonthlyStatement() {
 
   const monthStr = String(month).padStart(2, '0');
 
-  // Filter dailyData for the selected month
   const monthRecords = dailyData.filter(d => {
     const [y, m] = d.date.split('-');
     return parseInt(y) === year && m === monthStr;
@@ -1076,25 +1075,23 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  // MATERIAL & PACKING BAG TRACKING
-  let materialTotal = 0;
-  let packingBagTotal = 0;
-  let materialRows = "";
-  let packingRows = "";
+  let materialTotal = 0, packingBagTotal = 0;
+  let materialRows = "", packingRows = "";
 
-  // PEOPLE PAYMENTS PER DATE (with descriptions)
-  const mummyPayments = {};           
-  const forcadosRichardPayments = {}; 
-  const forcadosPreciousPayments = {};
-  const forcadosBlessingPayments = {};
+  // PEOPLE PAYMENTS PER DATE
+  const payments = {
+    mummy: {},
+    richard: {},
+    precious: {},
+    blessing: {}
+  };
 
-  // Loop through each daily record
+  // Process each daily record
   monthRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
 
-    // Sales summary
     if (d.sales) {
       d.sales.forEach(s => {
         totalQty += s.qty;
@@ -1103,20 +1100,19 @@ function printMonthlyStatement() {
       });
     }
 
-    // Expenses
     if (d.expenses) {
       d.expenses.forEach(e => {
         const amount = Number(e.amount) || 0;
         const type = (e.type || "").toLowerCase().trim();
         const desc = (e.desc || "").toLowerCase().trim();
 
-        // MATERIALS
+        // MATERIAL
         if (type.includes("material") || desc.includes("material")) {
           materialTotal += amount;
           materialRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // PACKING BAG
+        // PACKING
         if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
           packingBagTotal += amount;
           packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
@@ -1124,36 +1120,35 @@ function printMonthlyStatement() {
 
         // MUMMY
         if (type.includes("mummy") || desc.includes("mummy")) {
-          if (!mummyPayments[d.date]) mummyPayments[d.date] = [];
-          mummyPayments[d.date].push({desc: e.desc, amount});
+          if (!payments.mummy[d.date]) payments.mummy[d.date] = [];
+          payments.mummy[d.date].push({desc: e.desc, amount});
         }
 
-        // MR RICHARD FORCADOS
+        // RICHARD FORCADOS
         if ((type.includes("richard") && type.includes("forcados")) || 
             (desc.includes("richard") && desc.includes("forcados"))) {
-          if (!forcadosRichardPayments[d.date]) forcadosRichardPayments[d.date] = [];
-          forcadosRichardPayments[d.date].push({desc: e.desc, amount});
+          if (!payments.richard[d.date]) payments.richard[d.date] = [];
+          payments.richard[d.date].push({desc: e.desc, amount});
         }
 
         // FORCADOS PRECIOUS
         if (type.includes("precious") || desc.includes("precious") ||
             type.includes("forcados precious") || desc.includes("forcados precious")) {
-          if (!forcadosPreciousPayments[d.date]) forcadosPreciousPayments[d.date] = [];
-          forcadosPreciousPayments[d.date].push({desc: e.desc, amount});
+          if (!payments.precious[d.date]) payments.precious[d.date] = [];
+          payments.precious[d.date].push({desc: e.desc, amount});
         }
 
         // FORCADOS BLESSING
         if (type.includes("blessing") || desc.includes("blessing") ||
             type.includes("forcados blessing") || desc.includes("forcados blessing")) {
-          if (!forcadosBlessingPayments[d.date]) forcadosBlessingPayments[d.date] = [];
-          forcadosBlessingPayments[d.date].push({desc: e.desc, amount});
+          if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
+          payments.blessing[d.date].push({desc: e.desc, amount});
         }
       });
     }
   });
 
   const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
-
   const win = window.open('', '', 'width=1000,height=800');
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
@@ -1175,12 +1170,8 @@ function printMonthlyStatement() {
       <h4>MONTH SUMMARY</h4>
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
-          <th>Date</th>
-          <th>Total Sales</th>
-          <th>Total Expenses</th>
-          <th>Net</th>
-          <th>Total Qty</th>
-          <th>Avg Unit Price</th>
+          <th>Date</th><th>Total Sales</th><th>Total Expenses</th>
+          <th>Net</th><th>Total Qty</th><th>Avg Unit Price</th>
         </tr>
     `);
 
@@ -1217,90 +1208,53 @@ function printMonthlyStatement() {
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
         ${materialRows || '<tr><td colspan="3">No material expenses</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL MATERIAL COST</td>
-          <td>₦${materialTotal.toFixed(2)}</td>
-        </tr>
+        <tr style="font-weight:bold;"><td colspan="2">TOTAL MATERIAL COST</td><td>₦${materialTotal.toFixed(2)}</td></tr>
       </table>
 
       <br><h4>PACKING BAG EXPENSES</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
         ${packingRows || '<tr><td colspan="3">No packing bag expenses</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL PACKING BAG COST</td>
-          <td>₦${packingBagTotal.toFixed(2)}</td>
-        </tr>
+        <tr style="font-weight:bold;"><td colspan="2">TOTAL PACKING BAG COST</td><td>₦${packingBagTotal.toFixed(2)}</td></tr>
       </table>
-
-      <br><h4>MONEY RECEIVED BY PERSON (WITH DESCRIPTION)</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr>
-          <th>Date</th>
-          <th>Description</th>
-          <th>Mummy</th>
-          <th>Mr RICHARD FORCADOS</th>
-          <th>FORCADOS PRECIOUS</th>
-          <th>FORCADOS BLESSING</th>
-        </tr>
     `);
 
-    // All unique dates
-    const allDates = [...new Set([...Object.keys(mummyPayments),
-                                  ...Object.keys(forcadosRichardPayments),
-                                  ...Object.keys(forcadosPreciousPayments),
-                                  ...Object.keys(forcadosBlessingPayments)])].sort();
+    // Function to render individual person table
+    const renderPersonTable = (personName, personPayments) => {
+      win.document.write(`<br><h4>${personName.toUpperCase()} RECEIVED</h4>
+        <table border="1" width="100%" cellpadding="5">
+          <tr><th>Date</th><th>Description</th><th>Amount</th></tr>`);
 
-    allDates.forEach(date => {
-      // Determine max number of entries per person for this date
-      const maxRows = Math.max(
-        (mummyPayments[date] || []).length,
-        (forcadosRichardPayments[date] || []).length,
-        (forcadosPreciousPayments[date] || []).length,
-        (forcadosBlessingPayments[date] || []).length
-      );
+      const dates = Object.keys(personPayments).sort();
+      let total = 0;
+      dates.forEach(date => {
+        personPayments[date].forEach(entry => {
+          win.document.write(`
+            <tr>
+              <td>${date}</td>
+              <td>${entry.desc}</td>
+              <td>₦${entry.amount.toFixed(2)}</td>
+            </tr>
+          `);
+          total += entry.amount;
+        });
+      });
 
-      for (let i = 0; i < maxRows; i++) {
-        const mummyEntry = mummyPayments[date] ? mummyPayments[date][i] : {desc:'', amount:0};
-        const richardEntry = forcadosRichardPayments[date] ? forcadosRichardPayments[date][i] : {desc:'', amount:0};
-        const preciousEntry = forcadosPreciousPayments[date] ? forcadosPreciousPayments[date][i] : {desc:'', amount:0};
-        const blessingEntry = forcadosBlessingPayments[date] ? forcadosBlessingPayments[date][i] : {desc:'', amount:0};
-
-        // Use the first non-empty description for the row
-        const desc = mummyEntry.desc || richardEntry.desc || preciousEntry.desc || blessingEntry.desc || '';
-
-        win.document.write(`
-          <tr>
-            <td>${date}</td>
-            <td>${desc}</td>
-            <td>₦${mummyEntry.amount.toFixed(2)}</td>
-            <td>₦${richardEntry.amount.toFixed(2)}</td>
-            <td>₦${preciousEntry.amount.toFixed(2)}</td>
-            <td>₦${blessingEntry.amount.toFixed(2)}</td>
+      win.document.write(`
+          <tr style="font-weight:bold;">
+            <td colspan="2">TOTAL</td>
+            <td>₦${total.toFixed(2)}</td>
           </tr>
-        `);
-      }
-    });
+        </table>
+      `);
+    };
 
-    // Grand totals
-    const mummyGrandTotal = Object.values(mummyPayments).flat().reduce((a,b)=>a+b.amount,0);
-    const richardGrandTotal = Object.values(forcadosRichardPayments).flat().reduce((a,b)=>a+b.amount,0);
-    const preciousGrandTotal = Object.values(forcadosPreciousPayments).flat().reduce((a,b)=>a+b.amount,0);
-    const blessingGrandTotal = Object.values(forcadosBlessingPayments).flat().reduce((a,b)=>a+b.amount,0);
+    renderPersonTable("Mummy", payments.mummy);
+    renderPersonTable("Mr RICHARD FORCADOS", payments.richard);
+    renderPersonTable("FORCADOS PRECIOUS", payments.precious);
+    renderPersonTable("FORCADOS BLESSING", payments.blessing);
 
-    win.document.write(`
-        <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL</td>
-          <td>₦${mummyGrandTotal.toFixed(2)}</td>
-          <td>₦${richardGrandTotal.toFixed(2)}</td>
-          <td>₦${preciousGrandTotal.toFixed(2)}</td>
-          <td>₦${blessingGrandTotal.toFixed(2)}</td>
-        </tr>
-      </table>
-
-      <p>${footer}</p>
-      <hr>
-    `);
+    win.document.write(`<p>${footer}</p><hr>`);
   }
 
   win.document.close();
@@ -1308,6 +1262,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1477,6 +1432,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
