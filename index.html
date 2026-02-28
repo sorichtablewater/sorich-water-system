@@ -1083,25 +1083,18 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  // MATERIALS & PACKING
+  // ✅ MATERIAL & PACKING BAG TRACKING
   let materialTotal = 0;
   let packingBagTotal = 0;
   let materialRows = "";
   let packingRows = "";
 
-  // ===== SALARY TRACKING FOR FULL NAMES =====
-  const salaryNames = [
-    "FORCADOS RICHARD",
-    "MUMMY",
-    "FORCADOS PRECIOUS",
-    "FORCADOS BLESSING"
-  ];
-
-  let salaryData = {};
-  salaryNames.forEach(name => salaryData[name] = { rows: "", total: 0 });
+  // ✅ PERSON EXPENSE TRACKING
+  const people = ["Forcados Richard", "Forcados Precious", "Forcados Blessing", "Mummy"];
+  const personTotals = {};
+  people.forEach(p => personTotals[p] = 0);
 
   monthRecords.forEach(d => {
-
     totalSales += d.totalSales;
     totalExpenses += d.totalExpenses;
     totalNet += d.net;
@@ -1113,41 +1106,50 @@ function printMonthlyStatement() {
       unitCount++;
     });
 
-    // READ EXPENSES
+    // ===== READ EXPENSES =====
     if (d.expenses) {
       d.expenses.forEach(e => {
-
-        const type = (e.type || "").toUpperCase();
-        const desc = (e.desc || "").toUpperCase();
+        const type = (e.type || "").toLowerCase();
+        const desc = (e.desc || "").toLowerCase();
         const amount = Number(e.amount) || 0;
 
-        const fullText = `${type} ${desc}`;
-
         // MATERIALS
-        if (type.includes("MATERIAL") || desc.includes("MATERIAL")) {
+        if (type.includes("material") || desc.includes("material")) {
           materialTotal += amount;
-          materialRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
+          materialRows += `
+            <tr>
+              <td>${d.date}</td>
+              <td>${e.desc}</td>
+              <td>₦${amount.toFixed(2)}</td>
+            </tr>
+          `;
         }
 
         // PACKING BAG
-        if (type.includes("PACKING") || desc.includes("PACKING") || desc.includes("BAG")) {
+        if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
           packingBagTotal += amount;
-          packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
+          packingRows += `
+            <tr>
+              <td>${d.date}</td>
+              <td>${e.desc}</td>
+              <td>₦${amount.toFixed(2)}</td>
+            </tr>
+          `;
         }
 
-        // SALARY EXPENSES - MATCH FULL NAMES
-        salaryNames.forEach(name => {
-          if (fullText.includes(name)) {
-            salaryData[name].rows += `<tr><td>${d.date}</td><td>${name}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-            salaryData[name].total += amount;
+        // PEOPLE
+        people.forEach(p => {
+          if (e.desc && e.desc.toLowerCase().includes(p.toLowerCase())) {
+            personTotals[p] += amount;
           }
         });
-
       });
     }
   });
 
-  const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
+  const monthlyAvgUnitPrice = unitCount
+    ? (unitSum / unitCount).toFixed(2)
+    : 0;
 
   const win = window.open('', '', 'width=800,height=800');
   if (!win) {
@@ -1156,18 +1158,19 @@ function printMonthlyStatement() {
   }
 
   for (let i = 0; i < copies; i++) {
-
     const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
+      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+      <p>08164084402, 07012623006, 08067338211</p>
       <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
       <p>Period: ${year}-${monthStr}</p>
       <p>ISSUER: ${manager}</p>
       <hr>
 
       <h4>MONTH SUMMARY</h4>
-      <table border="1" width="100%" cellpadding="5">
+      <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
           <th>Date</th>
           <th>Total Sales</th>
@@ -1179,9 +1182,9 @@ function printMonthlyStatement() {
     `);
 
     monthRecords.forEach(d => {
-      const dailyQty = d.sales.reduce((a, s) => a + s.qty, 0);
+      const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
       const dailyAvgUnit = d.sales.length
-        ? (d.sales.reduce((a, s) => a + Number(s.unit), 0) / d.sales.length).toFixed(2)
+        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
 
       win.document.write(`
@@ -1196,7 +1199,16 @@ function printMonthlyStatement() {
       `);
     });
 
-    win.document.write(`</table>
+    win.document.write(`
+        <tr style="font-weight:bold;">
+          <td>TOTAL</td>
+          <td>₦${totalSales.toFixed(2)}</td>
+          <td>₦${totalExpenses.toFixed(2)}</td>
+          <td>₦${totalNet.toFixed(2)}</td>
+          <td>${totalQty}</td>
+          <td>₦${monthlyAvgUnitPrice}</td>
+        </tr>
+      </table>
 
       <br><h4>MATERIAL EXPENSES</h4>
       <table border="1" width="100%" cellpadding="5">
@@ -1218,24 +1230,20 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
-      <br><h4>SALARY PAYMENTS PER PERSON</h4>
-    `);
-
-    salaryNames.forEach(name => {
-      win.document.write(`
-        <h5>${name}</h5>
-        <table border="1" width="100%" cellpadding="5">
-          <tr><th>Date</th><th>Name</th><th>Description</th><th>Amount</th></tr>
-          ${salaryData[name].rows || '<tr><td colspan="4">No payments</td></tr>'}
-          <tr style="font-weight:bold;">
-            <td colspan="3">TOTAL ${name}</td>
-            <td>₦${salaryData[name].total.toFixed(2)}</td>
+      <br><h4>MONEY RECEIVED BY PERSON</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Person</th><th>Total Received</th></tr>
+        ${people.map(p => `
+          <tr>
+            <td>${p}</td>
+            <td>₦${personTotals[p].toFixed(2)}</td>
           </tr>
-        </table>
-      `);
-    });
+        `).join('')}
+      </table>
 
-    win.document.write(`<p>${footer}</p><hr>`);
+      <p>${footer}</p>
+      <hr>
+    `);
   }
 
   win.document.close();
@@ -1243,11 +1251,6 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
-
-
-
-
-
 
 
 
@@ -1408,9 +1411,3 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
-
-
-
-
-
-
