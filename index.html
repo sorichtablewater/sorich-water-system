@@ -1083,11 +1083,23 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  // ✅ NEW MATERIAL & PACKING BAG TRACKING
+  // ===== MATERIAL & PACKING BAG TRACKING =====
   let materialTotal = 0;
   let packingBagTotal = 0;
   let materialRows = "";
   let packingRows = "";
+
+  // ===== FAMILY PAYMENTS TRACKING =====
+  const allowedPeople = [
+    "forcados richard",
+    "mummy",
+    "forcados precious",
+    "forcados blessing"
+  ];
+
+  let familyPayments = {};
+  let familyTotal = 0;
+  let familyRows = "";
 
   monthRecords.forEach(d => {
     totalSales += d.totalSales;
@@ -1107,16 +1119,18 @@ function printMonthlyStatement() {
 
         const type = (e.type || "").toLowerCase();
         const desc = (e.desc || "").toLowerCase();
+        const paidTo = (e.paidTo || "").toLowerCase();
+        const amount = Number(e.amount) || 0;
 
         // MATERIALS
         if (type.includes("material") || desc.includes("material")) {
-          materialTotal += Number(e.amount);
+          materialTotal += amount;
 
           materialRows += `
             <tr>
               <td>${d.date}</td>
               <td>${e.desc}</td>
-              <td>₦${Number(e.amount).toFixed(2)}</td>
+              <td>₦${amount.toFixed(2)}</td>
             </tr>
           `;
         }
@@ -1127,18 +1141,46 @@ function printMonthlyStatement() {
           desc.includes("packing") ||
           desc.includes("bag")
         ) {
-          packingBagTotal += Number(e.amount);
+          packingBagTotal += amount;
 
           packingRows += `
             <tr>
               <td>${d.date}</td>
               <td>${e.desc}</td>
-              <td>₦${Number(e.amount).toFixed(2)}</td>
+              <td>₦${amount.toFixed(2)}</td>
             </tr>
           `;
         }
+
+        // ===== FAMILY PAYMENTS =====
+        if (allowedPeople.includes(paidTo)) {
+
+          const key = d.date + "|" + paidTo;
+
+          if (!familyPayments[key]) {
+            familyPayments[key] = {
+              date: d.date,
+              person: paidTo.toUpperCase(),
+              amount: 0
+            };
+          }
+
+          familyPayments[key].amount += amount;
+          familyTotal += amount;
+        }
       });
     }
+  });
+
+  // BUILD FAMILY TABLE ROWS
+  Object.values(familyPayments).forEach(f => {
+    familyRows += `
+      <tr>
+        <td>${f.date}</td>
+        <td>${f.person}</td>
+        <td>₦${f.amount.toFixed(2)}</td>
+      </tr>
+    `;
   });
 
   const monthlyAvgUnitPrice = unitCount
@@ -1227,6 +1269,20 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
+      <br><h4>FAMILY PAYMENTS</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr>
+          <th>Date</th>
+          <th>Paid To</th>
+          <th>Amount</th>
+        </tr>
+        ${familyRows || '<tr><td colspan="3">No payments recorded</td></tr>'}
+        <tr style="font-weight:bold;">
+          <td colspan="2">TOTAL FAMILY PAYMENTS</td>
+          <td>₦${familyTotal.toFixed(2)}</td>
+        </tr>
+      </table>
+
       <p>${footer}</p>
       <hr>
     `);
@@ -1237,6 +1293,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1396,3 +1453,4 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
