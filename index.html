@@ -1082,9 +1082,9 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // PEOPLE TOTALS
-  let mummyTotal = 0;
-  let forcadosRichardTotal = 0;
+  // PEOPLE TOTALS PER DATE
+  const mummyPayments = {};           // { "2026-02-01": 500, ... }
+  const forcadosRichardPayments = {}; // { "2026-02-03": 1000, ... }
 
   // Loop through each daily record
   monthRecords.forEach(d => {
@@ -1111,37 +1111,24 @@ function printMonthlyStatement() {
         // MATERIALS
         if (type.includes("material") || desc.includes("material")) {
           materialTotal += amount;
-          materialRows += `
-            <tr>
-              <td>${d.date}</td>
-              <td>${e.desc}</td>
-              <td>₦${amount.toFixed(2)}</td>
-            </tr>
-          `;
+          materialRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
         // PACKING BAG
         if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
           packingBagTotal += amount;
-          packingRows += `
-            <tr>
-              <td>${d.date}</td>
-              <td>${e.desc}</td>
-              <td>₦${amount.toFixed(2)}</td>
-            </tr>
-          `;
+          packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // PEOPLE TOTALS
-        // Check Mummy
+        // MUMMY
         if (type.includes("mummy") || desc.includes("mummy")) {
-          mummyTotal += amount;
+          mummyPayments[d.date] = (mummyPayments[d.date] || 0) + amount;
         }
 
-        // Check Mr RICHARD FORCADOS robustly
+        // MR RICHARD FORCADOS (robust match)
         if ((type.includes("richard") && type.includes("forcados")) || 
             (desc.includes("richard") && desc.includes("forcados"))) {
-          forcadosRichardTotal += amount;
+          forcadosRichardPayments[d.date] = (forcadosRichardPayments[d.date] || 0) + amount;
         }
       });
     }
@@ -1228,16 +1215,35 @@ function printMonthlyStatement() {
         </tr>
       </table>
 
-      <br><h4>MONEY RECEIVED BY PERSON</h4>
+      <br><h4>MONEY RECEIVED BY PERSON (BY DATE)</h4>
       <table border="1" width="100%" cellpadding="5">
-        <tr><th>Person</th><th>Total Received</th></tr>
+        <tr><th>Date</th><th>Mummy</th><th>Mr RICHARD FORCADOS</th></tr>
+    `);
+
+    // Get all unique dates
+    const allDates = [...new Set([...Object.keys(mummyPayments), ...Object.keys(forcadosRichardPayments)])].sort();
+
+    allDates.forEach(date => {
+      const mummyAmt = mummyPayments[date] || 0;
+      const richardAmt = forcadosRichardPayments[date] || 0;
+      win.document.write(`
         <tr>
-          <td>Mummy</td>
-          <td>₦${mummyTotal.toFixed(2)}</td>
+          <td>${date}</td>
+          <td>₦${mummyAmt.toFixed(2)}</td>
+          <td>₦${richardAmt.toFixed(2)}</td>
         </tr>
-        <tr>
-          <td>Mr RICHARD FORCADOS</td>
-          <td>₦${forcadosRichardTotal.toFixed(2)}</td>
+      `);
+    });
+
+    // Grand totals
+    const mummyGrandTotal = Object.values(mummyPayments).reduce((a,b)=>a+b,0);
+    const richardGrandTotal = Object.values(forcadosRichardPayments).reduce((a,b)=>a+b,0);
+
+    win.document.write(`
+        <tr style="font-weight:bold;">
+          <td>TOTAL</td>
+          <td>₦${mummyGrandTotal.toFixed(2)}</td>
+          <td>₦${richardGrandTotal.toFixed(2)}</td>
         </tr>
       </table>
 
@@ -1251,6 +1257,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1416,6 +1423,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
