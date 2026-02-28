@@ -1083,25 +1083,25 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  // ===== MATERIAL & PACKING BAG TRACKING =====
+  // MATERIALS & PACKING
   let materialTotal = 0;
   let packingBagTotal = 0;
   let materialRows = "";
   let packingRows = "";
 
-  // ===== FAMILY PAYMENTS TRACKING =====
-  const allowedPeople = [
+  // ===== SALARY TRACKING =====
+  const salaryNames = [
     "forcados richard",
     "mummy",
     "forcados precious",
     "forcados blessing"
   ];
 
-  let familyPayments = {};
-  let familyTotal = 0;
-  let familyRows = "";
+  let salaryRows = "";
+  let salaryTotal = 0;
 
   monthRecords.forEach(d => {
+
     totalSales += d.totalSales;
     totalExpenses += d.totalExpenses;
     totalNet += d.net;
@@ -1121,6 +1121,9 @@ function printMonthlyStatement() {
         const desc = (e.desc || "").toLowerCase();
         const paidTo = (e.paidTo || "").toLowerCase();
         const amount = Number(e.amount) || 0;
+
+        // combine all text fields
+        const fullText = `${type} ${desc} ${paidTo}`;
 
         // MATERIALS
         if (type.includes("material") || desc.includes("material")) {
@@ -1152,35 +1155,24 @@ function printMonthlyStatement() {
           `;
         }
 
-        // ===== FAMILY PAYMENTS =====
-        if (allowedPeople.includes(paidTo)) {
+        // ===== SALARY DETECTION =====
+        salaryNames.forEach(name => {
+          if (fullText.includes(name)) {
 
-          const key = d.date + "|" + paidTo;
+            salaryRows += `
+              <tr>
+                <td>${d.date}</td>
+                <td>${name.toUpperCase()}</td>
+                <td>₦${amount.toFixed(2)}</td>
+              </tr>
+            `;
 
-          if (!familyPayments[key]) {
-            familyPayments[key] = {
-              date: d.date,
-              person: paidTo.toUpperCase(),
-              amount: 0
-            };
+            salaryTotal += amount;
           }
+        });
 
-          familyPayments[key].amount += amount;
-          familyTotal += amount;
-        }
       });
     }
-  });
-
-  // BUILD FAMILY TABLE ROWS
-  Object.values(familyPayments).forEach(f => {
-    familyRows += `
-      <tr>
-        <td>${f.date}</td>
-        <td>${f.person}</td>
-        <td>₦${f.amount.toFixed(2)}</td>
-      </tr>
-    `;
   });
 
   const monthlyAvgUnitPrice = unitCount
@@ -1199,15 +1191,13 @@ function printMonthlyStatement() {
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
-      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-      <p>08164084402, 07012623006, 08067338211</p>
       <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
       <p>Period: ${year}-${monthStr}</p>
       <p>ISSUER: ${manager}</p>
       <hr>
 
       <h4>MONTH SUMMARY</h4>
-      <table border="1" cellpadding="5" cellspacing="0" width="100%">
+      <table border="1" width="100%" cellpadding="5">
         <tr>
           <th>Date</th>
           <th>Total Sales</th>
@@ -1220,10 +1210,10 @@ function printMonthlyStatement() {
 
     monthRecords.forEach(d => {
 
-      const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+      const dailyQty = d.sales.reduce((a, s) => a + s.qty, 0);
 
       const dailyAvgUnit = d.sales.length
-        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
+        ? (d.sales.reduce((a, s) => a + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
 
       win.document.write(`
@@ -1239,47 +1229,19 @@ function printMonthlyStatement() {
     });
 
     win.document.write(`
-        <tr style="font-weight:bold;">
-          <td>TOTAL</td>
-          <td>₦${totalSales.toFixed(2)}</td>
-          <td>₦${totalExpenses.toFixed(2)}</td>
-          <td>₦${totalNet.toFixed(2)}</td>
-          <td>${totalQty}</td>
-          <td>₦${monthlyAvgUnitPrice}</td>
-        </tr>
       </table>
 
-      <br><h4>MATERIAL EXPENSES</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
-        ${materialRows || '<tr><td colspan="3">No material expenses</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL MATERIAL COST</td>
-          <td>₦${materialTotal.toFixed(2)}</td>
-        </tr>
-      </table>
-
-      <br><h4>PACKING BAG EXPENSES</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
-        ${packingRows || '<tr><td colspan="3">No packing bag expenses</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL PACKING BAG COST</td>
-          <td>₦${packingBagTotal.toFixed(2)}</td>
-        </tr>
-      </table>
-
-      <br><h4>FAMILY PAYMENTS</h4>
+      <br><h4>SALARY PAYMENTS</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr>
           <th>Date</th>
-          <th>Paid To</th>
+          <th>Name</th>
           <th>Amount</th>
         </tr>
-        ${familyRows || '<tr><td colspan="3">No payments recorded</td></tr>'}
+        ${salaryRows || '<tr><td colspan="3">No salary payments found</td></tr>'}
         <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL FAMILY PAYMENTS</td>
-          <td>₦${familyTotal.toFixed(2)}</td>
+          <td colspan="2">TOTAL SALARY</td>
+          <td>₦${salaryTotal.toFixed(2)}</td>
         </tr>
       </table>
 
@@ -1293,6 +1255,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1453,4 +1416,5 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
