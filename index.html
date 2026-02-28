@@ -1089,7 +1089,7 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // ===== SALARY TRACKING =====
+  // ===== SALARY TRACKING PER PERSON =====
   const salaryNames = [
     "forcados richard",
     "mummy",
@@ -1097,8 +1097,8 @@ function printMonthlyStatement() {
     "forcados blessing"
   ];
 
-  let salaryRows = "";
-  let salaryTotal = 0;
+  let salaryData = {};
+  salaryNames.forEach(name => salaryData[name] = { rows: "", total: 0 });
 
   monthRecords.forEach(d => {
 
@@ -1119,16 +1119,14 @@ function printMonthlyStatement() {
 
         const type = (e.type || "").toLowerCase();
         const desc = (e.desc || "").toLowerCase();
-        const paidTo = (e.paidTo || "").toLowerCase();
         const amount = Number(e.amount) || 0;
 
         // combine all text fields
-        const fullText = `${type} ${desc} ${paidTo}`;
+        const fullText = `${type} ${desc}`;
 
         // MATERIALS
         if (type.includes("material") || desc.includes("material")) {
           materialTotal += amount;
-
           materialRows += `
             <tr>
               <td>${d.date}</td>
@@ -1145,7 +1143,6 @@ function printMonthlyStatement() {
           desc.includes("bag")
         ) {
           packingBagTotal += amount;
-
           packingRows += `
             <tr>
               <td>${d.date}</td>
@@ -1155,19 +1152,17 @@ function printMonthlyStatement() {
           `;
         }
 
-        // ===== SALARY DETECTION =====
+        // ===== SALARY PER PERSON =====
         salaryNames.forEach(name => {
           if (fullText.includes(name)) {
-
-            salaryRows += `
+            salaryData[name].rows += `
               <tr>
                 <td>${d.date}</td>
                 <td>${name.toUpperCase()}</td>
                 <td>₦${amount.toFixed(2)}</td>
               </tr>
             `;
-
-            salaryTotal += amount;
+            salaryData[name].total += amount;
           }
         });
 
@@ -1209,9 +1204,7 @@ function printMonthlyStatement() {
     `);
 
     monthRecords.forEach(d => {
-
       const dailyQty = d.sales.reduce((a, s) => a + s.qty, 0);
-
       const dailyAvgUnit = d.sales.length
         ? (d.sales.reduce((a, s) => a + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
@@ -1231,20 +1224,45 @@ function printMonthlyStatement() {
     win.document.write(`
       </table>
 
-      <br><h4>SALARY PAYMENTS</h4>
+      <br><h4>MATERIAL EXPENSES</h4>
       <table border="1" width="100%" cellpadding="5">
-        <tr>
-          <th>Date</th>
-          <th>Name</th>
-          <th>Amount</th>
-        </tr>
-        ${salaryRows || '<tr><td colspan="3">No salary payments found</td></tr>'}
+        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+        ${materialRows || '<tr><td colspan="3">No material expenses</td></tr>'}
         <tr style="font-weight:bold;">
-          <td colspan="2">TOTAL SALARY</td>
-          <td>₦${salaryTotal.toFixed(2)}</td>
+          <td colspan="2">TOTAL MATERIAL COST</td>
+          <td>₦${materialTotal.toFixed(2)}</td>
         </tr>
       </table>
 
+      <br><h4>PACKING BAG EXPENSES</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+        ${packingRows || '<tr><td colspan="3">No packing bag expenses</td></tr>'}
+        <tr style="font-weight:bold;">
+          <td colspan="2">TOTAL PACKING BAG COST</td>
+          <td>₦${packingBagTotal.toFixed(2)}</td>
+        </tr>
+      </table>
+
+      <br><h4>SALARY PAYMENTS PER PERSON</h4>
+    `);
+
+    // Loop through each person and show table
+    salaryNames.forEach(name => {
+      win.document.write(`
+        <h5>${name.toUpperCase()}</h5>
+        <table border="1" width="100%" cellpadding="5">
+          <tr><th>Date</th><th>Name</th><th>Amount</th></tr>
+          ${salaryData[name].rows || '<tr><td colspan="3">No payments</td></tr>'}
+          <tr style="font-weight:bold;">
+            <td colspan="2">TOTAL ${name.toUpperCase()}</td>
+            <td>₦${salaryData[name].total.toFixed(2)}</td>
+          </tr>
+        </table>
+      `);
+    });
+
+    win.document.write(`
       <p>${footer}</p>
       <hr>
     `);
@@ -1255,6 +1273,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1416,5 +1435,6 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
