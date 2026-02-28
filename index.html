@@ -1132,11 +1132,15 @@ function printMonthlyStatement() {
           `;
         }
 
-        // PEOPLE TOTALS: check only type and desc fields
+        // PEOPLE TOTALS
+        // Check Mummy
         if (type.includes("mummy") || desc.includes("mummy")) {
           mummyTotal += amount;
         }
-        if (type.includes("forcados richard") || desc.includes("forcados richard")) {
+
+        // Check Mr RICHARD FORCADOS robustly
+        if ((type.includes("richard") && type.includes("forcados")) || 
+            (desc.includes("richard") && desc.includes("forcados"))) {
           forcadosRichardTotal += amount;
         }
       });
@@ -1232,7 +1236,7 @@ function printMonthlyStatement() {
           <td>₦${mummyTotal.toFixed(2)}</td>
         </tr>
         <tr>
-          <td>Forcados Richard CEO</td>
+          <td>Mr RICHARD FORCADOS</td>
           <td>₦${forcadosRichardTotal.toFixed(2)}</td>
         </tr>
       </table>
@@ -1247,6 +1251,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1411,6 +1416,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
