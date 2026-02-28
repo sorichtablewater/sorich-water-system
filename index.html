@@ -1114,10 +1114,10 @@ function printMonthlyStatement() {
     if (d.expenses) {
       d.expenses.forEach(e => {
         const amount = Number(e.amount) || 0;
-        const type = (e.type || "").toLowerCase().trim();
-        const desc = (e.desc || "").toLowerCase().trim();
 
         // MATERIALS
+        const type = (e.type || "").toLowerCase().trim();
+        const desc = (e.desc || "").toLowerCase().trim();
         if (type.includes("material") || desc.includes("material")) {
           materialTotal += amount;
           materialRows += `
@@ -1141,10 +1141,13 @@ function printMonthlyStatement() {
           `;
         }
 
-        // PEOPLE TOTALS
+        // PEOPLE TOTALS: check all fields
         people.forEach(p => {
-          if (desc.includes(p.toLowerCase())) {
-            personTotals[p] += amount;
+          for (const key in e) {
+            if (typeof e[key] === "string" && e[key].toLowerCase().includes(p.toLowerCase())) {
+              personTotals[p] += amount;
+              break; // stop after first match in any field
+            }
           }
         });
       });
@@ -1253,6 +1256,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1414,4 +1418,5 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
