@@ -1089,7 +1089,7 @@ function printMonthlyStatement() {
   let materialRows = "";
   let packingRows = "";
 
-  // ===== SALARY TRACKING PER PERSON =====
+  // ===== SALARY TRACKING FOR FULL NAMES =====
   const salaryNames = [
     "FORCADOS RICHARD",
     "MUMMY",
@@ -1113,7 +1113,7 @@ function printMonthlyStatement() {
       unitCount++;
     });
 
-    // ===== READ EXPENSES =====
+    // READ EXPENSES
     if (d.expenses) {
       d.expenses.forEach(e => {
 
@@ -1135,7 +1135,7 @@ function printMonthlyStatement() {
           packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // ===== SALARY EXPENSES FOR SPECIFIC NAMES =====
+        // SALARY EXPENSES - MATCH FULL NAMES
         salaryNames.forEach(name => {
           if (fullText.includes(name)) {
             salaryData[name].rows += `<tr><td>${d.date}</td><td>${name}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
@@ -1147,9 +1147,7 @@ function printMonthlyStatement() {
     }
   });
 
-  const monthlyAvgUnitPrice = unitCount
-    ? (unitSum / unitCount).toFixed(2)
-    : 0;
+  const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
 
   const win = window.open('', '', 'width=800,height=800');
   if (!win) {
@@ -1223,7 +1221,6 @@ function printMonthlyStatement() {
       <br><h4>SALARY PAYMENTS PER PERSON</h4>
     `);
 
-    // Loop through each person and show table with description
     salaryNames.forEach(name => {
       win.document.write(`
         <h5>${name}</h5>
@@ -1246,6 +1243,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1410,6 +1408,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
