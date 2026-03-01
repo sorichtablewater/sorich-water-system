@@ -1122,8 +1122,8 @@ function printMonthlyStatement() {
           packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // DIESEL
-        if (type === "diesel" || desc.includes("diesel")) {
+        // DIESEL ONLY
+        if (type.includes("diesel") || desc.includes("diesel")) {
           dieselTotal += amount;
           dieselRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
@@ -1319,6 +1319,7 @@ function printMonthlyStatement() {
 
 
 
+
 // ====== WEEKLY STATEMENT FUNCTION (MONDAY - SATURDAY) ======
 function printWeeklyStatement() {
   if (!dailyData.length) {
@@ -1474,4 +1475,5 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
