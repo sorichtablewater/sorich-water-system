@@ -1075,10 +1075,14 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  let materialTotal = 0, packingBagTotal = 0, dieselTotal = 0;
-  let materialRows = "", packingRows = "", dieselRows = "";
+  let materialTotal = 0,
+      packingBagTotal = 0,
+      dieselTotal = 0;
 
-  // PEOPLE PAYMENTS PER DATE
+  let materialRows = "",
+      packingRows = "",
+      dieselRows = "";
+
   const payments = {
     mummy: {},
     richard: {},
@@ -1086,12 +1090,12 @@ function printMonthlyStatement() {
     blessing: {}
   };
 
-  // BORROW ENTRIES
   let borrowRows = "";
   let totalBorrow = 0;
 
-  // Process each daily record
+  // ===== PROCESS RECORDS =====
   monthRecords.forEach(d => {
+
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
@@ -1104,79 +1108,91 @@ function printMonthlyStatement() {
       });
     }
 
-    if (d.expenses) {
-      d.expenses.forEach(e => {
-        const amount = Number(e.amount) || 0;
-        const type = (e.type || "").toLowerCase().trim();
-        const desc = (e.desc || "").toLowerCase().trim();
+    if (!d.expenses) return;
 
-        // ======================
-        // ✅ DIESEL (NEW ADDED)
-        // ======================
-        if (type.includes("diesel") || desc.includes("diesel")) {
-          dieselTotal += amount;
-          dieselRows += `
-            <tr>
-              <td>${d.date}</td>
-              <td>${e.desc || e.type}</td>
-              <td>₦${amount.toFixed(2)}</td>
-            </tr>`;
-        }
+    d.expenses.forEach(e => {
 
-        // MATERIAL
-        if (type.includes("material") || desc.includes("material")) {
-          materialTotal += amount;
-          materialRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-        }
+      const amount = Number(e.amount) || 0;
 
-        // PACKING
-        if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
-          packingBagTotal += amount;
-          packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-        }
+      // ✅ SAFE TEXT (MAIN FIX)
+      const type = String(e.type || "").toLowerCase();
+      const desc = String(e.desc || "").toLowerCase();
+      const text = type + " " + desc; // search everything together
 
-        // MUMMY
-        if (type.includes("mummy") || desc.includes("mummy")) {
-          if (!payments.mummy[d.date]) payments.mummy[d.date] = [];
-          payments.mummy[d.date].push({desc: e.desc, amount});
-        }
+      // ===== DIESEL =====
+      if (text.includes("diesel")) {
+        dieselTotal += amount;
+        dieselRows += `
+          <tr>
+            <td>${d.date}</td>
+            <td>${e.desc || e.type}</td>
+            <td>₦${amount.toFixed(2)}</td>
+          </tr>`;
+      }
 
-        // RICHARD FORCADOS
-        if ((type.includes("richard") && type.includes("forcados")) || 
-            (desc.includes("richard") && desc.includes("forcados"))) {
-          if (!payments.richard[d.date]) payments.richard[d.date] = [];
-          payments.richard[d.date].push({desc: e.desc, amount});
-        }
+      // ===== MATERIAL =====
+      if (text.includes("material")) {
+        materialTotal += amount;
+        materialRows += `
+          <tr>
+            <td>${d.date}</td>
+            <td>${e.desc}</td>
+            <td>₦${amount.toFixed(2)}</td>
+          </tr>`;
+      }
 
-        // FORCADOS PRECIOUS
-        if (type.includes("precious") || desc.includes("precious") ||
-            type.includes("forcados precious") || desc.includes("forcados precious")) {
-          if (!payments.precious[d.date]) payments.precious[d.date] = [];
-          payments.precious[d.date].push({desc: e.desc, amount});
-        }
+      // ===== PACKING =====
+      if (text.includes("packing") || text.includes("bag")) {
+        packingBagTotal += amount;
+        packingRows += `
+          <tr>
+            <td>${d.date}</td>
+            <td>${e.desc}</td>
+            <td>₦${amount.toFixed(2)}</td>
+          </tr>`;
+      }
 
-        // FORCADOS BLESSING
-        if (type.includes("blessing") || desc.includes("blessing") ||
-            type.includes("forcados blessing") || desc.includes("forcados blessing")) {
-          if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
-          payments.blessing[d.date].push({desc: e.desc, amount});
-        }
+      // ===== MUMMY =====
+      if (text.includes("mummy")) {
+        if (!payments.mummy[d.date]) payments.mummy[d.date] = [];
+        payments.mummy[d.date].push({desc: e.desc, amount});
+      }
 
-        // BORROW
-        if (type.includes("borrow") || desc.includes("borrow")) {
-          borrowRows += `<tr>
+      // ===== RICHARD FORCADOS =====
+      if (text.includes("richard") && text.includes("forcados")) {
+        if (!payments.richard[d.date]) payments.richard[d.date] = [];
+        payments.richard[d.date].push({desc: e.desc, amount});
+      }
+
+      // ===== PRECIOUS =====
+      if (text.includes("precious")) {
+        if (!payments.precious[d.date]) payments.precious[d.date] = [];
+        payments.precious[d.date].push({desc: e.desc, amount});
+      }
+
+      // ===== BLESSING =====
+      if (text.includes("blessing")) {
+        if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
+        payments.blessing[d.date].push({desc: e.desc, amount});
+      }
+
+      // ===== BORROW =====
+      if (text.includes("borrow")) {
+        borrowRows += `
+          <tr>
             <td>${d.date}</td>
             <td>${e.type || "-"}</td>
             <td>${e.desc || "-"}</td>
             <td>₦${amount.toFixed(2)}</td>
           </tr>`;
-          totalBorrow += amount;
-        }
-      });
-    }
+        totalBorrow += amount;
+      }
+
+    });
   });
 
   const monthlyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
+
   const win = window.open('', '', 'width=1000,height=800');
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
@@ -1184,18 +1200,11 @@ function printMonthlyStatement() {
   }
 
   for (let i = 0; i < copies; i++) {
-    const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
-      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-      <p>08164084402, 07012623006, 08067338211</p>
-      <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
-      <p>Period: ${year}-${monthStr}</p>
-      <p>ISSUER: ${manager}</p>
-      <hr>
+      <h3>DIESEL EXPENSES</h3>
 
-      <h4>DIESEL EXPENSES</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
         ${dieselRows || '<tr><td colspan="3">No diesel expenses</td></tr>'}
@@ -1204,9 +1213,9 @@ function printMonthlyStatement() {
           <td>₦${dieselTotal.toFixed(2)}</td>
         </tr>
       </table>
-    `);
 
-    win.document.write(`<p>${footer}</p><hr>`);
+      <p>${footer}</p><hr>
+    `);
   }
 
   win.document.close();
@@ -1214,6 +1223,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1386,4 +1396,5 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
