@@ -1075,8 +1075,8 @@ function printMonthlyStatement() {
       unitSum = 0,
       unitCount = 0;
 
-  let materialTotal = 0, packingBagTotal = 0;
-  let materialRows = "", packingRows = "";
+  let materialTotal = 0, packingBagTotal = 0, dieselTotal = 0;
+  let materialRows = "", packingRows = "", dieselRows = "";
 
   // PEOPLE PAYMENTS PER DATE
   const payments = {
@@ -1120,6 +1120,12 @@ function printMonthlyStatement() {
         if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
           packingBagTotal += amount;
           packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
+        }
+
+        // DIESEL
+        if (type === "diesel" || desc.includes("diesel")) {
+          dieselTotal += amount;
+          dieselRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
         // MUMMY
@@ -1232,6 +1238,13 @@ function printMonthlyStatement() {
         ${packingRows || '<tr><td colspan="3">No packing bag expenses</td></tr>'}
         <tr style="font-weight:bold;"><td colspan="2">TOTAL PACKING BAG COST</td><td>₦${packingBagTotal.toFixed(2)}</td></tr>
       </table>
+
+      <br><h4>DIESEL EXPENSES</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+        ${dieselRows || '<tr><td colspan="3">No diesel expenses</td></tr>'}
+        <tr style="font-weight:bold;"><td colspan="2">TOTAL DIESEL COST</td><td>₦${dieselTotal.toFixed(2)}</td></tr>
+      </table>
     `);
 
     // Render PEOPLE tables
@@ -1289,6 +1302,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1460,3 +1474,4 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
