@@ -1090,6 +1090,25 @@ function printMonthlyStatement() {
   let borrowRows = "";
   let totalBorrow = 0;
 
+  // DEBTORS SUMMARY
+  let debtorRows = "";
+  let totalOwing = 0;
+  debtData.forEach(d => {
+    const balance = Number(d.owing);
+    if (balance > 0) {
+      debtorRows += `
+        <tr>
+          <td>${d.customer}</td>
+          <td>₦${(d.totalPaid + d.owing).toFixed(2)}</td>
+          <td>₦${d.totalPaid.toFixed(2)}</td>
+          <td>₦${balance.toFixed(2)}</td>
+          <td>❌ Owing</td>
+        </tr>
+      `;
+      totalOwing += balance;
+    }
+  });
+
   // Process each daily record
   monthRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
@@ -1128,27 +1147,24 @@ function printMonthlyStatement() {
           dieselRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
         }
 
-        // MUMMY
+        // PEOPLE PAYMENTS
         if (type.includes("mummy") || desc.includes("mummy")) {
           if (!payments.mummy[d.date]) payments.mummy[d.date] = [];
           payments.mummy[d.date].push({desc: e.desc, amount});
         }
 
-        // RICHARD FORCADOS
         if ((type.includes("richard") && type.includes("forcados")) || 
             (desc.includes("richard") && desc.includes("forcados"))) {
           if (!payments.richard[d.date]) payments.richard[d.date] = [];
           payments.richard[d.date].push({desc: e.desc, amount});
         }
 
-        // FORCADOS PRECIOUS
         if (type.includes("precious") || desc.includes("precious") ||
             type.includes("forcados precious") || desc.includes("forcados precious")) {
           if (!payments.precious[d.date]) payments.precious[d.date] = [];
           payments.precious[d.date].push({desc: e.desc, amount});
         }
 
-        // FORCADOS BLESSING
         if (type.includes("blessing") || desc.includes("blessing") ||
             type.includes("forcados blessing") || desc.includes("forcados blessing")) {
           if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
@@ -1188,7 +1204,20 @@ function printMonthlyStatement() {
       <p>ISSUER: ${manager}</p>
       <hr>
 
-      <h4>MONTH SUMMARY</h4>
+      <h4>DEBTORS SUMMARY</h4>
+      <table border="1" width="100%" cellpadding="5">
+        <tr><th>Customer</th><th>Total Owed</th><th>Paid</th><th>Balance</th><th>Status</th></tr>
+        ${debtorRows || '<tr><td colspan="5">No debtors</td></tr>'}
+        <tr style="font-weight:bold;">
+          <td colspan="4">TOTAL OWING</td>
+          <td>₦${totalOwing.toFixed(2)}</td>
+        </tr>
+      </table>
+    `);
+
+    // MONTHLY SUMMARY
+    win.document.write(`
+      <br><h4>MONTH SUMMARY</h4>
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
           <th>Date</th><th>Total Sales</th><th>Total Expenses</th>
@@ -1224,30 +1253,24 @@ function printMonthlyStatement() {
           <td>₦${monthlyAvgUnitPrice}</td>
         </tr>
       </table>
-
-      <br><h4>MATERIAL EXPENSES</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
-        ${materialRows || '<tr><td colspan="3">No material expenses</td></tr>'}
-        <tr style="font-weight:bold;"><td colspan="2">TOTAL MATERIAL COST</td><td>₦${materialTotal.toFixed(2)}</td></tr>
-      </table>
-
-      <br><h4>PACKING BAG EXPENSES</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
-        ${packingRows || '<tr><td colspan="3">No packing bag expenses</td></tr>'}
-        <tr style="font-weight:bold;"><td colspan="2">TOTAL PACKING BAG COST</td><td>₦${packingBagTotal.toFixed(2)}</td></tr>
-      </table>
-
-      <br><h4>DIESEL EXPENSES</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
-        ${dieselRows || '<tr><td colspan="3">No diesel expenses</td></tr>'}
-        <tr style="font-weight:bold;"><td colspan="2">TOTAL DIESEL COST</td><td>₦${dieselTotal.toFixed(2)}</td></tr>
-      </table>
     `);
 
-    // Render PEOPLE tables
+    // MATERIAL, PACKING, DIESEL TABLES
+    const renderExpenseTable = (title, rows, total) => {
+      win.document.write(`<br><h4>${title}</h4>
+        <table border="1" width="100%" cellpadding="5">
+          <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
+          ${rows || `<tr><td colspan="3">No ${title.toLowerCase()}</td></tr>`}
+          <tr style="font-weight:bold;"><td colspan="2">TOTAL ${title.toUpperCase()}</td><td>₦${total.toFixed(2)}</td></tr>
+        </table>
+      `);
+    };
+
+    renderExpenseTable("Material Expenses", materialRows, materialTotal);
+    renderExpenseTable("Packing Bag Expenses", packingRows, packingBagTotal);
+    renderExpenseTable("Diesel Expenses", dieselRows, dieselTotal);
+
+    // PEOPLE TABLES
     const renderPersonTable = (personName, personPayments) => {
       win.document.write(`<br><h4>${personName.toUpperCase()} RECEIVED</h4>
         <table border="1" width="100%" cellpadding="5">
@@ -1282,7 +1305,7 @@ function printMonthlyStatement() {
     renderPersonTable("FORCADOS PRECIOUS", payments.precious);
     renderPersonTable("FORCADOS BLESSING", payments.blessing);
 
-    // Render BORROW table
+    // BORROW TABLE
     win.document.write(`<br><h4>BORROW</h4>
       <table border="1" width="100%" cellpadding="5">
         <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr>
@@ -1302,6 +1325,7 @@ function printMonthlyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
@@ -1475,5 +1499,6 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
