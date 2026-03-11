@@ -63,13 +63,17 @@ body.dark-mode th {background-color:#003366;}
 <button onclick="showSection('salesPage')">🛒 Sales</button>
 <button onclick="showSection('debtorsPage')">💳 Debtors</button>
 <button onclick="showSection('expensesPage')">💰 Expenses</button>
+
+<button onclick="startDraftDay()">📝 Start Draft Day</button>
 <button onclick="endOfDay()">📅 End of Day</button>
+
 <button onclick="showSection('dailyRecordsPage')">📋 Daily Records</button>
 <button onclick="showSection('chartsPage')">📊 Charts</button>
 <button onclick="settingsPage()">⚙ Settings</button>
 <button onclick="logout()">Logout</button>
 </div>
 </div>
+
 
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
@@ -246,12 +250,25 @@ body.dark-mode th {background-color:#003366;}
   <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 <script>
-// ====== Offline JS Logic ======
-let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
-let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
-let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
-let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
-let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
+// ====== Draft Day System ======
+let draftDate = localStorage.getItem('draftDate') || null;
+
+function startDraftDay(){
+
+let date = prompt(
+"Enter date for this draft day (YYYY-MM-DD)",
+new Date().toISOString().split('T')[0]
+);
+
+if(!date) return;
+
+draftDate = date;
+
+localStorage.setItem('draftDate', draftDate);
+
+alert("Draft day started for " + draftDate);
+
+}
 
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
@@ -907,13 +924,17 @@ function renderDailyRecordInvoice(d) {
 function endOfDay() {
     if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
 
-    // Default to TODAY (even if it's past midnight)
+    // Use Draft Date if set, otherwise default to TODAY
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
+    let chosenDate = draftDate || todayStr;
 
-    // Allow you to edit the date if you're finishing yesterday's work
-    let chosenDate = prompt("Confirm date for End of Day record (YYYY-MM-DD):", todayStr);
-    if (!chosenDate) return;
+    // Allow you to edit the date only if no draft date is set
+    if (!draftDate) {
+        let inputDate = prompt("Confirm date for End of Day record (YYYY-MM-DD):", todayStr);
+        if (!inputDate) return;
+        chosenDate = inputDate;
+    }
 
     // Calculate totals
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
@@ -953,6 +974,10 @@ function endOfDay() {
     localStorage.setItem('salesData', JSON.stringify(salesData));
     localStorage.setItem('expenseData', JSON.stringify(expenseData));
 
+    // Clear Draft Date after saving
+    draftDate = null;
+    localStorage.removeItem('draftDate');
+
     // Refresh dashboard
     renderSalesTable();
     renderExpenses();
@@ -960,6 +985,7 @@ function endOfDay() {
 
     alert("End of day completed! Record saved for " + chosenDate);
 }
+
 
 // ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
 function renderChart() {
@@ -1499,6 +1525,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
