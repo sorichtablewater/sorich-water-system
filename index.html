@@ -60,18 +60,20 @@ body.dark-mode th {background-color:#003366;}
 </div>
 
 <div class="dashboard-buttons">
-<button onclick="showSection('salesPage')">🛒 Sales</button>
-<button onclick="showSection('debtorsPage')">💳 Debtors</button>
-<button onclick="showSection('expensesPage')">💰 Expenses</button>
+    <button onclick="showSection('salesPage')">🛒 Sales</button>
+    <button onclick="showSection('debtorsPage')">💳 Debtors</button>
+    <button onclick="showSection('expensesPage')">💰 Expenses</button>
 
-<button onclick="startDraftDay()">📝 Start Draft Day</button>
-<button onclick="endOfDay()">📅 End of Day</button>
+    <button onclick="startDraftDay()">📝 Start Draft Day</button>
+    <button onclick="saveToDraft()">💾 Save to Draft</button>
+    <button onclick="promptLoadDraft()">📂 Load Draft</button>
+    <button onclick="promptEndDraft()">✅ End Draft</button>
+    <button onclick="endOfDay()">📅 End of Day</button>
 
-<button onclick="showSection('dailyRecordsPage')">📋 Daily Records</button>
-<button onclick="showSection('chartsPage')">📊 Charts</button>
-<button onclick="settingsPage()">⚙ Settings</button>
-<button onclick="logout()">Logout</button>
-</div>
+    <button onclick="showSection('dailyRecordsPage')">📋 Daily Records</button>
+    <button onclick="showSection('chartsPage')">📊 Charts</button>
+    <button onclick="settingsPage()">⚙ Settings</button>
+    <button onclick="logout()">Logout</button>
 </div>
 
 
@@ -1514,6 +1516,107 @@ function updateCustomerSuggestions() {
   });
 }
 
+// ====== Draft Functions ======
+function saveToDraft() {
+    if (!salesData.length && !expenseData.length) {
+        alert("Nothing to save to draft!");
+        return;
+    }
+
+    let draftDate = prompt("Enter draft date (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+    if (!draftDate) return;
+
+    let drafts = JSON.parse(localStorage.getItem('drafts')) || [];
+
+    drafts.push({
+        draftDate,
+        sales: salesData,
+        expenses: expenseData
+    });
+
+    localStorage.setItem('drafts', JSON.stringify(drafts));
+
+    // Clear current sales and expenses
+    salesData = [];
+    expenseData = [];
+    localStorage.setItem('salesData', JSON.stringify(salesData));
+    localStorage.setItem('expenseData', JSON.stringify(expenseData));
+
+    alert(`Draft saved for ${draftDate}! You can continue with today's sales.`);
+}
+
+function loadDraft(draftDate) {
+    let drafts = JSON.parse(localStorage.getItem('drafts')) || [];
+    let draft = drafts.find(d => d.draftDate === draftDate);
+
+    if (!draft) {
+        alert("Draft not found!");
+        return;
+    }
+
+    salesData = draft.sales;
+    expenseData = draft.expenses;
+
+    localStorage.setItem('salesData', JSON.stringify(salesData));
+    localStorage.setItem('expenseData', JSON.stringify(expenseData));
+
+    alert(`Draft for ${draftDate} loaded. You can update and finalize.`);
+}
+
+function endOfDraft(draftDate) {
+    let drafts = JSON.parse(localStorage.getItem('drafts')) || [];
+    let draftIndex = drafts.findIndex(d => d.draftDate === draftDate);
+
+    if (draftIndex === -1) {
+        alert("Draft not found!");
+        return;
+    }
+
+    const draft = drafts[draftIndex];
+
+    // Archive draft to dailyData
+    const totalSales = draft.sales.reduce((acc, s) => acc + Number(s.total), 0);
+    const totalExpenses = draft.expenses.reduce((acc, e) => acc + Number(e.amount), 0);
+    const avgUnitPrice = draft.sales.length 
+        ? draft.sales.reduce((acc, s) => acc + Number(s.unit), 0) / draft.sales.length 
+        : 0;
+
+    dailyData.push({
+        date: draft.draftDate,
+        totalSales,
+        totalExpenses,
+        net: totalSales - totalExpenses,
+        avgUnitPrice,
+        sales: draft.sales,
+        expenses: draft.expenses
+    });
+
+    localStorage.setItem('dailyData', JSON.stringify(dailyData));
+
+    // Remove draft
+    drafts.splice(draftIndex, 1);
+    localStorage.setItem('drafts', JSON.stringify(drafts));
+
+    // Clear loaded draft from current session
+    salesData = [];
+    expenseData = [];
+    localStorage.setItem('salesData', JSON.stringify(salesData));
+    localStorage.setItem('expenseData', JSON.stringify(expenseData));
+
+    alert(`Draft for ${draftDate} finalized and moved to daily records!`);
+}
+
+// ====== Draft Prompt Helpers ======
+function promptLoadDraft() {
+    let date = prompt("Enter draft date to load (YYYY-MM-DD):");
+    if (date) loadDraft(date);
+}
+
+function promptEndDraft() {
+    let date = prompt("Enter draft date to finalize (YYYY-MM-DD):");
+    if (date) endOfDraft(date);
+}
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
@@ -1525,6 +1628,7 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
 
