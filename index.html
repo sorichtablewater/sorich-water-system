@@ -297,16 +297,6 @@ function updateSaleCalc(){
 [saleQty, saleTotal, salePaid, salePrevDebt].forEach(e => e.addEventListener('input', updateSaleCalc));
 updateSaleCalc();
 
-function prefillOwing(){
-  const name = document.getElementById('saleCustomer').value;
-  const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
-  if(debt) { 
-    const total = parseFloat(saleTotal.value) || 0; 
-    salePaid.value = total - debt.owing; 
-    salePrevDebt.value = debt.owing; // NEW: auto-fill previous debt if customer exists
-  }
-  updateSaleCalc();
-}
 
 function addSale(){
   const customer = document.getElementById('saleCustomer').value || 'Unknown';
@@ -1530,4 +1520,5 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
