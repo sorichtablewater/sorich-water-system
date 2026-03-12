@@ -1516,10 +1516,19 @@ renderExpenses();
 renderDailyRecords();
 updateCustomerSuggestions();
 
+// FORCE CUSTOMER LAST PURCHASE MEMORY
+const customerInput = document.getElementById('saleCustomer');
+
+if(customerInput){
+  customerInput.addEventListener('input', prefillOwing);
+  customerInput.addEventListener('change', prefillOwing);
+  customerInput.addEventListener('blur', prefillOwing);
+}
 
 </script>
 </body>
 </html>
+
 
 
 
