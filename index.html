@@ -76,7 +76,7 @@ body.dark-mode th {background-color:#003366;}
 <h2>Sales</h2>
 
 <label>Customer: 
-  <input type="text" id="saleCustomer" list="customerList" placeholder="New or select customer" oninput="prefillOwing()">
+  <input type="text" id="saleCustomer" list="customerList" placeholder="New or select customer" oninput="prefillOwing()" onchange="prefillOwing()">
 </label>
 <datalist id="customerList"></datalist>
 
@@ -1520,5 +1520,6 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
 
 
