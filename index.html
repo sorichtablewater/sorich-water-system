@@ -1478,36 +1478,37 @@ function updateCustomerSuggestions() {
   });
 }
 
-// ====== LAST PURCHASE MEMORY ======
-function prefillOwing(){
-  const name = document.getElementById('saleCustomer').value.trim().toLowerCase();
+// ====== PREFILL LAST PURCHASE ======
+function prefillOwing() {
+    const customer = document.getElementById('saleCustomer').value.trim();
+    if (!customer) return;
 
-  if(!name) return;
+    // Find the last sale for this customer
+    const lastSale = [...salesData].reverse().find(s => s.customer.toLowerCase() === customer.toLowerCase());
 
-  // FIND LAST SALE FOR THIS CUSTOMER
-  const lastSale = [...salesData].reverse().find(s => 
-    s.customer.toLowerCase() === name
-  );
+    if (lastSale) {
+        // Prefill fields with last purchase
+        saleQty.value = lastSale.qty;
+        saleTotal.value = lastSale.total;
+        salePaid.value = lastSale.paid;
+        salePrevDebt.value = lastSale.owing; // previous debt
 
-  if(lastSale){
-    // PREFILL LAST PURCHASE
-    saleQty.value = lastSale.qty;
-    saleTotal.value = lastSale.total;
-    salePaid.value = lastSale.paid;
-  }
-
-  // LOAD PREVIOUS DEBT IF ANY
-  const debt = debtData.find(d => d.customer.toLowerCase() === name);
-
-  if(debt){
-    salePrevDebt.value = debt.owing;
-  } else {
-    salePrevDebt.value = 0;
-  }
-
-  updateSaleCalc();
+        updateSaleCalc(); // update unit price and owing display
+    } else {
+        // Reset to default if no previous sale
+        saleQty.value = 10;
+        saleTotal.value = 2500;
+        salePaid.value = 2000;
+        salePrevDebt.value = 0;
+        updateSaleCalc();
+    }
 }
 
+// Attach listeners (for typing and selecting customer)
+const customerInput = document.getElementById('saleCustomer');
+if(customerInput){
+    ['input','change','blur'].forEach(evt => customerInput.addEventListener(evt, prefillOwing));
+}
 
 // ====== INIT ======
 renderSalesTable();
@@ -1528,6 +1529,7 @@ if(customerInput){
 </script>
 </body>
 </html>
+
 
 
 
