@@ -1488,6 +1488,37 @@ function updateCustomerSuggestions() {
   });
 }
 
+// ====== LAST PURCHASE MEMORY ======
+function prefillOwing(){
+  const name = document.getElementById('saleCustomer').value.trim().toLowerCase();
+
+  if(!name) return;
+
+  // FIND LAST SALE FOR THIS CUSTOMER
+  const lastSale = [...salesData].reverse().find(s => 
+    s.customer.toLowerCase() === name
+  );
+
+  if(lastSale){
+    // PREFILL LAST PURCHASE
+    saleQty.value = lastSale.qty;
+    saleTotal.value = lastSale.total;
+    salePaid.value = lastSale.paid;
+  }
+
+  // LOAD PREVIOUS DEBT IF ANY
+  const debt = debtData.find(d => d.customer.toLowerCase() === name);
+
+  if(debt){
+    salePrevDebt.value = debt.owing;
+  } else {
+    salePrevDebt.value = 0;
+  }
+
+  updateSaleCalc();
+}
+
+
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
@@ -1499,3 +1530,4 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
