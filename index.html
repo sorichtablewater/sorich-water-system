@@ -401,41 +401,41 @@ function renderSalesTable(){
     printBtn.onclick=()=>printInvoice(s);
     row.insertCell(7).appendChild(printBtn);
 
-    // 🗑 DELETE BUTTON
-    const deleteBtn=document.createElement('button');
-    deleteBtn.innerText='Delete';
-    deleteBtn.style.background='red';
-    deleteBtn.style.color='#fff';
-    deleteBtn.onclick=()=>{
-      if(confirm('Delete this sale?')){
-        salesData.splice(index,1);
-        localStorage.setItem('salesData', JSON.stringify(salesData));
-        renderSalesTable();
-        renderDebtors(); // Update debts if needed
+ // 🗑 DELETE BUTTON
+const deleteBtn = document.createElement('button');
+deleteBtn.innerText = 'Delete';
+deleteBtn.style.background = 'red';
+deleteBtn.style.color = '#fff';
+deleteBtn.onclick = () => {
+  if (confirm('Delete this sale?')) {
+    const sale = salesData[index];
+
+    // Remove sale from salesData
+    salesData.splice(index, 1);
+
+    // Update debtData: subtract this sale's owing and paid from debt
+    const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === sale.customer.toLowerCase());
+    if (debtIndex >= 0) {
+      debtData[debtIndex].owing -= sale.owing;
+      debtData[debtIndex].totalPaid -= sale.paid;
+
+      // If debt is fully cleared or negative, remove debtor entirely
+      if (debtData[debtIndex].owing <= 0) {
+        debtData.splice(debtIndex, 1);
       }
-    };
-    row.insertCell(8).appendChild(deleteBtn);
+    }
 
-    sumQty+=s.qty;
-    sumTotal+=s.total;
-    sumPaid+=s.paid;
-    sumOwing+=s.owing;
-    unitSum+=s.unit;
-  });
+    // Save updated data
+    localStorage.setItem('salesData', JSON.stringify(salesData));
+    localStorage.setItem('debtData', JSON.stringify(debtData));
 
-  const avgUnit = salesData.length ? (unitSum/salesData.length).toFixed(2) : 0;
-  document.getElementById('sumQty').innerText=sumQty;
-  document.getElementById('sumTotal').innerText=sumTotal;
-  document.getElementById('sumPaid').innerText=sumPaid;
-  document.getElementById('sumOwing').innerText=sumOwing;
-  document.getElementById('avgPrice').innerText=avgUnit;
-  document.getElementById('totalSales').innerText=sumTotal;
-  document.getElementById('totalPaid').innerText=sumPaid;
+    // Re-render tables
+    renderSalesTable();
+    renderDebtors();
+  }
+};
+row.insertCell(8).appendChild(deleteBtn);
 
-  const totalDebt = debtData.reduce((acc,d)=>acc+d.owing,0);
-  document.getElementById('debts').innerText=totalDebt.toFixed(2);
-  document.getElementById('avgUnitPrice').innerText=avgUnit;
-}
 
 
 // ====== DEBTORS ======
@@ -1499,3 +1499,4 @@ updateCustomerSuggestions();
 </script>
 </body>
 </html>
+
