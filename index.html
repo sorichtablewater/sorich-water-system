@@ -76,7 +76,7 @@ body.dark-mode th {background-color:#003366;}
 <h2>Sales</h2>
 
 <label>Customer: 
-  <input type="text" id="saleCustomer" list="customerList" placeholder="New or select customer" oninput="prefillOwing()" onchange="prefillOwing()">
+  <input type="text" id="saleCustomer" list="customerList" placeholder="New or select customer" oninput="prefillOwing()">
 </label>
 <datalist id="customerList"></datalist>
 
@@ -297,6 +297,16 @@ function updateSaleCalc(){
 [saleQty, saleTotal, salePaid, salePrevDebt].forEach(e => e.addEventListener('input', updateSaleCalc));
 updateSaleCalc();
 
+function prefillOwing(){
+  const name = document.getElementById('saleCustomer').value;
+  const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
+  if(debt) { 
+    const total = parseFloat(saleTotal.value) || 0; 
+    salePaid.value = total - debt.owing; 
+    salePrevDebt.value = debt.owing; // NEW: auto-fill previous debt if customer exists
+  }
+  updateSaleCalc();
+}
 
 function addSale(){
   const customer = document.getElementById('saleCustomer').value || 'Unknown';
@@ -1478,38 +1488,6 @@ function updateCustomerSuggestions() {
   });
 }
 
-// ====== PREFILL LAST PURCHASE ======
-function prefillOwing() {
-    const customer = document.getElementById('saleCustomer').value.trim();
-    if (!customer) return;
-
-    // Find the last sale for this customer
-    const lastSale = [...salesData].reverse().find(s => s.customer.toLowerCase() === customer.toLowerCase());
-
-    if (lastSale) {
-        // Prefill fields with last purchase
-        saleQty.value = lastSale.qty;
-        saleTotal.value = lastSale.total;
-        salePaid.value = lastSale.paid;
-        salePrevDebt.value = lastSale.owing; // previous debt
-
-        updateSaleCalc(); // update unit price and owing display
-    } else {
-        // Reset to default if no previous sale
-        saleQty.value = 10;
-        saleTotal.value = 2500;
-        salePaid.value = 2000;
-        salePrevDebt.value = 0;
-        updateSaleCalc();
-    }
-}
-
-// Attach listeners (for typing and selecting customer)
-const customerInput = document.getElementById('saleCustomer');
-if(customerInput){
-    ['input','change','blur'].forEach(evt => customerInput.addEventListener(evt, prefillOwing));
-}
-
 // ====== INIT ======
 renderSalesTable();
 renderDebtors();
@@ -1517,20 +1495,7 @@ renderExpenses();
 renderDailyRecords();
 updateCustomerSuggestions();
 
-// FORCE CUSTOMER LAST PURCHASE MEMORY
-const customerInput = document.getElementById('saleCustomer');
-
-if(customerInput){
-  customerInput.addEventListener('input', prefillOwing);
-  customerInput.addEventListener('change', prefillOwing);
-  customerInput.addEventListener('blur', prefillOwing);
-}
 
 </script>
 </body>
 </html>
-
-
-
-
-
