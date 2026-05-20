@@ -331,23 +331,40 @@ function addSale(){
     date: new Date().toLocaleDateString()
   });
 
-  // Update debt data
-  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
-  if(debtIndex >= 0){
-    debtData[debtIndex].owing += parseFloat(owing);
-    debtData[debtIndex].totalPaid += paid;
-  } else {
+ // ===== UPDATE DEBT DATA CORRECTLY =====
+const debtIndex = debtData.findIndex(
+  d => d.customer.toLowerCase() === customer.toLowerCase()
+);
+
+// ONLY the new sale debt
+const newDebt = total - paid;
+
+if (debtIndex >= 0) {
+
+  // add ONLY new debt
+  debtData[debtIndex].owing =
+    Number(debtData[debtIndex].owing) + Number(newDebt);
+
+  debtData[debtIndex].totalPaid =
+    Number(debtData[debtIndex].totalPaid) + Number(paid);
+
+} else {
+
+  // create new debtor only if owing exists
+  if (newDebt > 0) {
     debtData.push({
       customer,
-      owing: parseFloat(owing),
-      totalPaid: paid
+      owing: Number(newDebt),
+      totalPaid: Number(paid)
     });
   }
 
-  // Re-render tables
+}
+
+   // Re-render tables
   renderSalesTable();
   renderDebtors();
-
+  updateCustomerSuggestions();
   // Reset form
   document.getElementById('saleCustomer').value = '';
   saleQty.value = 10;
@@ -378,7 +395,8 @@ function renderSalesTable(){
     </tr>
   `;
 
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0,unitSum=0;
+  // ✅ REMOVED unitSum
+  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0;
 
   salesData.forEach((s,index)=>{
     const row=table.insertRow();
@@ -414,47 +432,71 @@ function renderSalesTable(){
         salesData.splice(index,1);
         localStorage.setItem('salesData', JSON.stringify(salesData));
 
-        // Update debtData automatically
-        const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === sale.customer.toLowerCase());
-        if(debtIndex >= 0) {
-          // Subtract this sale's owing and paid from the debtor
-          debtData[debtIndex].owing -= sale.owing;
-          debtData[debtIndex].totalPaid -= sale.paid;
+      // Update debtData automatically
+const debtIndex = debtData.findIndex(
+  d => d.customer.toLowerCase() === sale.customer.toLowerCase()
+);
 
-          // Remove debtor if no more debt
-          if(debtData[debtIndex].owing <= 0) {
-            debtData.splice(debtIndex,1);
-          }
-        }
+if (debtIndex >= 0) {
 
-        localStorage.setItem('debtData', JSON.stringify(debtData));
+  // remove ONLY this sale's actual debt
+  const actualSaleDebt =
+    Number(sale.total) - Number(sale.paid);
+
+  debtData[debtIndex].owing =
+    Number(debtData[debtIndex].owing) - actualSaleDebt;
+
+  debtData[debtIndex].totalPaid =
+    Number(debtData[debtIndex].totalPaid) - Number(sale.paid);
+
+  // prevent negative values
+  if (debtData[debtIndex].owing < 0) {
+    debtData[debtIndex].owing = 0;
+  }
+
+  if (debtData[debtIndex].totalPaid < 0) {
+    debtData[debtIndex].totalPaid = 0;
+  }
+
+  // Remove debtor if fully cleared
+  if (debtData[debtIndex].owing <= 0) {
+    debtData.splice(debtIndex, 1);
+  }
+}
+
+localStorage.setItem('debtData', JSON.stringify(debtData));
 
         // Re-render tables
         renderSalesTable();
         renderDebtors();
       }
     };
+
     row.insertCell(8).appendChild(deleteBtn);
 
-    sumQty+=s.qty;
-    sumTotal+=s.total;
-    sumPaid+=s.paid;
-    sumOwing+=s.owing;
-    unitSum+=s.unit;
+    // ✅ TOTALS
+    sumQty += Number(s.qty);
+    sumTotal += Number(s.total);
+    sumPaid += Number(s.paid);
+    sumOwing += Number(s.owing);
   });
 
-  const avgUnit = salesData.length ? (unitSum/salesData.length).toFixed(2) : 0;
-  document.getElementById('sumQty').innerText=sumQty;
-  document.getElementById('sumTotal').innerText=sumTotal;
-  document.getElementById('sumPaid').innerText=sumPaid;
-  document.getElementById('sumOwing').innerText=sumOwing;
-  document.getElementById('avgPrice').innerText=avgUnit;
-  document.getElementById('totalSales').innerText=sumTotal;
-  document.getElementById('totalPaid').innerText=sumPaid;
+  // ✅ CORRECT WEIGHTED AVERAGE UNIT PRICE
+  const avgUnit = sumQty ? (sumTotal / sumQty).toFixed(2) : 0;
 
-  const totalDebt = debtData.reduce((acc,d)=>acc+d.owing,0);
-  document.getElementById('debts').innerText=totalDebt.toFixed(2);
-  document.getElementById('avgUnitPrice').innerText=avgUnit;
+  document.getElementById('sumQty').innerText = sumQty;
+  document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
+  document.getElementById('sumPaid').innerText = sumPaid.toFixed(2);
+  document.getElementById('sumOwing').innerText = sumOwing.toFixed(2);
+  document.getElementById('avgPrice').innerText = avgUnit;
+
+  document.getElementById('totalSales').innerText = sumTotal.toFixed(2);
+  document.getElementById('totalPaid').innerText = sumPaid.toFixed(2);
+
+  const totalDebt = debtData.reduce((acc,d)=>acc + Number(d.owing),0);
+
+  document.getElementById('debts').innerText = totalDebt.toFixed(2);
+  document.getElementById('avgUnitPrice').innerText = avgUnit;
 }
 
 
@@ -1024,7 +1066,12 @@ function renderChart() {
 
 // ====== EDIT SALE FUNCTION ======
 function editSale(index){
+
   const s = salesData[index];
+
+  // STORE OLD VALUES
+  const oldCustomer = s.customer;
+  const oldDebt = Number(s.total) - Number(s.paid);
 
   const newCustomer = prompt("Edit Customer Name:", s.customer);
   if(newCustomer === null) return;
@@ -1038,10 +1085,34 @@ function editSale(index){
   const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
   if(isNaN(newPaid)) return;
 
-  const newUnit = newQty ? (newTotal/newQty).toFixed(2) : 0;
+  const newUnit = newQty ? (newTotal / newQty).toFixed(2) : 0;
   const newOwing = (newTotal - newPaid).toFixed(2);
 
-  // update record
+  // REMOVE OLD DEBT FROM debtData
+  const oldDebtIndex = debtData.findIndex(
+    d => d.customer.toLowerCase() === oldCustomer.toLowerCase()
+  );
+
+  if (oldDebtIndex >= 0) {
+
+    debtData[oldDebtIndex].owing -= oldDebt;
+    debtData[oldDebtIndex].totalPaid -= Number(s.paid);
+
+    if (debtData[oldDebtIndex].owing < 0) {
+      debtData[oldDebtIndex].owing = 0;
+    }
+
+    if (debtData[oldDebtIndex].totalPaid < 0) {
+      debtData[oldDebtIndex].totalPaid = 0;
+    }
+
+    // REMOVE CUSTOMER IF CLEARED
+    if (debtData[oldDebtIndex].owing <= 0) {
+      debtData.splice(oldDebtIndex, 1);
+    }
+  }
+
+  // UPDATE SALE
   s.customer = newCustomer;
   s.qty = newQty;
   s.total = newTotal;
@@ -1049,10 +1120,39 @@ function editSale(index){
   s.unit = parseFloat(newUnit);
   s.owing = parseFloat(newOwing);
 
-  localStorage.setItem('salesData', JSON.stringify(salesData));
+  // ADD NEW DEBT
+  const newDebt = newTotal - newPaid;
 
+  if (newDebt > 0) {
+
+    const newDebtIndex = debtData.findIndex(
+      d => d.customer.toLowerCase() === newCustomer.toLowerCase()
+    );
+
+    if (newDebtIndex >= 0) {
+
+      debtData[newDebtIndex].owing += newDebt;
+      debtData[newDebtIndex].totalPaid += newPaid;
+
+    } else {
+
+      debtData.push({
+        customer: newCustomer,
+        owing: newDebt,
+        totalPaid: newPaid
+      });
+
+    }
+  }
+
+  // SAVE
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+
+  // REFRESH
   renderSalesTable();
   renderDebtors();
+  updateCustomerSuggestions();
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
