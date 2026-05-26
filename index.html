@@ -132,15 +132,14 @@ body.dark-mode th {background-color:#003366;}
   <input type="text" id="debtorSearch" placeholder="Search customer..." style="padding:5px; margin-bottom:10px; width:30%;">
   
   <table id="debtorsTable">
-    <tr>
-      <th>Customer</th>
-      <th>Total Owed</th>
-      <th>Amount Paid</th>
-      <th>Balance</th>
-      <th>Status</th>
-      <th>Pay Now</th>
-    </tr>
-  </table>
+  <tr>
+    <th>Customer</th>
+    <th>Amount Paid</th>
+    <th>Balance</th>
+    <th>Status</th>
+    <th>Pay Now</th>
+  </tr>
+</table>
 </div>
 
 
@@ -502,6 +501,7 @@ localStorage.setItem('debtData', JSON.stringify(debtData));
 
 
 // ====== DEBTORS ======
+// ====== DEBTORS ======
 function renderDebtors() {
   const table = document.getElementById('debtorsTable');
   const search = document.getElementById('debtorSearch').value.toLowerCase();
@@ -509,7 +509,6 @@ function renderDebtors() {
   table.innerHTML = `
     <tr>
       <th>Customer</th>
-      <th>Total Owed</th>
       <th>Amount Paid</th>
       <th>Balance</th>
       <th>Status</th>
@@ -519,38 +518,48 @@ function renderDebtors() {
 
   debtData.forEach((d, index) => {
 
-    // ✅ ONLY SHOW CUSTOMERS THAT STILL OWE
+    // ONLY SHOW CUSTOMERS THAT STILL OWE
     if (Number(d.owing) <= 0) return;
 
     if (!d.customer.toLowerCase().includes(search)) return;
 
     const row = table.insertRow();
+
     row.insertCell(0).innerText = d.customer;
-    row.insertCell(1).innerText = (Number(d.totalPaid) + Number(d.owing)).toFixed(2);
-    row.insertCell(2).innerText = Number(d.totalPaid).toFixed(2);
-    row.insertCell(3).innerText = Number(d.owing).toFixed(2);
-    row.insertCell(4).innerText = '❌ Owing';
 
-    const actionCell = row.insertCell(5);
+    // Amount Paid
+    row.insertCell(1).innerText =
+      Number(d.totalPaid).toFixed(2);
 
-    // Pay button
+    // Balance
+    row.insertCell(2).innerText =
+      Number(d.owing).toFixed(2);
+
+    // Status
+    row.insertCell(3).innerText = '❌ Owing';
+
+    const actionCell = row.insertCell(4);
+
+    // PAY BUTTON
     const payBtn = document.createElement('button');
     payBtn.innerText = 'Pay';
     payBtn.onclick = () => payDebt(index);
     actionCell.appendChild(payBtn);
 
-    // Clear button
+    // CLEAR BUTTON
     const clearBtn = document.createElement('button');
     clearBtn.innerText = '🗑 Clear';
     clearBtn.style.background = 'red';
     clearBtn.style.color = '#fff';
     clearBtn.style.marginLeft = '5px';
+
     clearBtn.onclick = () => {
       if (confirm(`Clear debtor "${d.customer}"?`)) {
-        clearDebtor(index); // Make sure you have a clearDebtor function
-        renderDebtors(); // Refresh table after clearing
+        clearDebtor(index);
+        renderDebtors();
       }
     };
+
     actionCell.appendChild(clearBtn);
   });
 }
