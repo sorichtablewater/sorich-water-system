@@ -1573,26 +1573,19 @@ function printWeeklyStatement() {
       `);
     });
 
-    win.document.write(`
+   win.document.write(`
         <tr style="font-weight:bold;">
           <td>TOTAL</td>
-          <td>₦${totalSales.toFixed(2)}</td>
-          <td>₦${totalExpenses.toFixed(2)}</td>
-          <td>₦${totalNet.toFixed(2)}</td>
+          <td>₦${formatMoney(totalSales)}</td>
+          <td>₦${formatMoney(totalExpenses)}</td>
+          <td>₦${formatMoney(totalNet)}</td>
           <td>${totalQty}</td>
-          <td>₦${weeklyAvgUnitPrice}</td>
+          <td>₦${formatMoney(weeklyAvgUnitPrice)}</td>
         </tr>
       </table>
       <p>${footer}</p>
       <hr>
     `);
-  }
-
-  win.document.close();
-  win.focus();
-  win.print();
-  win.close();
-}
 
 
 
