@@ -1483,7 +1483,10 @@ function printWeeklyStatement() {
     return;
   }
 
-  const inputDate = prompt("Enter any date in the week (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+  const inputDate = prompt(
+    "Enter any date in the week (YYYY-MM-DD):",
+    new Date().toISOString().split('T')[0]
+  );
   if (!inputDate) return;
 
   const selectedDate = new Date(inputDate);
@@ -1492,8 +1495,9 @@ function printWeeklyStatement() {
     return;
   }
 
-  const day = selectedDate.getDay(); // 0=Sun,1=Mon
+  const day = selectedDate.getDay();
   const diffToMonday = day === 0 ? -6 : 1 - day;
+
   const monday = new Date(selectedDate);
   monday.setDate(selectedDate.getDate() + diffToMonday);
 
@@ -1517,33 +1521,94 @@ function printWeeklyStatement() {
   let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0;
   let unitSum = 0, unitCount = 0;
 
+  // =========================
+  // ✅ NEW: WEEKLY DEBTOR MAP
+  // =========================
+  const weekDebtors = {};
+
   weekRecords.forEach(d => {
     totalSales += d.totalSales;
     totalExpenses += d.totalExpenses;
     totalNet += d.net;
+
     d.sales.forEach(s => {
       totalQty += s.qty;
       unitSum += Number(s.unit);
       unitCount++;
+
+      const owing = Number(s.owing) || 0;
+
+      if (owing > 0) {
+        const name = s.customer;
+
+        if (!weekDebtors[name]) {
+          weekDebtors[name] = {
+            totalOwed: 0,
+            totalPaid: 0,
+            balance: 0
+          };
+        }
+
+        weekDebtors[name].totalOwed += (Number(s.total) || 0);
+        weekDebtors[name].totalPaid += (Number(s.paid) || 0);
+        weekDebtors[name].balance += owing;
+      }
     });
   });
 
-  const weeklyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
+  const weeklyAvgUnitPrice = unitCount
+    ? (unitSum / unitCount).toFixed(2)
+    : 0;
 
-  const win = window.open('', '', 'width=800,height=800');
-  if (!win) { alert("Pop-up blocked! Allow pop-ups."); return; }
+  const win = window.open('', '', 'width=900,height=800');
+  if (!win) {
+    alert("Pop-up blocked! Allow pop-ups.");
+    return;
+  }
 
   for (let i = 0; i < copies; i++) {
     const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
-      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-      <p>08164084402, 07012623006, 08067338211</p>
-      <h3>WEEKLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
-      <p>Period: ${start} to ${end} (Monday – Saturday)</p>
+      <p>WEEKLY STATEMENT - ${copyName.toUpperCase()} COPY</p>
+      <p>Period: ${start} to ${end}</p>
       <p>ISSUER: ${manager}</p>
       <hr>
+    `);
+
+    // =========================
+    // ✅ NEW: DEBTORS TABLE
+    // =========================
+    win.document.write(`
+      <h3>WEEKLY DEBTORS</h3>
+      <table border="1" width="100%" cellpadding="5">
+        <tr>
+          <th>Customer</th>
+          <th>Total Owed</th>
+          <th>Total Paid</th>
+          <th>Balance</th>
+        </tr>
+    `);
+
+    Object.entries(weekDebtors).forEach(([name, d]) => {
+      win.document.write(`
+        <tr>
+          <td>${name}</td>
+          <td>₦${d.totalOwed.toFixed(2)}</td>
+          <td>₦${d.totalPaid.toFixed(2)}</td>
+          <td>₦${d.balance.toFixed(2)}</td>
+        </tr>
+      `);
+    });
+
+    win.document.write(`</table><br>`);
+
+    // =========================
+    // EXISTING WEEKLY SUMMARY
+    // =========================
+    win.document.write(`
+      <h3>WEEKLY SALES SUMMARY</h3>
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
           <th>Date</th>
@@ -1583,6 +1648,7 @@ function printWeeklyStatement() {
           <td>₦${weeklyAvgUnitPrice}</td>
         </tr>
       </table>
+
       <p>${footer}</p>
       <hr>
     `);
