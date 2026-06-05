@@ -179,7 +179,7 @@ body.dark-mode th {background-color:#003366;}
 <div id="dailyRecordsPage" class="section" style="display:none; position: relative;">
   <h2>Daily Records</h2>
   <button onclick="printMonthlyStatement()">🖨 Print Monthly Statement</button>
-  <button onclick="printWeeklyStatement()">🖨 Print Weekly Statement (Mon–Sat)</button>
+ <button onclick="printWeeklyStatement()">🖨 Print Date Range Report</button>
 
   <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
   <button onclick="backToDashboard()" style="
@@ -1475,26 +1475,26 @@ function printMonthlyStatement() {
 
 
 
-// ====== WEEKLY STATEMENT FUNCTION (CUSTOM DATE RANGE) ======
+// ====== WEEKLY / DATE RANGE STATEMENT FUNCTION ======
 function printWeeklyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
     return;
   }
 
-  let start = prompt(
-    "Enter FROM date (YYYY-MM-DD):",
-    document.getElementById('fromDate').value || new Date().toISOString().split('T')[0]
-  );
+  // USE CALENDAR DATE PICKERS
+  let start = document.getElementById('fromDate').value;
+  let end = document.getElementById('toDate').value;
 
-  if (!start) return;
+  if (!start || !end) {
+    alert("Please select both From Date and To Date from the calendar.");
+    return;
+  }
 
-  let end = prompt(
-    "Enter TO date (YYYY-MM-DD):",
-    document.getElementById('toDate').value || new Date().toISOString().split('T')[0]
-  );
-
-  if (!end) return;
+  if (start > end) {
+    alert("From Date cannot be greater than To Date.");
+    return;
+  }
 
   const weekRecords = dailyData.filter(
     d => d.date >= start && d.date <= end
@@ -1549,9 +1549,9 @@ function printWeeklyStatement() {
       <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
       <p>08164084402, 07012623006, 08067338211</p>
 
-      <h3>WEEKLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
+      <h3>DATE RANGE REPORT - ${copyName.toUpperCase()} COPY</h3>
 
-      <p><strong>Period:</strong> ${start} to ${end}</p>
+      <p><strong>Date Range:</strong> ${start} to ${end}</p>
       <p><strong>ISSUER:</strong> ${manager}</p>
 
       <hr>
