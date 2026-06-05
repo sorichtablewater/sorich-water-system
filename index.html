@@ -1518,42 +1518,50 @@ function printWeeklyStatement() {
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0;
-  let unitSum = 0, unitCount = 0;
+  let totalSales = 0,
+      totalExpenses = 0,
+      totalNet = 0,
+      totalQty = 0,
+      unitSum = 0,
+      unitCount = 0;
 
   // =========================
-  // ✅ NEW: WEEKLY DEBTOR MAP
+  // ✅ WEEKLY SALES + LIVE DEBTORS
   // =========================
-  const weekDebtors = {};
+  const weekCustomers = new Set();
 
   weekRecords.forEach(d => {
-    totalSales += d.totalSales;
-    totalExpenses += d.totalExpenses;
-    totalNet += d.net;
+    totalSales += Number(d.totalSales) || 0;
+    totalExpenses += Number(d.totalExpenses) || 0;
+    totalNet += Number(d.net) || 0;
 
     d.sales.forEach(s => {
-      totalQty += s.qty;
-      unitSum += Number(s.unit);
+      totalQty += Number(s.qty) || 0;
+      unitSum += Number(s.unit) || 0;
       unitCount++;
 
-      const owing = Number(s.owing) || 0;
-
-      if (owing > 0) {
-        const name = s.customer;
-
-        if (!weekDebtors[name]) {
-          weekDebtors[name] = {
-            totalOwed: 0,
-            totalPaid: 0,
-            balance: 0
-          };
-        }
-
-        weekDebtors[name].totalOwed += (Number(s.total) || 0);
-        weekDebtors[name].totalPaid += (Number(s.paid) || 0);
-        weekDebtors[name].balance += owing;
-      }
+      weekCustomers.add(s.customer.toLowerCase());
     });
+  });
+
+  // =========================
+  // LIVE DEBT CALCULATION
+  // =========================
+  const weekDebtors = {};
+  let totalWeekDebt = 0;
+
+  weekCustomers.forEach(name => {
+    const debt = debtData.find(d => d.customer.toLowerCase() === name);
+
+    if (debt && Number(debt.owing) > 0) {
+      weekDebtors[name] = {
+        totalOwed: Number(debt.totalPaid || 0) + Number(debt.owing || 0),
+        totalPaid: Number(debt.totalPaid || 0),
+        balance: Number(debt.owing || 0)
+      };
+
+      totalWeekDebt += Number(debt.owing);
+    }
   });
 
   const weeklyAvgUnitPrice = unitCount
@@ -1578,10 +1586,10 @@ function printWeeklyStatement() {
     `);
 
     // =========================
-    // ✅ NEW: DEBTORS TABLE
+    // DEBTORS TABLE (LIVE + TOTAL)
     // =========================
     win.document.write(`
-      <h3>WEEKLY DEBTORS</h3>
+      <h3>WEEKLY DEBTORS (LIVE)</h3>
       <table border="1" width="100%" cellpadding="5">
         <tr>
           <th>Customer</th>
@@ -1602,10 +1610,20 @@ function printWeeklyStatement() {
       `);
     });
 
-    win.document.write(`</table><br>`);
+    // TOTAL ROW
+    win.document.write(`
+      <tr style="font-weight:bold;">
+        <td>TOTAL</td>
+        <td>-</td>
+        <td>-</td>
+        <td>₦${totalWeekDebt.toFixed(2)}</td>
+      </tr>
+    </table>
+    <br>
+    `);
 
     // =========================
-    // EXISTING WEEKLY SUMMARY
+    // WEEKLY SALES SUMMARY
     // =========================
     win.document.write(`
       <h3>WEEKLY SALES SUMMARY</h3>
@@ -1621,7 +1639,7 @@ function printWeeklyStatement() {
     `);
 
     weekRecords.forEach(d => {
-      const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+      const dailyQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
       const dailyAvgUnit = d.sales.length
         ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
@@ -1629,9 +1647,9 @@ function printWeeklyStatement() {
       win.document.write(`
         <tr>
           <td>${d.date}</td>
-          <td>₦${d.totalSales.toFixed(2)}</td>
-          <td>₦${d.totalExpenses.toFixed(2)}</td>
-          <td>₦${d.net.toFixed(2)}</td>
+          <td>₦${Number(d.totalSales).toFixed(2)}</td>
+          <td>₦${Number(d.totalExpenses).toFixed(2)}</td>
+          <td>₦${Number(d.net).toFixed(2)}</td>
           <td>${dailyQty}</td>
           <td>₦${dailyAvgUnit}</td>
         </tr>
