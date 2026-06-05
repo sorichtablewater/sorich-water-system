@@ -805,11 +805,10 @@ function renderDailyRecords() {
 
         const row = table.insertRow();
         row.insertCell(0).innerText = d.date;
-        row.insertCell(1).innerText = d.totalSales.toFixed(2);
-        row.insertCell(2).innerText = d.totalExpenses.toFixed(2);
-        row.insertCell(3).innerText = d.net.toFixed(2);
-        row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
-
+        row.insertCell(1).innerText = formatMoney(d.totalSales);
+row.insertCell(2).innerText = formatMoney(d.totalExpenses);
+row.insertCell(3).innerText = formatMoney(d.net);
+row.insertCell(4).innerText = formatMoney(d.avgUnitPrice);
         const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
         row.insertCell(5).innerText = totalQty;
 
@@ -864,10 +863,10 @@ function filterDailyRecords() {
     filteredData.forEach(d => {
         const row = table.insertRow();
         row.insertCell(0).innerText = d.date;
-        row.insertCell(1).innerText = d.totalSales.toFixed(2);
-        row.insertCell(2).innerText = d.totalExpenses.toFixed(2);
-        row.insertCell(3).innerText = d.net.toFixed(2);
-        row.insertCell(4).innerText = d.avgUnitPrice.toFixed(2);
+        row.insertCell(1).innerText = formatMoney(d.totalSales);
+row.insertCell(2).innerText = formatMoney(d.totalExpenses);
+row.insertCell(3).innerText = formatMoney(d.net);
+row.insertCell(4).innerText = formatMoney(d.avgUnitPrice);
 
         const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
         row.insertCell(5).innerText = totalQty;
