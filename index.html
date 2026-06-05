@@ -179,7 +179,8 @@ body.dark-mode th {background-color:#003366;}
 <div id="dailyRecordsPage" class="section" style="display:none; position: relative;">
   <h2>Daily Records</h2>
   <button onclick="printMonthlyStatement()">🖨 Print Monthly Statement</button>
- <button onclick="printWeeklyStatement()">🖨 Print Date Range Report</button>
+ <button onclick="printWeeklyStatement()">🖨 Print Weekly Statement (Mon–Sat)</button>
+
 
   <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
   <button onclick="backToDashboard()" style="
@@ -1475,33 +1476,38 @@ function printMonthlyStatement() {
 
 
 
-// ====== WEEKLY / DATE RANGE STATEMENT FUNCTION ======
+
+// ====== WEEKLY STATEMENT FUNCTION (MONDAY - SATURDAY) ======
 function printWeeklyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
     return;
   }
 
-  // USE CALENDAR DATE PICKERS
-  let start = document.getElementById('fromDate').value;
-  let end = document.getElementById('toDate').value;
+  const inputDate = prompt("Enter any date in the week (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+  if (!inputDate) return;
 
-  if (!start || !end) {
-    alert("Please select both From Date and To Date from the calendar.");
+  const selectedDate = new Date(inputDate);
+  if (isNaN(selectedDate)) {
+    alert("Invalid date format. Use YYYY-MM-DD");
     return;
   }
 
-  if (start > end) {
-    alert("From Date cannot be greater than To Date.");
-    return;
-  }
+  const day = selectedDate.getDay(); // 0=Sun,1=Mon
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(selectedDate);
+  monday.setDate(selectedDate.getDate() + diffToMonday);
 
-  const weekRecords = dailyData.filter(
-    d => d.date >= start && d.date <= end
-  );
+  const saturday = new Date(monday);
+  saturday.setDate(monday.getDate() + 5);
+
+  const start = monday.toISOString().split('T')[0];
+  const end = saturday.toISOString().split('T')[0];
+
+  const weekRecords = dailyData.filter(d => d.date >= start && d.date <= end);
 
   if (!weekRecords.length) {
-    alert("No records found for selected period.");
+    alert("No records found for this week (Monday to Saturday).");
     return;
   }
 
@@ -1509,53 +1515,36 @@ function printWeeklyStatement() {
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  let totalSales = 0,
-      totalExpenses = 0,
-      totalNet = 0,
-      totalQty = 0,
-      unitSum = 0,
-      unitCount = 0;
+  let totalSales = 0, totalExpenses = 0, totalNet = 0, totalQty = 0;
+  let unitSum = 0, unitCount = 0;
 
   weekRecords.forEach(d => {
-    totalSales += Number(d.totalSales) || 0;
-    totalExpenses += Number(d.totalExpenses) || 0;
-    totalNet += Number(d.net) || 0;
-
-    if (d.sales) {
-      d.sales.forEach(s => {
-        totalQty += Number(s.qty) || 0;
-        unitSum += Number(s.unit) || 0;
-        unitCount++;
-      });
-    }
+    totalSales += d.totalSales;
+    totalExpenses += d.totalExpenses;
+    totalNet += d.net;
+    d.sales.forEach(s => {
+      totalQty += s.qty;
+      unitSum += Number(s.unit);
+      unitCount++;
+    });
   });
 
-  const weeklyAvgUnitPrice =
-    unitCount ? (unitSum / unitCount).toFixed(2) : "0.00";
+  const weeklyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
 
   const win = window.open('', '', 'width=800,height=800');
-  if (!win) {
-    alert("Pop-up blocked! Allow pop-ups.");
-    return;
-  }
+  if (!win) { alert("Pop-up blocked! Allow pop-ups."); return; }
 
   for (let i = 0; i < copies; i++) {
-
-    const copyName =
-      ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+    const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
       <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
       <p>08164084402, 07012623006, 08067338211</p>
-
-      <h3>DATE RANGE REPORT - ${copyName.toUpperCase()} COPY</h3>
-
-      <p><strong>Date Range:</strong> ${start} to ${end}</p>
-      <p><strong>ISSUER:</strong> ${manager}</p>
-
+      <h3>WEEKLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
+      <p>Period: ${start} to ${end} (Monday – Saturday)</p>
+      <p>ISSUER: ${manager}</p>
       <hr>
-
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
           <th>Date</th>
@@ -1568,25 +1557,17 @@ function printWeeklyStatement() {
     `);
 
     weekRecords.forEach(d => {
-
-      const dailyQty = d.sales
-        ? d.sales.reduce((acc, s) => acc + Number(s.qty), 0)
+      const dailyQty = d.sales.reduce((acc, s) => acc + s.qty, 0);
+      const dailyAvgUnit = d.sales.length
+        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
         : 0;
-
-      const dailyAvgUnit =
-        d.sales && d.sales.length
-          ? (
-              d.sales.reduce((acc, s) => acc + Number(s.unit), 0) /
-              d.sales.length
-            ).toFixed(2)
-          : "0.00";
 
       win.document.write(`
         <tr>
           <td>${d.date}</td>
-          <td>₦${Number(d.totalSales).toFixed(2)}</td>
-          <td>₦${Number(d.totalExpenses).toFixed(2)}</td>
-          <td>₦${Number(d.net).toFixed(2)}</td>
+          <td>₦${d.totalSales.toFixed(2)}</td>
+          <td>₦${d.totalExpenses.toFixed(2)}</td>
+          <td>₦${d.net.toFixed(2)}</td>
           <td>${dailyQty}</td>
           <td>₦${dailyAvgUnit}</td>
         </tr>
@@ -1603,15 +1584,6 @@ function printWeeklyStatement() {
           <td>₦${weeklyAvgUnitPrice}</td>
         </tr>
       </table>
-
-      <br>
-
-      <p><strong>Total Sales:</strong> ₦${totalSales.toFixed(2)}</p>
-      <p><strong>Total Expenses:</strong> ₦${totalExpenses.toFixed(2)}</p>
-      <p><strong>Net Balance:</strong> ₦${totalNet.toFixed(2)}</p>
-      <p><strong>Total Quantity:</strong> ${totalQty}</p>
-      <p><strong>Average Unit Price:</strong> ₦${weeklyAvgUnitPrice}</p>
-
       <p>${footer}</p>
       <hr>
     `);
@@ -1622,6 +1594,7 @@ function printWeeklyStatement() {
   win.print();
   win.close();
 }
+
 
 
 
