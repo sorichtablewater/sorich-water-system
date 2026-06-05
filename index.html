@@ -526,7 +526,7 @@ function renderDebtors() {
 
     const row = table.insertRow();
     row.insertCell(0).innerText = d.customer;
-    row.insertCell(1).innerText = (Number(d.totalPaid) + Number(d.owing)).toFixed(2);
+    row.insertCell(1).innerText = Number(d.owing).toFixed(2);
     row.insertCell(2).innerText = Number(d.totalPaid).toFixed(2);
     row.insertCell(3).innerText = Number(d.owing).toFixed(2);
     row.insertCell(4).innerText = '❌ Owing';
