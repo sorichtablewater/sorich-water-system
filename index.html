@@ -482,10 +482,11 @@ localStorage.setItem('debtData', JSON.stringify(debtData));
     row.insertCell(8).appendChild(deleteBtn);
 
     // ✅ TOTALS
-    sumQty += Number(s.qty);
-    sumTotal += Number(s.total);
-    sumPaid += Number(s.paid);
-    sumOwing += Number(s.owing);
+sumQty += Number(s.qty);
+sumTotal += Number(s.total);
+sumPaid += Number(s.paid);
+sumOwing += Number(s.owing);
+unitSum += Number(s.unit);
   });
 
   // ✅ CORRECT WEIGHTED AVERAGE UNIT PRICE
