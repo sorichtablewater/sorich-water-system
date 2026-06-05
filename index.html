@@ -645,17 +645,8 @@ function printInvoice(sale){
   for(let i=0;i<copies;i++){
     const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
     win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
-    win.document.write(`
-  <p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p>
-  <p>
-    ${customer} | 
-    ${qty} | 
-    ${formatMoney(unit)} | 
-    ${formatMoney(total)} | 
-    ${formatMoney(paid)} | 
-    ${formatMoney(owing)}
-  </p>
-`);
+    win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
+  }
   win.document.close(); win.focus(); win.print(); win.close();
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
 }
