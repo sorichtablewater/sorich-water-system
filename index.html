@@ -253,6 +253,13 @@ let expenseData=JSON.parse(localStorage.getItem('expenseData'))||[];
 let dailyData=JSON.parse(localStorage.getItem('dailyData'))||[];
 let invoiceNumber=parseInt(localStorage.getItem('invoiceNumber'))||1;
 
+// ====== MONEY FORMATTER ======
+function formatMoney(value){
+  return Number(value || 0).toLocaleString('en-NG',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+  });
+}
 // ====== TIME ======
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
 setInterval(updateTime,1000); updateTime();
@@ -526,9 +533,9 @@ function renderDebtors() {
 
     const row = table.insertRow();
     row.insertCell(0).innerText = d.customer;
-    row.insertCell(1).innerText = Number(d.owing).toFixed(2);
-    row.insertCell(2).innerText = Number(d.totalPaid).toFixed(2);
-    row.insertCell(3).innerText = Number(d.owing).toFixed(2);
+    row.insertCell(1).innerText = formatMoney(d.owing);
+row.insertCell(2).innerText = formatMoney(d.totalPaid);
+row.insertCell(3).innerText = formatMoney(d.owing);
     row.insertCell(4).innerText = '❌ Owing';
 
     const actionCell = row.insertCell(5);
