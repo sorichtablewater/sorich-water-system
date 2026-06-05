@@ -403,7 +403,7 @@ function renderSalesTable(){
   `;
 
   // ✅ REMOVED unitSum
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0;
+  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0,unitSum=0;
 
   salesData.forEach((s,index)=>{
     const row=table.insertRow();
@@ -489,7 +489,9 @@ localStorage.setItem('debtData', JSON.stringify(debtData));
   });
 
   // ✅ CORRECT WEIGHTED AVERAGE UNIT PRICE
-  const avgUnit = sumQty ? (sumTotal / sumQty).toFixed(2) : 0;
+  const avgUnit = salesData.length
+  ? (unitSum / salesData.length).toFixed(2)
+  : 0;
 
   document.getElementById('sumQty').innerText = sumQty;
   document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
