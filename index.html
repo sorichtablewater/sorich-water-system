@@ -410,10 +410,10 @@ function renderSalesTable(){
     const row=table.insertRow();
     row.insertCell(0).innerText=s.customer;
     row.insertCell(1).innerText=s.qty;
-    row.insertCell(2).innerText=s.total;
-    row.insertCell(3).innerText=s.unit;
-    row.insertCell(4).innerText=s.paid;
-    row.insertCell(5).innerText=s.owing;
+    row.insertCell(2).innerText = formatMoney(s.total);
+row.insertCell(3).innerText = formatMoney(s.unit);
+row.insertCell(4).innerText = formatMoney(s.paid);
+row.insertCell(5).innerText = formatMoney(s.owing);
 
     // ✏️ EDIT BUTTON
     const editBtn=document.createElement('button');
@@ -496,9 +496,11 @@ unitSum += Number(s.unit);
   : 0;
 
   document.getElementById('sumQty').innerText = sumQty;
-  document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
-  document.getElementById('sumPaid').innerText = sumPaid.toFixed(2);
-  document.getElementById('sumOwing').innerText = sumOwing.toFixed(2);
+ document.getElementById('sumTotal').innerText = formatMoney(sumTotal);
+
+document.getElementById('sumPaid').innerText = formatMoney(sumPaid);
+
+document.getElementById('sumOwing').innerText = formatMoney(sumOwing);
   document.getElementById('avgPrice').innerText = avgUnit;
 
   document.getElementById('totalSales').innerText = sumTotal.toFixed(2);
@@ -638,15 +640,26 @@ function printInvoice(sale){
   const qty=sale?sale.qty:parseFloat(document.getElementById('saleQty').value)||0;
   const total=sale?sale.total:parseFloat(document.getElementById('saleTotal').value)||0;
   const paid=sale?sale.paid:parseFloat(document.getElementById('salePaid').value)||0;
-  const unit=sale?sale.unit:(qty?total/qty:0).toFixed(2);
-  const owing=(total-paid).toFixed(2);
+ const unit = sale ? Number(sale.unit) : (qty ? total / qty : 0);
 
+const owing = Number(total - paid);
   const win=window.open('','PRINT','width=600,height=800');
   for(let i=0;i<copies;i++){
     const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
     win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
-    win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
-  }
+   win.document.write(`
+<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p>
+<p>
+${customer} |
+${qty.toLocaleString()} |
+₦${formatMoney(unit)} |
+₦${formatMoney(total)} |
+₦${formatMoney(paid)} |
+₦${formatMoney(owing)}
+</p>
+<p>${f}</p>
+<hr>
+`);
   win.document.close(); win.focus(); win.print(); win.close();
   invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
 }
