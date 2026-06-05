@@ -1483,11 +1483,7 @@ function printWeeklyStatement() {
     return;
   }
 
-  const inputDate = prompt(
-    "Enter any date in the week (YYYY-MM-DD):",
-    new Date().toISOString().split('T')[0]
-  );
-
+  const inputDate = prompt("Enter any date in the week (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
   if (!inputDate) return;
 
   const selectedDate = new Date(inputDate);
@@ -1496,9 +1492,8 @@ function printWeeklyStatement() {
     return;
   }
 
-  const day = selectedDate.getDay();
+  const day = selectedDate.getDay(); // 0=Sun,1=Mon
   const diffToMonday = day === 0 ? -6 : 1 - day;
-
   const monday = new Date(selectedDate);
   monday.setDate(selectedDate.getDate() + diffToMonday);
 
@@ -1526,7 +1521,6 @@ function printWeeklyStatement() {
     totalSales += d.totalSales;
     totalExpenses += d.totalExpenses;
     totalNet += d.net;
-
     d.sales.forEach(s => {
       totalQty += s.qty;
       unitSum += Number(s.unit);
@@ -1537,10 +1531,7 @@ function printWeeklyStatement() {
   const weeklyAvgUnitPrice = unitCount ? (unitSum / unitCount).toFixed(2) : 0;
 
   const win = window.open('', '', 'width=800,height=800');
-  if (!win) {
-    alert("Pop-up blocked! Allow pop-ups.");
-    return;
-  }
+  if (!win) { alert("Pop-up blocked! Allow pop-ups."); return; }
 
   for (let i = 0; i < copies; i++) {
     const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
@@ -1553,7 +1544,6 @@ function printWeeklyStatement() {
       <p>Period: ${start} to ${end} (Monday – Saturday)</p>
       <p>ISSUER: ${manager}</p>
       <hr>
-
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
         <tr>
           <th>Date</th>
@@ -1605,17 +1595,20 @@ function printWeeklyStatement() {
 }
 
 
-// ====== FIXED: CUSTOMER SUGGESTIONS (MUST BE OUTSIDE WEEKLY FUNCTION) ======
+
+
 function updateCustomerSuggestions() {
   const list = document.getElementById('customerList');
   if (!list) return;
 
   const names = new Set();
 
+  // collect names from sales
   salesData.forEach(s => {
     if (s.customer) names.add(s.customer);
   });
 
+  // collect names from debtors
   debtData.forEach(d => {
     if (d.customer) names.add(d.customer);
   });
