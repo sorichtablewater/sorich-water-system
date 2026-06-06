@@ -491,32 +491,26 @@ unitSum += Number(s.unit);
   });
 
   // ✅ CORRECT WEIGHTED AVERAGE UNIT PRICE
- const avgUnit = sumQty > 0
-  ? (sumTotal / sumQty)
+  const avgUnit = salesData.length
+  ? (unitSum / salesData.length).toFixed(2)
   : 0;
 
   document.getElementById('sumQty').innerText = sumQty;
   document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
   document.getElementById('sumPaid').innerText = sumPaid.toFixed(2);
   document.getElementById('sumOwing').innerText = sumOwing.toFixed(2);
-  document.getElementById('avgPrice').innerText =
-  avgUnit.toFixed(2);
+  document.getElementById('avgPrice').innerText = avgUnit;
 
-document.getElementById('totalSales').innerText =
-  sumTotal.toFixed(2);
+  document.getElementById('totalSales').innerText = sumTotal.toFixed(2);
+  document.getElementById('totalPaid').innerText = sumPaid.toFixed(2);
 
-document.getElementById('totalPaid').innerText =
-  sumPaid.toFixed(2);
+  const totalDebt = debtData.reduce((acc,d)=>acc + Number(d.owing),0);
 
-const totalDebt = debtData.reduce(
-  (acc,d)=>acc + Number(d.owing),0
-);
+  document.getElementById('debts').innerText = totalDebt.toFixed(2);
+  document.getElementById('avgUnitPrice').innerText = avgUnit;
+}
 
-document.getElementById('debts').innerText =
-  totalDebt.toFixed(2);
 
-document.getElementById('avgUnitPrice').innerText =
-  avgUnit.toFixed(2);
 
 // ====== DEBTORS ======
 function renderDebtors() {
@@ -997,14 +991,10 @@ function endOfDay() {
     // Calculate totals
     const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
     const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
-   const totalQty = salesData.reduce(
-  (acc, s) => acc + Number(s.qty),
-  0
-);
+    const avgUnitPrice = salesData.length 
+        ? salesData.reduce((acc, s) => acc + Number(s.unit), 0) / salesData.length 
+        : 0;
 
-const avgUnitPrice = totalQty > 0
-  ? totalSales / totalQty
-  : 0;
     // Archive data with chosen date
     dailyData.push({
         date: chosenDate,
@@ -1486,6 +1476,7 @@ function printMonthlyStatement() {
 
 
 
+// ====== WEEKLY STATEMENT FUNCTION (MONDAY - SATURDAY) ======
 function printWeeklyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
@@ -1516,99 +1507,75 @@ function printWeeklyStatement() {
   const start = monday.toISOString().split('T')[0];
   const end = saturday.toISOString().split('T')[0];
 
-  const weekRecords = dailyData.filter(
-    d => d.date >= start && d.date <= end
-  );
+  const weekRecords = dailyData.filter(d => d.date >= start && d.date <= end);
 
   if (!weekRecords.length) {
     alert("No records found for this week (Monday to Saturday).");
     return;
   }
 
-  const copies =
-    parseInt(document.getElementById('invoiceCopies').value) || 4;
+  const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
+  const manager = document.getElementById('managerName').value || 'Manager';
+  const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  const manager =
-    document.getElementById('managerName').value || 'Manager';
+  let totalSales = 0,
+      totalExpenses = 0,
+      totalNet = 0,
+      totalQty = 0,
+      unitSum = 0,
+      unitCount = 0;
 
-  const footer =
-    document.getElementById('invoiceFooter').value ||
-    'Drink It. Love It.';
-
-  let totalSales = 0;
-  let totalExpenses = 0;
-  let totalNet = 0;
-  let totalQty = 0;
-
+  // =========================
+  // ✅ WEEKLY SALES + LIVE DEBTORS
+  // =========================
   const weekCustomers = new Set();
 
   weekRecords.forEach(d => {
-
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
 
     d.sales.forEach(s => {
       totalQty += Number(s.qty) || 0;
+      unitSum += Number(s.unit) || 0;
+      unitCount++;
 
-      weekCustomers.add(
-        s.customer.toLowerCase()
-      );
+      weekCustomers.add(s.customer.toLowerCase());
     });
-
   });
 
-  // ✅ CORRECT WEEKLY AVERAGE
-  const weeklyAvgUnitPrice =
-    totalQty > 0
-      ? (totalSales / totalQty).toFixed(2)
-      : 0;
-
+  // =========================
+  // LIVE DEBT CALCULATION
+  // =========================
   const weekDebtors = {};
   let totalWeekDebt = 0;
 
   weekCustomers.forEach(name => {
-
-    const debt = debtData.find(
-      d => d.customer.toLowerCase() === name
-    );
+    const debt = debtData.find(d => d.customer.toLowerCase() === name);
 
     if (debt && Number(debt.owing) > 0) {
-
       weekDebtors[name] = {
-        totalOwed:
-          Number(debt.totalPaid || 0) +
-          Number(debt.owing || 0),
-
-        totalPaid:
-          Number(debt.totalPaid || 0),
-
-        balance:
-          Number(debt.owing || 0)
+        totalOwed: Number(debt.totalPaid || 0) + Number(debt.owing || 0),
+        totalPaid: Number(debt.totalPaid || 0),
+        balance: Number(debt.owing || 0)
       };
 
       totalWeekDebt += Number(debt.owing);
-
     }
-
   });
 
-  const win = window.open(
-    '',
-    '',
-    'width=900,height=800'
-  );
+  const weeklyAvgUnitPrice = unitCount
+    ? (unitSum / unitCount).toFixed(2)
+    : 0;
 
+  const win = window.open('', '', 'width=900,height=800');
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
     return;
   }
 
   for (let i = 0; i < copies; i++) {
-
-    const copyName =
-      ['Customer','Driver','Security','Manager'][i]
-      || 'Copy';
+    const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
@@ -1618,6 +1585,9 @@ function printWeeklyStatement() {
       <hr>
     `);
 
+    // =========================
+    // DEBTORS TABLE (LIVE + TOTAL)
+    // =========================
     win.document.write(`
       <h3>WEEKLY DEBTORS (LIVE)</h3>
       <table border="1" width="100%" cellpadding="5">
@@ -1630,7 +1600,6 @@ function printWeeklyStatement() {
     `);
 
     Object.entries(weekDebtors).forEach(([name, d]) => {
-
       win.document.write(`
         <tr>
           <td>${name}</td>
@@ -1639,9 +1608,9 @@ function printWeeklyStatement() {
           <td>₦${d.balance.toFixed(2)}</td>
         </tr>
       `);
-
     });
 
+    // TOTAL ROW
     win.document.write(`
       <tr style="font-weight:bold;">
         <td>TOTAL</td>
@@ -1649,15 +1618,16 @@ function printWeeklyStatement() {
         <td>-</td>
         <td>₦${totalWeekDebt.toFixed(2)}</td>
       </tr>
-      </table>
-      <br>
+    </table>
+    <br>
     `);
 
+    // =========================
+    // WEEKLY SALES SUMMARY
+    // =========================
     win.document.write(`
       <h3>WEEKLY SALES SUMMARY</h3>
-
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
-
         <tr>
           <th>Date</th>
           <th>Total Sales</th>
@@ -1669,21 +1639,10 @@ function printWeeklyStatement() {
     `);
 
     weekRecords.forEach(d => {
-
-      const dailyQty =
-        d.sales.reduce(
-          (acc,s)=>acc + Number(s.qty),
-          0
-        );
-
-      // ✅ CORRECT DAILY AVERAGE
-      const dailyAvgUnit =
-        dailyQty > 0
-          ? (
-              Number(d.totalSales) /
-              dailyQty
-            ).toFixed(2)
-          : 0;
+      const dailyQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+      const dailyAvgUnit = d.sales.length
+        ? (d.sales.reduce((acc, s) => acc + Number(s.unit), 0) / d.sales.length).toFixed(2)
+        : 0;
 
       win.document.write(`
         <tr>
@@ -1695,24 +1654,22 @@ function printWeeklyStatement() {
           <td>₦${dailyAvgUnit}</td>
         </tr>
       `);
-
     });
 
     win.document.write(`
-      <tr style="font-weight:bold;">
-        <td>TOTAL</td>
-        <td>₦${totalSales.toFixed(2)}</td>
-        <td>₦${totalExpenses.toFixed(2)}</td>
-        <td>₦${totalNet.toFixed(2)}</td>
-        <td>${totalQty}</td>
-        <td>₦${weeklyAvgUnitPrice}</td>
-      </tr>
+        <tr style="font-weight:bold;">
+          <td>TOTAL</td>
+          <td>₦${totalSales.toFixed(2)}</td>
+          <td>₦${totalExpenses.toFixed(2)}</td>
+          <td>₦${totalNet.toFixed(2)}</td>
+          <td>${totalQty}</td>
+          <td>₦${weeklyAvgUnitPrice}</td>
+        </tr>
       </table>
 
       <p>${footer}</p>
       <hr>
     `);
-
   }
 
   win.document.close();
