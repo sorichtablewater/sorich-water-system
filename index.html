@@ -403,8 +403,10 @@ function renderSalesTable(){
     </tr>
   `;
 
-  // ✅ REMOVED unitSum
-  let sumQty=0,sumTotal=0,sumPaid=0,sumOwing=0,unitSum=0;
+  let sumQty = 0;
+  let sumTotal = 0;
+  let sumPaid = 0;
+  let sumOwing = 0;
 
   salesData.forEach((s,index)=>{
     const row=table.insertRow();
@@ -436,45 +438,34 @@ function renderSalesTable(){
       if(confirm('Delete this sale?')){
         const sale = salesData[index];
 
-        // Remove sale
         salesData.splice(index,1);
         localStorage.setItem('salesData', JSON.stringify(salesData));
 
-      // Update debtData automatically
-const debtIndex = debtData.findIndex(
-  d => d.customer.toLowerCase() === sale.customer.toLowerCase()
-);
+        const debtIndex = debtData.findIndex(
+          d => d.customer.toLowerCase() === sale.customer.toLowerCase()
+        );
 
-if (debtIndex >= 0) {
+        if (debtIndex >= 0) {
 
-  // remove ONLY this sale's actual debt
-  const actualSaleDebt =
-    Number(sale.total) - Number(sale.paid);
+          const actualSaleDebt =
+            Number(sale.total) - Number(sale.paid);
 
-  debtData[debtIndex].owing =
-    Number(debtData[debtIndex].owing) - actualSaleDebt;
+          debtData[debtIndex].owing =
+            Number(debtData[debtIndex].owing) - actualSaleDebt;
 
-  debtData[debtIndex].totalPaid =
-    Number(debtData[debtIndex].totalPaid) - Number(sale.paid);
+          debtData[debtIndex].totalPaid =
+            Number(debtData[debtIndex].totalPaid) - Number(sale.paid);
 
-  // prevent negative values
-  if (debtData[debtIndex].owing < 0) {
-    debtData[debtIndex].owing = 0;
-  }
+          if (debtData[debtIndex].owing < 0) debtData[debtIndex].owing = 0;
+          if (debtData[debtIndex].totalPaid < 0) debtData[debtIndex].totalPaid = 0;
 
-  if (debtData[debtIndex].totalPaid < 0) {
-    debtData[debtIndex].totalPaid = 0;
-  }
+          if (debtData[debtIndex].owing <= 0) {
+            debtData.splice(debtIndex, 1);
+          }
+        }
 
-  // Remove debtor if fully cleared
-  if (debtData[debtIndex].owing <= 0) {
-    debtData.splice(debtIndex, 1);
-  }
-}
+        localStorage.setItem('debtData', JSON.stringify(debtData));
 
-localStorage.setItem('debtData', JSON.stringify(debtData));
-
-        // Re-render tables
         renderSalesTable();
         renderDebtors();
       }
@@ -482,31 +473,28 @@ localStorage.setItem('debtData', JSON.stringify(debtData));
 
     row.insertCell(8).appendChild(deleteBtn);
 
-    // ✅ TOTALS
-sumQty += Number(s.qty);
-sumTotal += Number(s.total);
-sumPaid += Number(s.paid);
-sumOwing += Number(s.owing);
-unitSum += Number(s.unit);
+    sumQty += Number(s.qty);
+    sumTotal += Number(s.total);
+    sumPaid += Number(s.paid);
+    sumOwing += Number(s.owing);
   });
 
-  // ✅ CORRECT WEIGHTED AVERAGE UNIT PRICE
-  const avgUnit = salesData.length
-  ? (unitSum / salesData.length).toFixed(2)
-  : 0;
+  // ✅ CORRECT AVERAGE UNIT PRICE (TOTAL SALES ÷ TOTAL QTY)
+  const avgUnit = sumQty ? (sumTotal / sumQty).toFixed(2) : 0;
 
   document.getElementById('sumQty').innerText = sumQty;
   document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
   document.getElementById('sumPaid').innerText = sumPaid.toFixed(2);
   document.getElementById('sumOwing').innerText = sumOwing.toFixed(2);
+
   document.getElementById('avgPrice').innerText = avgUnit;
 
   document.getElementById('totalSales').innerText = sumTotal.toFixed(2);
   document.getElementById('totalPaid').innerText = sumPaid.toFixed(2);
 
   const totalDebt = debtData.reduce((acc,d)=>acc + Number(d.owing),0);
-
   document.getElementById('debts').innerText = totalDebt.toFixed(2);
+
   document.getElementById('avgUnitPrice').innerText = avgUnit;
 }
 
@@ -782,7 +770,6 @@ function clearDailyExpenses() {
 }
 
 
-// ====== DAILY RECORDS (NEWEST FIRST) ======
 function renderDailyRecords() {
     const table = document.getElementById('dailyTable');
     table.innerHTML = `
@@ -797,26 +784,35 @@ function renderDailyRecords() {
 <th>Clear</th>
 </tr>`;
 
-    // clone + reverse so newest records appear first
     const sortedData = [...dailyData].reverse();
 
     sortedData.forEach((d) => {
-        const index = dailyData.indexOf(d); // keep correct index for delete
+        const index = dailyData.indexOf(d);
+
+        const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+        const totalSales = Number(d.totalSales) || 0;
+
+        // ✅ FIXED: correct weighted average
+        const avgUnitPrice = totalQty ? (totalSales / totalQty) : 0;
 
         const row = table.insertRow();
         row.insertCell(0).innerText = d.date;
         row.insertCell(1).innerText = formatMoney(d.totalSales);
-row.insertCell(2).innerText = formatMoney(d.totalExpenses);
-row.insertCell(3).innerText = formatMoney(d.net);
-row.insertCell(4).innerText = formatMoney(d.avgUnitPrice);
-        const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+        row.insertCell(2).innerText = formatMoney(d.totalExpenses);
+        row.insertCell(3).innerText = formatMoney(d.net);
+
+        // show corrected value (not stored value)
+        row.insertCell(4).innerText = formatMoney(avgUnitPrice);
+
         row.insertCell(5).innerText = totalQty;
 
         // View button
         const viewCell = row.insertCell(6);
         const viewBtn = document.createElement('button');
         viewBtn.innerText = 'View';
-        viewBtn.onclick = function() { renderDailyRecordInvoice(d); };
+        viewBtn.onclick = function() {
+            renderDailyRecordInvoice(d);
+        };
         viewCell.appendChild(viewBtn);
 
         // Clear button
@@ -1476,7 +1472,6 @@ function printMonthlyStatement() {
 
 
 
-// ====== WEEKLY STATEMENT FUNCTION (MONDAY - SATURDAY) ======
 function printWeeklyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
@@ -1521,13 +1516,8 @@ function printWeeklyStatement() {
   let totalSales = 0,
       totalExpenses = 0,
       totalNet = 0,
-      totalQty = 0,
-      unitSum = 0,
-      unitCount = 0;
+      totalQty = 0;
 
-  // =========================
-  // ✅ WEEKLY SALES + LIVE DEBTORS
-  // =========================
   const weekCustomers = new Set();
 
   weekRecords.forEach(d => {
@@ -1537,9 +1527,6 @@ function printWeeklyStatement() {
 
     d.sales.forEach(s => {
       totalQty += Number(s.qty) || 0;
-      unitSum += Number(s.unit) || 0;
-      unitCount++;
-
       weekCustomers.add(s.customer.toLowerCase());
     });
   });
@@ -1564,8 +1551,9 @@ function printWeeklyStatement() {
     }
   });
 
-  const weeklyAvgUnitPrice = unitCount
-    ? (unitSum / unitCount).toFixed(2)
+  // ✅ CORRECT WEEKLY AVERAGE UNIT PRICE
+  const weeklyAvgUnitPrice = totalQty
+    ? (totalSales / totalQty).toFixed(2)
     : 0;
 
   const win = window.open('', '', 'width=900,height=800');
@@ -1585,9 +1573,7 @@ function printWeeklyStatement() {
       <hr>
     `);
 
-    // =========================
-    // DEBTORS TABLE (LIVE + TOTAL)
-    // =========================
+    // DEBTORS TABLE
     win.document.write(`
       <h3>WEEKLY DEBTORS (LIVE)</h3>
       <table border="1" width="100%" cellpadding="5">
@@ -1610,7 +1596,6 @@ function printWeeklyStatement() {
       `);
     });
 
-    // TOTAL ROW
     win.document.write(`
       <tr style="font-weight:bold;">
         <td>TOTAL</td>
@@ -1622,9 +1607,7 @@ function printWeeklyStatement() {
     <br>
     `);
 
-    // =========================
     // WEEKLY SALES SUMMARY
-    // =========================
     win.document.write(`
       <h3>WEEKLY SALES SUMMARY</h3>
       <table border="1" cellpadding="5" cellspacing="0" width="100%">
