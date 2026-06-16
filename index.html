@@ -1483,34 +1483,26 @@ function printWeeklyStatement() {
     return;
   }
 
-  const inputDate = prompt(
-    "Enter any date in the week (YYYY-MM-DD):",
+  const start = prompt(
+    "Enter START date (YYYY-MM-DD):",
     new Date().toISOString().split('T')[0]
   );
-  if (!inputDate) return;
 
-  const selectedDate = new Date(inputDate);
-  if (isNaN(selectedDate)) {
-    alert("Invalid date format. Use YYYY-MM-DD");
-    return;
-  }
+  if (!start) return;
 
-  const day = selectedDate.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const end = prompt(
+    "Enter END date (YYYY-MM-DD):",
+    new Date().toISOString().split('T')[0]
+  );
 
-  const monday = new Date(selectedDate);
-  monday.setDate(selectedDate.getDate() + diffToMonday);
+  if (!end) return;
 
-  const saturday = new Date(monday);
-  saturday.setDate(monday.getDate() + 5);
-
-  const start = monday.toISOString().split('T')[0];
-  const end = saturday.toISOString().split('T')[0];
-
-  const weekRecords = dailyData.filter(d => d.date >= start && d.date <= end);
+  const weekRecords = dailyData.filter(
+    d => d.date >= start && d.date <= end
+  );
 
   if (!weekRecords.length) {
-    alert("No records found for this week (Monday to Saturday).");
+    alert(`No records found between ${start} and ${end}`);
     return;
   }
 
@@ -1518,10 +1510,10 @@ function printWeeklyStatement() {
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  let totalSales = 0,
-      totalExpenses = 0,
-      totalNet = 0,
-      totalQty = 0;
+  let totalSales = 0;
+  let totalExpenses = 0;
+  let totalNet = 0;
+  let totalQty = 0;
 
   const weekCustomers = new Set();
 
@@ -1530,57 +1522,71 @@ function printWeeklyStatement() {
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
 
-    d.sales.forEach(s => {
+    (d.sales || []).forEach(s => {
       totalQty += Number(s.qty) || 0;
-      weekCustomers.add(s.customer.toLowerCase());
+      weekCustomers.add((s.customer || '').toLowerCase());
     });
   });
 
-  // =========================
-  // LIVE DEBT CALCULATION
-  // =========================
+  // LIVE DEBTORS
   const weekDebtors = {};
   let totalWeekDebt = 0;
 
   weekCustomers.forEach(name => {
-    const debt = debtData.find(d => d.customer.toLowerCase() === name);
+    const debt = debtData.find(
+      d => d.customer.toLowerCase() === name
+    );
 
     if (debt && Number(debt.owing) > 0) {
       weekDebtors[name] = {
-        totalOwed: Number(debt.totalPaid || 0) + Number(debt.owing || 0),
-        totalPaid: Number(debt.totalPaid || 0),
-        balance: Number(debt.owing || 0)
+        totalOwed:
+          Number(debt.totalPaid || 0) +
+          Number(debt.owing || 0),
+
+        totalPaid:
+          Number(debt.totalPaid || 0),
+
+        balance:
+          Number(debt.owing || 0)
       };
 
-      totalWeekDebt += Number(debt.owing);
+      totalWeekDebt += Number(debt.owing || 0);
     }
   });
 
-  // ✅ CORRECT WEEKLY AVERAGE UNIT PRICE
-  const weeklyAvgUnitPrice = totalQty
+  const avgUnitPrice = totalQty
     ? (totalSales / totalQty).toFixed(2)
-    : 0;
+    : "0.00";
 
-  const win = window.open('', '', 'width=900,height=800');
+  const win = window.open('', '', 'width=1000,height=800');
+
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
     return;
   }
 
   for (let i = 0; i < copies; i++) {
-    const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+
+    const copyName =
+      ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
       <h2>SORICH CLASSY SERVICES</h2>
-      <p>WEEKLY STATEMENT - ${copyName.toUpperCase()} COPY</p>
-      <p>Period: ${start} to ${end}</p>
-      <p>ISSUER: ${manager}</p>
+      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+      <p>08164084402, 07012623006, 08067338211</p>
+
+      <h3>DATE RANGE SALES REPORT - ${copyName.toUpperCase()} COPY</h3>
+
+      <p><strong>Period:</strong> ${start} TO ${end}</p>
+      <p><strong>ISSUER:</strong> ${manager}</p>
+
       <hr>
     `);
 
-    // DEBTORS TABLE
+    // DEBTORS
     win.document.write(`
-      <h3>WEEKLY DEBTORS (LIVE)</h3>
+      <h3>LIVE DEBTORS</h3>
+
       <table border="1" width="100%" cellpadding="5">
         <tr>
           <th>Customer</th>
@@ -1591,14 +1597,16 @@ function printWeeklyStatement() {
     `);
 
     Object.entries(weekDebtors).forEach(([name, d]) => {
+
       win.document.write(`
         <tr>
-          <td>${name}</td>
-          <td>₦${d.totalOwed.toFixed(2)}</td>
-          <td>₦${d.totalPaid.toFixed(2)}</td>
-          <td>₦${d.balance.toFixed(2)}</td>
+          <td>${name.toUpperCase()}</td>
+          <td>₦${d.totalOwed.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${d.totalPaid.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${d.balance.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
         </tr>
       `);
+
     });
 
     win.document.write(`
@@ -1606,57 +1614,86 @@ function printWeeklyStatement() {
         <td>TOTAL</td>
         <td>-</td>
         <td>-</td>
-        <td>₦${totalWeekDebt.toFixed(2)}</td>
+        <td>₦${totalWeekDebt.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
       </tr>
-    </table>
-    <br>
+      </table>
+
+      <br>
     `);
 
-    // WEEKLY SALES SUMMARY
+    // SALES SUMMARY
     win.document.write(`
-      <h3>WEEKLY SALES SUMMARY</h3>
-      <table border="1" cellpadding="5" cellspacing="0" width="100%">
+      <h3>SALES SUMMARY</h3>
+
+      <table border="1" width="100%" cellpadding="5">
         <tr>
           <th>Date</th>
           <th>Total Sales</th>
           <th>Total Expenses</th>
-          <th>Net</th>
+          <th>Net Balance</th>
           <th>Total Qty</th>
           <th>Avg Unit Price</th>
         </tr>
     `);
 
-   weekRecords.forEach(d => {
-  const dailyQty = d.sales.reduce((acc, s) => acc + Number(s.qty || 0), 0);
+    weekRecords.forEach(d => {
 
-  const dailyAvgUnit = dailyQty
-    ? ((Number(d.totalSales) || 0) / dailyQty).toFixed(2)
-    : 0;
+      const dailyQty =
+        (d.sales || []).reduce(
+          (acc, s) => acc + Number(s.qty || 0),
+          0
+        );
+
+      const dailyAvg =
+        dailyQty
+          ? ((Number(d.totalSales) || 0) / dailyQty).toFixed(2)
+          : "0.00";
 
       win.document.write(`
         <tr>
           <td>${d.date}</td>
-          <td>₦${Number(d.totalSales).toFixed(2)}</td>
-          <td>₦${Number(d.totalExpenses).toFixed(2)}</td>
-          <td>₦${Number(d.net).toFixed(2)}</td>
+          <td>₦${Number(d.totalSales).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${Number(d.totalExpenses).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${Number(d.net).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           <td>${dailyQty}</td>
-          <td>₦${dailyAvgUnit}</td>
+          <td>₦${dailyAvg}</td>
         </tr>
       `);
+
     });
 
     win.document.write(`
-        <tr style="font-weight:bold;">
-          <td>TOTAL</td>
-          <td>₦${totalSales.toFixed(2)}</td>
-          <td>₦${totalExpenses.toFixed(2)}</td>
-          <td>₦${totalNet.toFixed(2)}</td>
-          <td>${totalQty}</td>
-          <td>₦${weeklyAvgUnitPrice}</td>
-        </tr>
+      <tr style="font-weight:bold;">
+        <td>TOTAL</td>
+        <td>₦${totalSales.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        <td>₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        <td>₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        <td>${totalQty}</td>
+        <td>₦${avgUnitPrice}</td>
+      </tr>
       </table>
 
+      <br>
+
+      <h3>SUMMARY</h3>
+
+      <p><strong>Total Sales:</strong>
+      ₦${totalSales.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+
+      <p><strong>Total Expenses:</strong>
+      ₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+
+      <p><strong>Net Balance:</strong>
+      ₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+
+      <p><strong>Total Quantity Sold:</strong>
+      ${totalQty}</p>
+
+      <p><strong>Average Unit Price:</strong>
+      ₦${avgUnitPrice}</p>
+
       <p>${footer}</p>
+
       <hr>
     `);
   }
