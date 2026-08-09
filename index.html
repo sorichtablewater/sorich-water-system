@@ -344,11 +344,14 @@ function prefillOwing(){
 }
 
 function addSale(){
-  const customer = document.getElementById('saleCustomer').value || 'Unknown';
-  const qty = parseFloat(saleQty.value) || 0;
-  const total = parseFloat(saleTotal.value) || 0;
-  const paid = parseFloat(salePaid.value) || 0;
-  const prevDebt = parseFloat(salePrevDebt.value) || 0;
+ const customer = document.getElementById('saleCustomer').value || 'Unknown';
+
+saveCustomerSuggestion(customer);
+
+const qty = parseFloat(saleQty.value) || 0;
+const total = parseFloat(saleTotal.value) || 0;
+const paid = parseFloat(salePaid.value) || 0;
+const prevDebt = parseFloat(salePrevDebt.value) || 0;
 
   // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
@@ -2158,28 +2161,91 @@ function printWeeklyStatement() {
 
 
 
+// ==========================================
+// PERMANENT CUSTOMER SUGGESTIONS
+// Customers are saved even after End Of Day
+// ==========================================
+
+let customerData =
+JSON.parse(localStorage.getItem('customerData')) || [];
+
+
+// ==========================================
+// SAVE CUSTOMER NAME
+// ==========================================
+
+function saveCustomerSuggestion(name) {
+
+    if (!name) return;
+
+    name = name.trim();
+
+    if (!name) return;
+
+    // Check if customer already exists
+    const exists = customerData.some(
+        customer =>
+            customer.toLowerCase() === name.toLowerCase()
+    );
+
+    if (!exists) {
+
+        customerData.push(name);
+
+        localStorage.setItem(
+            'customerData',
+            JSON.stringify(customerData)
+        );
+    }
+}
+
+
+// ==========================================
+// UPDATE CUSTOMER SUGGESTIONS
+// ==========================================
+
 function updateCustomerSuggestions() {
-  const list = document.getElementById('customerList');
-  if (!list) return;
 
-  const names = new Set();
+    const list =
+        document.getElementById('customerList');
 
-  // collect names from sales
-  salesData.forEach(s => {
-    if (s.customer) names.add(s.customer);
-  });
+    if (!list) return;
 
-  // collect names from debtors
-  debtData.forEach(d => {
-    if (d.customer) names.add(d.customer);
-  });
+    // Save customers currently appearing in sales
+    salesData.forEach(s => {
 
-  list.innerHTML = '';
-  names.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    list.appendChild(opt);
-  });
+        if (s.customer) {
+            saveCustomerSuggestion(s.customer);
+        }
+
+    });
+
+
+    // Save customers currently appearing in debtors
+    debtData.forEach(d => {
+
+        if (d.customer) {
+            saveCustomerSuggestion(d.customer);
+        }
+
+    });
+
+
+    // Clear suggestion list
+    list.innerHTML = '';
+
+
+    // Add all permanently saved customers
+    customerData.forEach(name => {
+
+        const opt =
+            document.createElement('option');
+
+        opt.value = name;
+
+        list.appendChild(opt);
+
+    });
 }
 
 // ====== INIT ======
