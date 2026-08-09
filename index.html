@@ -110,8 +110,9 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- DEBTORS PAGE -->
 <div id="debtorsPage" class="section" style="display:none; position: relative;">
+
   <h2>Debtors</h2>
-  
+
   <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
   <button onclick="backToDashboard()" style="
     position: absolute;
@@ -125,24 +126,50 @@ body.dark-mode th {background-color:#003366;}
     border: none;
     cursor: pointer;
     transition: 0.3s;
-  " onmouseover="this.style.background='#004999'" onmouseout="this.style.background='#0066cc'">
+  "
+  onmouseover="this.style.background='#004999'"
+  onmouseout="this.style.background='#0066cc'">
     ⬅ Back to Dashboard
   </button>
 
-  <input type="text" id="debtorSearch" placeholder="Search customer..." style="padding:5px; margin-bottom:10px; width:30%;">
-  
-  <table id="debtorsTable">
-    <tr>
-      <th>Customer</th>
-      <th>Total Owed</th>
-      <th>Amount Paid</th>
-      <th>Balance</th>
-      <th>Status</th>
-      <th>Pay Now</th>
-    </tr>
-  </table>
-</div>
 
+  <!-- SEARCH CUSTOMER -->
+  <input
+    type="text"
+    id="debtorSearch"
+    placeholder="Search customer..."
+    style="
+      padding:5px;
+      margin-bottom:10px;
+      width:30%;
+    "
+  >
+
+
+  <!-- DEBTORS TABLE -->
+  <table id="debtorsTable">
+
+    <tr>
+
+      <th>Customer</th>
+
+      <th>Total Owed</th>
+
+      <th>Amount Paid</th>
+
+      <th>Balance</th>
+
+      <th>Last Debt Date</th>
+
+      <th>Status</th>
+
+      <th>Action</th>
+
+    </tr>
+
+  </table>
+
+</div>
 
 <!-- EXPENSES PAGE -->
 <div id="expensesPage" class="section" style="display:none;">
@@ -321,11 +348,16 @@ function addSale(){
   const qty = parseFloat(saleQty.value) || 0;
   const total = parseFloat(saleTotal.value) || 0;
   const paid = parseFloat(salePaid.value) || 0;
-  const prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
+  const prevDebt = parseFloat(salePrevDebt.value) || 0;
 
   // Include previous debt in owing
   const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2); // UPDATED
+  const owing = (total - paid + prevDebt).toFixed(2);
+
+  // Current date and time
+  const now = new Date();
+  const debtDate = now.toLocaleDateString('en-GB');
+  const debtTime = now.toLocaleTimeString('en-GB');
 
   // Push to sales data
   salesData.push({
@@ -335,55 +367,98 @@ function addSale(){
     unit: parseFloat(unit),
     paid,
     owing: parseFloat(owing),
-    prevDebt: prevDebt, // NEW: store previous debt
-    date: new Date().toLocaleDateString()
+    prevDebt: prevDebt,
+    date: debtDate,
+    time: debtTime
   });
 
- // ===== UPDATE DEBT DATA CORRECTLY =====
-const debtIndex = debtData.findIndex(
-  d => d.customer.toLowerCase() === customer.toLowerCase()
-);
+  // ===== UPDATE DEBT DATA =====
+  const debtIndex = debtData.findIndex(
+    d => d.customer.toLowerCase() === customer.toLowerCase()
+  );
 
-// ONLY the new sale debt
-const newDebt = total - paid;
+  // ONLY the new debt from this sale
+  const newDebt = total - paid;
 
-if (debtIndex >= 0) {
+  if (debtIndex >= 0) {
 
-  // add ONLY new debt
-  debtData[debtIndex].owing =
-    Number(debtData[debtIndex].owing) + Number(newDebt);
+    // Make sure old debtor has a history array
+    if (!Array.isArray(debtData[debtIndex].history)) {
+      debtData[debtIndex].history = [];
+    }
 
-  debtData[debtIndex].totalPaid =
-    Number(debtData[debtIndex].totalPaid) + Number(paid);
+    const oldBalance = Number(debtData[debtIndex].owing);
 
-} else {
+    // Add this particular day's debt to history
+    if (newDebt > 0) {
+      debtData[debtIndex].history.push({
+        type: 'debt',
+        date: debtDate,
+        time: debtTime,
+        amount: Number(newDebt),
+        balanceBefore: oldBalance,
+        balanceAfter: oldBalance + Number(newDebt)
+      });
+    }
 
-  // create new debtor only if owing exists
-  if (newDebt > 0) {
-    debtData.push({
-      customer,
-      owing: Number(newDebt),
-      totalPaid: Number(paid)
-    });
+    // Add new debt to customer's total balance
+    debtData[debtIndex].owing =
+      oldBalance + Number(newDebt);
+
+    // Add payment to total paid
+    debtData[debtIndex].totalPaid =
+      Number(debtData[debtIndex].totalPaid) + Number(paid);
+
+  } else {
+
+    // Create new debtor only if owing exists
+    if (newDebt > 0) {
+
+      debtData.push({
+        customer,
+        owing: Number(newDebt),
+        totalPaid: Number(paid),
+
+        // Store every debt separately
+        history: [
+          {
+            type: 'debt',
+            date: debtDate,
+            time: debtTime,
+            amount: Number(newDebt),
+            balanceBefore: 0,
+            balanceAfter: Number(newDebt)
+          }
+        ]
+      });
+
+    }
   }
 
-}
-
-   // Re-render tables
+  // Re-render tables
   renderSalesTable();
   renderDebtors();
   updateCustomerSuggestions();
+
   // Reset form
   document.getElementById('saleCustomer').value = '';
   saleQty.value = 10;
   saleTotal.value = 2500;
   salePaid.value = 2000;
-  salePrevDebt.value = 0; // RESET previous debt
+  salePrevDebt.value = 0;
+
   updateSaleCalc();
 
   // Save to localStorage
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
+  localStorage.setItem(
+    'salesData',
+    JSON.stringify(salesData)
+  );
+
+  localStorage.setItem(
+    'debtData',
+    JSON.stringify(debtData)
+  );
 }
 
 
@@ -499,9 +574,9 @@ function renderSalesTable(){
 }
 
 
-
 // ====== DEBTORS ======
 function renderDebtors() {
+
   const table = document.getElementById('debtorsTable');
   const search = document.getElementById('debtorSearch').value.toLowerCase();
 
@@ -511,6 +586,7 @@ function renderDebtors() {
       <th>Total Owed</th>
       <th>Amount Paid</th>
       <th>Balance</th>
+      <th>Last Debt Date</th>
       <th>Status</th>
       <th>Action</th>
     </tr>
@@ -518,103 +594,478 @@ function renderDebtors() {
 
   debtData.forEach((d, index) => {
 
-    // ✅ ONLY SHOW CUSTOMERS THAT STILL OWE
+    // ONLY SHOW CUSTOMERS THAT STILL OWE
     if (Number(d.owing) <= 0) return;
 
     if (!d.customer.toLowerCase().includes(search)) return;
 
+    // Make sure history exists
+    if (!Array.isArray(d.history)) {
+      d.history = [];
+    }
+
+    // Get the last debt date
+    const debtHistory = d.history.filter(
+      h => h.type === 'debt'
+    );
+
+    let lastDebtDate = '-';
+
+    if (debtHistory.length > 0) {
+      lastDebtDate =
+        debtHistory[debtHistory.length - 1].date;
+    }
+
     const row = table.insertRow();
-    row.insertCell(0).innerText = d.customer;
-    row.insertCell(1).innerText = formatMoney(d.owing);
-row.insertCell(2).innerText = formatMoney(d.totalPaid);
-row.insertCell(3).innerText = formatMoney(d.owing);
-    row.insertCell(4).innerText = '❌ Owing';
 
-    const actionCell = row.insertCell(5);
+    row.insertCell(0).innerText =
+      d.customer;
 
-    // Pay button
+    row.insertCell(1).innerText =
+      formatMoney(d.owing);
+
+    row.insertCell(2).innerText =
+      formatMoney(d.totalPaid);
+
+    row.insertCell(3).innerText =
+      formatMoney(d.owing);
+
+    row.insertCell(4).innerText =
+      lastDebtDate;
+
+    row.insertCell(5).innerText =
+      '❌ Owing';
+
+    const actionCell = row.insertCell(6);
+
+    // ====== HISTORY BUTTON ======
+    const historyBtn = document.createElement('button');
+
+    historyBtn.innerText = '📅 History';
+
+    historyBtn.style.background = '#0066cc';
+    historyBtn.style.color = '#fff';
+    historyBtn.style.border = 'none';
+    historyBtn.style.padding = '6px 10px';
+    historyBtn.style.borderRadius = '4px';
+    historyBtn.style.cursor = 'pointer';
+
+    historyBtn.onclick = () => {
+      showDebtHistory(index);
+    };
+
+    actionCell.appendChild(historyBtn);
+
+
+    // ====== PAY BUTTON ======
     const payBtn = document.createElement('button');
+
     payBtn.innerText = 'Pay';
+
+    payBtn.style.marginLeft = '5px';
+
     payBtn.onclick = () => payDebt(index);
+
     actionCell.appendChild(payBtn);
 
-    // Clear button
+
+    // ====== CLEAR BUTTON ======
     const clearBtn = document.createElement('button');
+
     clearBtn.innerText = '🗑 Clear';
+
     clearBtn.style.background = 'red';
     clearBtn.style.color = '#fff';
     clearBtn.style.marginLeft = '5px';
+
     clearBtn.onclick = () => {
+
       if (confirm(`Clear debtor "${d.customer}"?`)) {
-        clearDebtor(index); // Make sure you have a clearDebtor function
-        renderDebtors(); // Refresh table after clearing
+
+        clearDebtor(index);
+
       }
+
     };
+
     actionCell.appendChild(clearBtn);
+
   });
+
+  // Save history
+  localStorage.setItem(
+    'debtData',
+    JSON.stringify(debtData)
+  );
 }
 
 
-// ====== PAY DEBT (FIXED) ======
-function payDebt(index) {
+// ==========================================
+// SHOW DEBT HISTORY
+// ==========================================
+function showDebtHistory(index) {
+
   const d = debtData[index];
 
-  let remainingPayment = parseFloat(
-    prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))
-  );
+  if (!d) return;
 
-  if (isNaN(remainingPayment) || remainingPayment <= 0) {
-    alert('Invalid payment amount');
-    return;
+  // Make sure history exists
+  if (!Array.isArray(d.history)) {
+    d.history = [];
   }
 
-  if (remainingPayment > d.owing) {
-    alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
-    return;
+  let historyRows = '';
+
+  if (d.history.length === 0) {
+
+    historyRows = `
+      <tr>
+        <td colspan="5"
+            style="text-align:center;padding:15px;">
+          No debt history available.
+        </td>
+      </tr>
+    `;
+
+  } else {
+
+    d.history.forEach(h => {
+
+      let typeText = '';
+      let amountText = '';
+
+      if (h.type === 'debt') {
+
+        typeText = '🔴 Debt Added';
+
+        amountText =
+          '+ ₦' + formatMoney(h.amount);
+
+      } else if (h.type === 'payment') {
+
+        typeText = '💰 Payment';
+
+        amountText =
+          '- ₦' + formatMoney(h.amount);
+
+      }
+
+      historyRows += `
+        <tr>
+
+          <td style="padding:8px;border:1px solid #ccc;">
+            ${h.date || '-'}
+          </td>
+
+          <td style="padding:8px;border:1px solid #ccc;">
+            ${h.time || '-'}
+          </td>
+
+          <td style="padding:8px;border:1px solid #ccc;">
+            ${typeText}
+          </td>
+
+          <td style="padding:8px;border:1px solid #ccc;">
+            ${amountText}
+          </td>
+
+          <td style="padding:8px;border:1px solid #ccc;">
+            ₦${formatMoney(h.balanceAfter || 0)}
+          </td>
+
+        </tr>
+      `;
+
+    });
+
   }
 
-  d.owing -= remainingPayment;
-  d.totalPaid += remainingPayment;
 
-  // Update corresponding sales entries
-  salesData.forEach(sale => {
-    if (
-      remainingPayment > 0 &&
-      sale.customer.toLowerCase() === d.customer.toLowerCase() &&
-      sale.owing > 0
-    ) {
-      const deduction = Math.min(sale.owing, remainingPayment);
-      sale.paid += deduction;
-      sale.owing -= deduction;
-      remainingPayment -= deduction;
-    }
-  });
+  // Create history window
+  const modal = document.createElement('div');
 
-  if (d.owing <= 0) d.owing = 0;
+  modal.className = 'debt-history-modal';
 
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-  localStorage.setItem('salesData', JSON.stringify(salesData));
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.background = 'rgba(0,0,0,0.65)';
+  modal.style.zIndex = '9999';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
 
-  renderDebtors();
-  renderSalesTable();
+
+  modal.innerHTML = `
+
+    <div style="
+      background:#fff;
+      color:#000;
+      width:90%;
+      max-width:900px;
+      max-height:90vh;
+      overflow:auto;
+      padding:20px;
+      border-radius:10px;
+      box-sizing:border-box;
+    ">
+
+      <h2>
+        📅 Debt History - ${d.customer}
+      </h2>
+
+      <p>
+        <strong>Current Balance:</strong>
+        ₦${formatMoney(d.owing)}
+      </p>
+
+      <table style="
+        width:100%;
+        border-collapse:collapse;
+        margin-top:15px;
+      ">
+
+        <tr style="background:#eee;">
+
+          <th style="padding:8px;border:1px solid #ccc;">
+            Date
+          </th>
+
+          <th style="padding:8px;border:1px solid #ccc;">
+            Time
+          </th>
+
+          <th style="padding:8px;border:1px solid #ccc;">
+            Type
+          </th>
+
+          <th style="padding:8px;border:1px solid #ccc;">
+            Amount
+          </th>
+
+          <th style="padding:8px;border:1px solid #ccc;">
+            Balance
+          </th>
+
+        </tr>
+
+        ${historyRows}
+
+      </table>
+
+      <br>
+
+      <button
+        style="
+          background:#0066cc;
+          color:white;
+          border:none;
+          padding:10px 20px;
+          border-radius:5px;
+          cursor:pointer;
+        "
+        onclick="this.closest('.debt-history-modal').remove()"
+      >
+        Close
+      </button>
+
+    </div>
+
+  `;
+
+  document.body.appendChild(modal);
 }
 
-// ====== CLEAR CLEARED DEBTOR ======
+
+// ==========================================
+// PAY DEBT
+// ==========================================
+function payDebt(index) {
+
+  const d = debtData[index];
+
+  if (!d) return;
+
+  // Make sure history exists
+  if (!Array.isArray(d.history)) {
+    d.history = [];
+  }
+
+  let payment = parseFloat(
+    prompt(
+      `Enter amount to pay for ${d.customer}`,
+      Number(d.owing).toFixed(2)
+    )
+  );
+
+
+  if (isNaN(payment) || payment <= 0) {
+
+    alert('Invalid payment amount');
+
+    return;
+  }
+
+
+  if (payment > Number(d.owing)) {
+
+    alert(
+      `Customer only owes ₦${formatMoney(d.owing)}`
+    );
+
+    return;
+  }
+
+
+  // Balance before payment
+  const balanceBefore =
+    Number(d.owing);
+
+
+  // Reduce debt
+  d.owing =
+    Number(d.owing) - Number(payment);
+
+
+  // Increase total paid
+  d.totalPaid =
+    Number(d.totalPaid) + Number(payment);
+
+
+  // Payment date and time
+  const now = new Date();
+
+  const paymentDate =
+    now.toLocaleDateString('en-GB');
+
+  const paymentTime =
+    now.toLocaleTimeString('en-GB');
+
+
+  // Save payment into history
+  d.history.push({
+
+    type: 'payment',
+
+    date: paymentDate,
+
+    time: paymentTime,
+
+    amount: Number(payment),
+
+    balanceBefore: balanceBefore,
+
+    balanceAfter: Number(d.owing)
+
+  });
+
+
+  // ==========================================
+  // UPDATE SALES ENTRIES
+  // ==========================================
+
+  let remainingPayment =
+    Number(payment);
+
+
+  salesData.forEach(sale => {
+
+    if (
+      remainingPayment > 0 &&
+      sale.customer.toLowerCase() ===
+        d.customer.toLowerCase() &&
+      Number(sale.owing) > 0
+    ) {
+
+      const deduction = Math.min(
+        Number(sale.owing),
+        remainingPayment
+      );
+
+
+      sale.paid =
+        Number(sale.paid) + deduction;
+
+
+      sale.owing =
+        Number(sale.owing) - deduction;
+
+
+      remainingPayment -= deduction;
+
+    }
+
+  });
+
+
+  if (d.owing <= 0) {
+    d.owing = 0;
+  }
+
+
+  // Save debt data
+  localStorage.setItem(
+    'debtData',
+    JSON.stringify(debtData)
+  );
+
+
+  // Save sales data
+  localStorage.setItem(
+    'salesData',
+    JSON.stringify(salesData)
+  );
+
+
+  // Refresh tables
+  renderDebtors();
+
+  renderSalesTable();
+
+}
+
+
+// ==========================================
+// CLEAR CLEARED DEBTOR
+// ==========================================
 function clearDebtor(index) {
-  if (!confirm('Remove this cleared debtor from the list?')) return;
+
+  if (
+    !confirm(
+      'Remove this cleared debtor from the list?'
+    )
+  ) {
+    return;
+  }
+
 
   debtData.splice(index, 1);
 
-  localStorage.setItem('debtData', JSON.stringify(debtData));
+
+  localStorage.setItem(
+    'debtData',
+    JSON.stringify(debtData)
+  );
+
 
   renderDebtors();
+
   renderSalesTable();
+
 }
 
 
-// ====== DEBTORS SEARCH LISTENER ======
-document.getElementById('debtorSearch').addEventListener('input', renderDebtors);
-
+// ==========================================
+// DEBTORS SEARCH LISTENER
+// ==========================================
+document
+  .getElementById('debtorSearch')
+  .addEventListener(
+    'input',
+    renderDebtors
+  );
 
 // ====== INVOICE PRINTING ======
 function printInvoice(sale){
