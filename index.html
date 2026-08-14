@@ -1522,6 +1522,11 @@ function editOneDailySale(dailyIndex, saleIndex) {
 
 // ====== RENDER DAILY RECORD INVOICE ======
 function renderDailyRecordInvoice(d) {
+    // Always recalculate from the actual sales/expenses before printing.
+    // This prevents the printed totals from using old stored values after edits.
+    recalcDailyRecord(d);
+    localStorage.setItem('dailyData', JSON.stringify(dailyData));
+
     const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
     const manager = document.getElementById('managerName').value || 'Manager';
     const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
@@ -1831,8 +1836,9 @@ function printMonthlyStatement() {
     }
   });
 
-  // Process each daily record
+  // Process each daily record from its actual sales/expenses.
   monthRecords.forEach(d => {
+    recalcDailyRecord(d);
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
@@ -1950,6 +1956,7 @@ function printMonthlyStatement() {
     `);
 
     monthRecords.forEach(d => {
+     recalcDailyRecord(d);
      const dailyQty = d.sales
   ? d.sales.reduce((acc, s) => acc + Number(s.qty || 0), 0)
   : 0;
@@ -2112,16 +2119,23 @@ function printWeeklyStatement() {
 
   const weekCustomers = new Set();
 
+  // Recalculate EVERY selected day from its actual entries before printing.
+  // Never trust old stored summary numbers after a sale/expense has been edited.
   weekRecords.forEach(d => {
+    recalcDailyRecord(d);
+
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
 
     (d.sales || []).forEach(s => {
       totalQty += Number(s.qty) || 0;
-      weekCustomers.add((s.customer || '').toLowerCase());
+      weekCustomers.add((s.customer || '').trim().toLowerCase());
     });
   });
+
+  // Save the corrected daily summaries before printing.
+  localStorage.setItem('dailyData', JSON.stringify(dailyData));
 
   // LIVE DEBTORS
   const weekDebtors = {};
@@ -2232,6 +2246,7 @@ function printWeeklyStatement() {
     `);
 
     weekRecords.forEach(d => {
+      recalcDailyRecord(d);
 
       const dailyQty =
         (d.sales || []).reduce(
