@@ -110,9 +110,8 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- DEBTORS PAGE -->
 <div id="debtorsPage" class="section" style="display:none; position: relative;">
-
   <h2>Debtors</h2>
-
+  
   <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
   <button onclick="backToDashboard()" style="
     position: absolute;
@@ -126,50 +125,25 @@ body.dark-mode th {background-color:#003366;}
     border: none;
     cursor: pointer;
     transition: 0.3s;
-  "
-  onmouseover="this.style.background='#004999'"
-  onmouseout="this.style.background='#0066cc'">
+  " onmouseover="this.style.background='#004999'" onmouseout="this.style.background='#0066cc'">
     ⬅ Back to Dashboard
   </button>
 
-
-  <!-- SEARCH CUSTOMER -->
-  <input
-    type="text"
-    id="debtorSearch"
-    placeholder="Search customer..."
-    style="
-      padding:5px;
-      margin-bottom:10px;
-      width:30%;
-    "
-  >
-
-
-  <!-- DEBTORS TABLE -->
+  <input type="text" id="debtorSearch" placeholder="Search customer..." style="padding:5px; margin-bottom:10px; width:30%;">
+  
   <table id="debtorsTable">
-
     <tr>
-
       <th>Customer</th>
-
       <th>Total Owed</th>
-
       <th>Amount Paid</th>
-
       <th>Balance</th>
-
       <th>Last Debt Date</th>
-
       <th>Status</th>
-
       <th>Action</th>
-
     </tr>
-
   </table>
-
 </div>
+
 
 <!-- EXPENSES PAGE -->
 <div id="expensesPage" class="section" style="display:none;">
@@ -344,126 +318,37 @@ function prefillOwing(){
 }
 
 function addSale(){
- const customer = document.getElementById('saleCustomer').value || 'Unknown';
-
-saveCustomerSuggestion(customer);
-
-const qty = parseFloat(saleQty.value) || 0;
-const total = parseFloat(saleTotal.value) || 0;
-const paid = parseFloat(salePaid.value) || 0;
-const prevDebt = parseFloat(salePrevDebt.value) || 0;
-
-  // Include previous debt in owing
+  const customer = document.getElementById('saleCustomer').value.trim() || 'Unknown';
+  const qty = parseFloat(saleQty.value) || 0;
+  const total = parseFloat(saleTotal.value) || 0;
+  const paid = parseFloat(salePaid.value) || 0;
+  const prevDebt = parseFloat(salePrevDebt.value) || 0;
   const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2);
-
-  // Current date and time
+  const newDebt = Math.max(0, total - paid);
+  const owing = newDebt + prevDebt;
+  const saleId = 'S' + Date.now() + Math.random().toString(36).slice(2,8);
   const now = new Date();
-  const debtDate = now.toLocaleDateString('en-GB');
-  const debtTime = now.toLocaleTimeString('en-GB');
 
-  // Push to sales data
-  salesData.push({
-    customer,
-    qty,
-    total,
-    unit: parseFloat(unit),
-    paid,
-    owing: parseFloat(owing),
-    prevDebt: prevDebt,
-    date: debtDate,
-    time: debtTime
-  });
+  salesData.push({ id:saleId, customer, qty, total, unit:Number(unit), paid, owing, prevDebt, date:now.toLocaleDateString('en-GB'), time:now.toLocaleTimeString('en-GB') });
 
-  // ===== UPDATE DEBT DATA =====
-  const debtIndex = debtData.findIndex(
-    d => d.customer.toLowerCase() === customer.toLowerCase()
-  );
-
-  // ONLY the new debt from this sale
-  const newDebt = total - paid;
-
-  if (debtIndex >= 0) {
-
-    // Make sure old debtor has a history array
-    if (!Array.isArray(debtData[debtIndex].history)) {
-      debtData[debtIndex].history = [];
+  const debtIndex = debtData.findIndex(d => d.customer.toLowerCase() === customer.toLowerCase());
+  if(debtIndex >= 0){
+    if(!Array.isArray(debtData[debtIndex].history)) debtData[debtIndex].history=[];
+    const oldBalance=Number(debtData[debtIndex].owing)||0;
+    if(newDebt>0){
+      debtData[debtIndex].history.push({saleId,type:'debt',date:null,time:now.toLocaleTimeString('en-GB'),amount:newDebt,balanceBefore:oldBalance,balanceAfter:oldBalance+newDebt});
     }
-
-    const oldBalance = Number(debtData[debtIndex].owing);
-
-    // Add this particular day's debt to history
-    if (newDebt > 0) {
-      debtData[debtIndex].history.push({
-        type: 'debt',
-        date: debtDate,
-        time: debtTime,
-        amount: Number(newDebt),
-        balanceBefore: oldBalance,
-        balanceAfter: oldBalance + Number(newDebt)
-      });
-    }
-
-    // Add new debt to customer's total balance
-    debtData[debtIndex].owing =
-      oldBalance + Number(newDebt);
-
-    // Add payment to total paid
-    debtData[debtIndex].totalPaid =
-      Number(debtData[debtIndex].totalPaid) + Number(paid);
-
-  } else {
-
-    // Create new debtor only if owing exists
-    if (newDebt > 0) {
-
-      debtData.push({
-        customer,
-        owing: Number(newDebt),
-        totalPaid: Number(paid),
-
-        // Store every debt separately
-        history: [
-          {
-            type: 'debt',
-            date: debtDate,
-            time: debtTime,
-            amount: Number(newDebt),
-            balanceBefore: 0,
-            balanceAfter: Number(newDebt)
-          }
-        ]
-      });
-
-    }
+    debtData[debtIndex].owing=oldBalance+newDebt;
+    debtData[debtIndex].totalPaid=Number(debtData[debtIndex].totalPaid||0)+paid;
+  } else if(newDebt>0){
+    debtData.push({customer,owing:newDebt,totalPaid:paid,history:[{saleId,type:'debt',date:null,time:now.toLocaleTimeString('en-GB'),amount:newDebt,balanceBefore:0,balanceAfter:newDebt}]});
   }
 
-  // Re-render tables
-  renderSalesTable();
-  renderDebtors();
-  updateCustomerSuggestions();
-
-  // Reset form
-  document.getElementById('saleCustomer').value = '';
-  saleQty.value = 10;
-  saleTotal.value = 2500;
-  salePaid.value = 2000;
-  salePrevDebt.value = 0;
-
-  updateSaleCalc();
-
-  // Save to localStorage
-  localStorage.setItem(
-    'salesData',
-    JSON.stringify(salesData)
-  );
-
-  localStorage.setItem(
-    'debtData',
-    JSON.stringify(debtData)
-  );
+  localStorage.setItem('salesData',JSON.stringify(salesData));
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+  renderSalesTable(); renderDebtors(); updateCustomerSuggestions();
+  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2000; salePrevDebt.value=0; updateSaleCalc();
 }
-
 
 function renderSalesTable(){
   const table=document.getElementById('salesTable');
@@ -577,498 +462,95 @@ function renderSalesTable(){
 }
 
 
+
 // ====== DEBTORS ======
 function renderDebtors() {
-
-  const table = document.getElementById('debtorsTable');
-  const search = document.getElementById('debtorSearch').value.toLowerCase();
-
-  table.innerHTML = `
-    <tr>
-      <th>Customer</th>
-      <th>Total Owed</th>
-      <th>Amount Paid</th>
-      <th>Balance</th>
-      <th>Last Debt Date</th>
-      <th>Status</th>
-      <th>Action</th>
-    </tr>
-  `;
-
-  debtData.forEach((d, index) => {
-
-    // ONLY SHOW CUSTOMERS THAT STILL OWE
-    if (Number(d.owing) <= 0) return;
-
-    if (!d.customer.toLowerCase().includes(search)) return;
-
-    // Make sure history exists
-    if (!Array.isArray(d.history)) {
-      d.history = [];
-    }
-
-    // Get the last debt date
-    const debtHistory = d.history.filter(
-      h => h.type === 'debt'
-    );
-
-    let lastDebtDate = '-';
-
-    if (debtHistory.length > 0) {
-      lastDebtDate =
-        debtHistory[debtHistory.length - 1].date;
-    }
-
-    const row = table.insertRow();
-
-    row.insertCell(0).innerText =
-      d.customer;
-
-    row.insertCell(1).innerText =
-      formatMoney(d.owing);
-
-    row.insertCell(2).innerText =
-      formatMoney(d.totalPaid);
-
-    row.insertCell(3).innerText =
-      formatMoney(d.owing);
-
-    row.insertCell(4).innerText =
-      lastDebtDate;
-
-    row.insertCell(5).innerText =
-      '❌ Owing';
-
-    const actionCell = row.insertCell(6);
-
-    // ====== HISTORY BUTTON ======
-    const historyBtn = document.createElement('button');
-
-    historyBtn.innerText = '📅 History';
-
-    historyBtn.style.background = '#0066cc';
-    historyBtn.style.color = '#fff';
-    historyBtn.style.border = 'none';
-    historyBtn.style.padding = '6px 10px';
-    historyBtn.style.borderRadius = '4px';
-    historyBtn.style.cursor = 'pointer';
-
-    historyBtn.onclick = () => {
-      showDebtHistory(index);
-    };
-
-    actionCell.appendChild(historyBtn);
-
-
-    // ====== PAY BUTTON ======
-    const payBtn = document.createElement('button');
-
-    payBtn.innerText = 'Pay';
-
-    payBtn.style.marginLeft = '5px';
-
-    payBtn.onclick = () => payDebt(index);
-
-    actionCell.appendChild(payBtn);
-
-
-    // ====== CLEAR BUTTON ======
-    const clearBtn = document.createElement('button');
-
-    clearBtn.innerText = '🗑 Clear';
-
-    clearBtn.style.background = 'red';
-    clearBtn.style.color = '#fff';
-    clearBtn.style.marginLeft = '5px';
-
-    clearBtn.onclick = () => {
-
-      if (confirm(`Clear debtor "${d.customer}"?`)) {
-
-        clearDebtor(index);
-
-      }
-
-    };
-
-    actionCell.appendChild(clearBtn);
-
+  const table=document.getElementById('debtorsTable');
+  const search=(document.getElementById('debtorSearch')?.value||'').toLowerCase();
+  table.innerHTML=`<tr><th>Customer</th><th>Total Owed</th><th>Amount Paid</th><th>Balance</th><th>Last Debt Date</th><th>Status</th><th>Action</th></tr>`;
+  debtData.forEach((d,index)=>{
+    if(Number(d.owing)<=0 || !d.customer.toLowerCase().includes(search)) return;
+    if(!Array.isArray(d.history)) d.history=[];
+    const debts=d.history.filter(h=>h.type==='debt'&&h.date).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const lastDebtDate=debts.length?debts[debts.length-1].date:'-';
+    const row=table.insertRow();
+    row.insertCell(0).innerText=d.customer; row.insertCell(1).innerText=formatMoney(d.owing); row.insertCell(2).innerText=formatMoney(d.totalPaid); row.insertCell(3).innerText=formatMoney(d.owing); row.insertCell(4).innerText=lastDebtDate; row.insertCell(5).innerText='❌ Owing';
+    const action=row.insertCell(6);
+    const hb=document.createElement('button'); hb.innerText='📅 History'; hb.onclick=()=>showDebtHistory(index); action.appendChild(hb);
+    const pb=document.createElement('button'); pb.innerText='Pay'; pb.onclick=()=>payDebt(index); action.appendChild(pb);
+    const cb=document.createElement('button'); cb.innerText='🗑 Clear'; cb.style.background='red'; cb.style.color='#fff'; cb.onclick=()=>{if(confirm(`Clear debtor "${d.customer}"?`)) clearDebtor(index);}; action.appendChild(cb);
   });
-
-  // Save history
-  localStorage.setItem(
-    'debtData',
-    JSON.stringify(debtData)
-  );
+  localStorage.setItem('debtData',JSON.stringify(debtData));
 }
 
-
-// ==========================================
-// SHOW DEBT HISTORY
-// ==========================================
-function showDebtHistory(index) {
-
-  const d = debtData[index];
-
-  if (!d) return;
-
-  // Make sure history exists
-  if (!Array.isArray(d.history)) {
-    d.history = [];
-  }
-
-  let historyRows = '';
-
-  if (d.history.length === 0) {
-
-    historyRows = `
-      <tr>
-        <td colspan="5"
-            style="text-align:center;padding:15px;">
-          No debt history available.
-        </td>
-      </tr>
-    `;
-
-  } else {
-
-    d.history.forEach(h => {
-
-      let typeText = '';
-      let amountText = '';
-
-      if (h.type === 'debt') {
-
-        typeText = '🔴 Debt Added';
-
-        amountText =
-          '+ ₦' + formatMoney(h.amount);
-
-      } else if (h.type === 'payment') {
-
-        typeText = '💰 Payment';
-
-        amountText =
-          '- ₦' + formatMoney(h.amount);
-
-      }
-
-      historyRows += `
-        <tr>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${h.date || '-'}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${h.time || '-'}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${typeText}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${amountText}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ₦${formatMoney(h.balanceAfter || 0)}
-          </td>
-
-        </tr>
-      `;
-
-    });
-
-  }
-
-
-  // Create history window
-  const modal = document.createElement('div');
-
-  modal.className = 'debt-history-modal';
-
-  modal.style.position = 'fixed';
-  modal.style.top = '0';
-  modal.style.left = '0';
-  modal.style.width = '100%';
-  modal.style.height = '100%';
-  modal.style.background = 'rgba(0,0,0,0.65)';
-  modal.style.zIndex = '9999';
-  modal.style.display = 'flex';
-  modal.style.alignItems = 'center';
-  modal.style.justifyContent = 'center';
-
-
-  modal.innerHTML = `
-
-    <div style="
-      background:#fff;
-      color:#000;
-      width:90%;
-      max-width:900px;
-      max-height:90vh;
-      overflow:auto;
-      padding:20px;
-      border-radius:10px;
-      box-sizing:border-box;
-    ">
-
-      <h2>
-        📅 Debt History - ${d.customer}
-      </h2>
-
-      <p>
-        <strong>Current Balance:</strong>
-        ₦${formatMoney(d.owing)}
-      </p>
-
-      <table style="
-        width:100%;
-        border-collapse:collapse;
-        margin-top:15px;
-      ">
-
-        <tr style="background:#eee;">
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Date
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Time
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Type
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Amount
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Balance
-          </th>
-
-        </tr>
-
-        ${historyRows}
-
-      </table>
-
-      <br>
-
-      <button
-        style="
-          background:#0066cc;
-          color:white;
-          border:none;
-          padding:10px 20px;
-          border-radius:5px;
-          cursor:pointer;
-        "
-        onclick="this.closest('.debt-history-modal').remove()"
-      >
-        Close
-      </button>
-
-    </div>
-
-  `;
-
+function showDebtHistory(index){
+  const d=debtData[index]; if(!d) return; if(!Array.isArray(d.history)) d.history=[];
+  let rows=d.history.length?d.history.map(h=>`<tr><td>${h.date||'Pending End of Day'}</td><td>${h.time||'-'}</td><td>${h.type==='payment'?'💰 Payment':'🔴 Debt Added'}</td><td>${h.type==='payment'?'-':'+'} ₦${formatMoney(h.amount)}</td><td>₦${formatMoney(h.balanceAfter||0)}</td></tr>`).join(''):`<tr><td colspan="5">No debt history available.</td></tr>`;
+  const modal=document.createElement('div'); modal.className='debt-history-modal'; modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML=`<div style="background:#fff;color:#000;width:90%;max-width:900px;max-height:90vh;overflow:auto;padding:20px;border-radius:10px"><h2>📅 Debt History - ${d.customer}</h2><p><strong>Current Balance:</strong> ₦${formatMoney(d.owing)}</p><table style="width:100%;border-collapse:collapse"><tr><th>Date</th><th>Time</th><th>Type</th><th>Amount</th><th>Balance</th></tr>${rows}</table><br><button onclick="this.closest('.debt-history-modal').remove()">Close</button></div>`;
   document.body.appendChild(modal);
 }
 
-
-// ==========================================
-// PAY DEBT
-// ==========================================
+// ====== PAY DEBT (FIXED) ======
 function payDebt(index) {
-
   const d = debtData[index];
 
-  if (!d) return;
-
-  // Make sure history exists
-  if (!Array.isArray(d.history)) {
-    d.history = [];
-  }
-
-  let payment = parseFloat(
-    prompt(
-      `Enter amount to pay for ${d.customer}`,
-      Number(d.owing).toFixed(2)
-    )
+  let remainingPayment = parseFloat(
+    prompt(`Enter amount to pay for ${d.customer}`, d.owing.toFixed(2))
   );
 
-
-  if (isNaN(payment) || payment <= 0) {
-
+  if (isNaN(remainingPayment) || remainingPayment <= 0) {
     alert('Invalid payment amount');
-
     return;
   }
 
-
-  if (payment > Number(d.owing)) {
-
-    alert(
-      `Customer only owes ₦${formatMoney(d.owing)}`
-    );
-
+  if (remainingPayment > d.owing) {
+    alert(`Customer only owes ₦${d.owing.toFixed(2)}`);
     return;
   }
 
+  d.owing -= remainingPayment;
+  d.totalPaid += remainingPayment;
 
-  // Balance before payment
-  const balanceBefore =
-    Number(d.owing);
-
-
-  // Reduce debt
-  d.owing =
-    Number(d.owing) - Number(payment);
-
-
-  // Increase total paid
-  d.totalPaid =
-    Number(d.totalPaid) + Number(payment);
-
-
-  // Payment date and time
-  const now = new Date();
-
-  const paymentDate =
-    now.toLocaleDateString('en-GB');
-
-  const paymentTime =
-    now.toLocaleTimeString('en-GB');
-
-
-  // Save payment into history
-  d.history.push({
-
-    type: 'payment',
-
-    date: paymentDate,
-
-    time: paymentTime,
-
-    amount: Number(payment),
-
-    balanceBefore: balanceBefore,
-
-    balanceAfter: Number(d.owing)
-
-  });
-
-
-  // ==========================================
-  // UPDATE SALES ENTRIES
-  // ==========================================
-
-  let remainingPayment =
-    Number(payment);
-
-
+  // Update corresponding sales entries
   salesData.forEach(sale => {
-
     if (
       remainingPayment > 0 &&
-      sale.customer.toLowerCase() ===
-        d.customer.toLowerCase() &&
-      Number(sale.owing) > 0
+      sale.customer.toLowerCase() === d.customer.toLowerCase() &&
+      sale.owing > 0
     ) {
-
-      const deduction = Math.min(
-        Number(sale.owing),
-        remainingPayment
-      );
-
-
-      sale.paid =
-        Number(sale.paid) + deduction;
-
-
-      sale.owing =
-        Number(sale.owing) - deduction;
-
-
+      const deduction = Math.min(sale.owing, remainingPayment);
+      sale.paid += deduction;
+      sale.owing -= deduction;
       remainingPayment -= deduction;
-
     }
-
   });
 
+  if (d.owing <= 0) d.owing = 0;
 
-  if (d.owing <= 0) {
-    d.owing = 0;
-  }
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+  localStorage.setItem('salesData', JSON.stringify(salesData));
 
-
-  // Save debt data
-  localStorage.setItem(
-    'debtData',
-    JSON.stringify(debtData)
-  );
-
-
-  // Save sales data
-  localStorage.setItem(
-    'salesData',
-    JSON.stringify(salesData)
-  );
-
-
-  // Refresh tables
   renderDebtors();
-
   renderSalesTable();
-
 }
 
-
-// ==========================================
-// CLEAR CLEARED DEBTOR
-// ==========================================
+// ====== CLEAR CLEARED DEBTOR ======
 function clearDebtor(index) {
-
-  if (
-    !confirm(
-      'Remove this cleared debtor from the list?'
-    )
-  ) {
-    return;
-  }
-
+  if (!confirm('Remove this cleared debtor from the list?')) return;
 
   debtData.splice(index, 1);
 
-
-  localStorage.setItem(
-    'debtData',
-    JSON.stringify(debtData)
-  );
-
+  localStorage.setItem('debtData', JSON.stringify(debtData));
 
   renderDebtors();
-
   renderSalesTable();
-
 }
 
 
-// ==========================================
-// DEBTORS SEARCH LISTENER
-// ==========================================
-document
-  .getElementById('debtorSearch')
-  .addEventListener(
-    'input',
-    renderDebtors
-  );
+// ====== DEBTORS SEARCH LISTENER ======
+document.getElementById('debtorSearch').addEventListener('input', renderDebtors);
+
 
 // ====== INVOICE PRINTING ======
 function printInvoice(sale){
@@ -1112,32 +594,35 @@ function addExpense() {
   document.getElementById('expensePaidTo').value = '';
 }
 
-// ====== RENDER EXPENSES WITH EDIT + ADD + DELETE ======
+// ====== RENDER EXPENSES WITH DELETE BUTTON ======
 function renderExpenses() {
   const table = document.getElementById('expensesTable');
   table.innerHTML = `
     <tr>
-      <th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Action</th>
-    </tr>`;
+      <th>Type</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Paid To</th>
+      <th>Date</th>
+      <th>Action</th>
+    </tr>
+  `;
 
   let totalExpense = 0;
+
   expenseData.forEach((e, index) => {
     const row = table.insertRow();
-    row.insertCell(0).innerText = e.type || 'General';
-    row.insertCell(1).innerText = e.desc || '';
-    row.insertCell(2).innerText = formatMoney(e.amount);
-    row.insertCell(3).innerText = e.paidTo || '';
-    row.insertCell(4).innerText = e.date || '';
-    totalExpense += Number(e.amount || 0);
+    row.insertCell(0).innerText = e.type;
+    row.insertCell(1).innerText = e.desc;
+    row.insertCell(2).innerText = e.amount.toFixed(2);
+    row.insertCell(3).innerText = e.paidTo;
+    row.insertCell(4).innerText = e.date;
+    totalExpense += Number(e.amount);
 
-    const action = row.insertCell(5);
-    const editBtn = document.createElement('button');
-    editBtn.innerText = '✏️ Edit';
-    editBtn.onclick = () => editExpense(index);
-    action.appendChild(editBtn);
-
+    // DELETE BUTTON
+    const deleteCell = row.insertCell(5);
     const deleteBtn = document.createElement('button');
-    deleteBtn.innerText = '🗑 Delete';
+    deleteBtn.innerText = 'Delete';
     deleteBtn.style.background = 'red';
     deleteBtn.style.color = '#fff';
     deleteBtn.onclick = () => {
@@ -1147,82 +632,17 @@ function renderExpenses() {
         renderExpenses();
       }
     };
-    action.appendChild(deleteBtn);
+    deleteCell.appendChild(deleteBtn);
   });
 
-  document.getElementById('expenses').innerText = formatMoney(totalExpense);
-  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total || 0), 0);
-  document.getElementById('expenseTotalSales').innerText = formatMoney(totalSales);
-  document.getElementById('expenseTotal').innerText = formatMoney(totalExpense);
-  document.getElementById('expenseProfit').innerText = formatMoney(totalSales - totalExpense);
+  // Update dashboard stats
+  document.getElementById('expenses').innerText = totalExpense.toFixed(2);
+  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total), 0);
+  document.getElementById('expenseTotalSales').innerText = totalSales.toFixed(2);
+  document.getElementById('expenseTotal').innerText = totalExpense.toFixed(2);
+  document.getElementById('expenseProfit').innerText = (totalSales - totalExpense).toFixed(2);
 }
 
-function editExpense(index) {
-  const e = expenseData[index];
-  if (!e) return;
-  const type = prompt('Edit Expense Type:', e.type || 'General');
-  if (type === null) return;
-  const desc = prompt('Edit Description:', e.desc || '');
-  if (desc === null) return;
-  const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
-  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
-  const paidTo = prompt('Edit Paid To:', e.paidTo || '');
-  if (paidTo === null) return;
-
-  e.type = type || 'General';
-  e.desc = desc || 'No description';
-  e.amount = amount;
-  e.paidTo = paidTo || 'Unknown';
-  // IMPORTANT: editing an expense never changes its recorded date.
-  localStorage.setItem('expenseData', JSON.stringify(expenseData));
-  renderExpenses();
-}
-
-function addExpenseToDailyRecord(dailyIndex) {
-  const d = dailyData[dailyIndex];
-  if (!d) return;
-  if (!Array.isArray(d.expenses)) d.expenses = [];
-
-  const type = prompt('Expense Type:', 'General');
-  if (type === null) return;
-  const desc = prompt('Expense Description:', '');
-  if (desc === null) return;
-  const amount = parseFloat(prompt('Expense Amount:', '0'));
-  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
-  const paidTo = prompt('Paid To:', '');
-  if (paidTo === null) return;
-
-  d.expenses.push({ type: type || 'General', desc: desc || 'No description', amount, paidTo: paidTo || 'Unknown' });
-  recalcDailyRecord(d);
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  renderDailyRecords();
-  editDailyRecord(dailyIndex);
-}
-
-function editDailyExpense(dailyIndex, expenseIndex) {
-  const d = dailyData[dailyIndex];
-  if (!d || !Array.isArray(d.expenses) || !d.expenses[expenseIndex]) return;
-  const e = d.expenses[expenseIndex];
-
-  const type = prompt('Edit Expense Type:', e.type || 'General');
-  if (type === null) return;
-  const desc = prompt('Edit Description:', e.desc || '');
-  if (desc === null) return;
-  const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
-  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
-  const paidTo = prompt('Edit Paid To:', e.paidTo || '');
-  if (paidTo === null) return;
-
-  e.type = type || 'General';
-  e.desc = desc || 'No description';
-  e.amount = amount;
-  e.paidTo = paidTo || 'Unknown';
-  // IMPORTANT: the expense remains under the daily record's original date.
-  recalcDailyRecord(d);
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  renderDailyRecords();
-  editDailyRecord(dailyIndex);
-}
 
 // ====== CLEAR MONTHLY EXPENSES ======
 function clearMonthlyExpenses() {
@@ -1286,238 +706,130 @@ function clearDailyExpenses() {
 }
 
 
-function recalcDailyRecord(d) {
-  if (!d) return;
-  if (!Array.isArray(d.sales)) d.sales = [];
-  if (!Array.isArray(d.expenses)) d.expenses = [];
-  d.totalSales = d.sales.reduce((sum, s) => sum + Number(s.total || 0), 0);
-  d.totalExpenses = d.expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const totalQty = d.sales.reduce((sum, s) => sum + Number(s.qty || 0), 0);
-  d.avgUnitPrice = totalQty ? d.totalSales / totalQty : 0;
-  d.net = d.totalSales - d.totalExpenses;
-}
-
-function dailyTableRows(records, table) {
-  records.forEach(d => {
-    recalcDailyRecord(d);
-    const originalIndex = dailyData.indexOf(d);
-    const totalQty = d.sales.reduce((sum, s) => sum + Number(s.qty || 0), 0);
-    const row = table.insertRow();
-    row.insertCell(0).innerText = d.date;
-    row.insertCell(1).innerText = formatMoney(d.totalSales);
-    row.insertCell(2).innerText = formatMoney(d.totalExpenses);
-    row.insertCell(3).innerText = formatMoney(d.net);
-    row.insertCell(4).innerText = formatMoney(d.avgUnitPrice);
-    row.insertCell(5).innerText = totalQty;
-
-    const viewCell = row.insertCell(6);
-    const viewBtn = document.createElement('button');
-    viewBtn.innerText = 'View';
-    viewBtn.onclick = () => renderDailyRecordInvoice(d);
-    viewCell.appendChild(viewBtn);
-
-    const editCell = row.insertCell(7);
-    const editBtn = document.createElement('button');
-    editBtn.innerText = '✏️ Edit / Add';
-    editBtn.style.background = '#0066cc';
-    editBtn.style.color = '#fff';
-    editBtn.onclick = () => editDailyRecord(originalIndex);
-    editCell.appendChild(editBtn);
-
-    const clearCell = row.insertCell(8);
-    const clearBtn = document.createElement('button');
-    clearBtn.innerText = 'Clear';
-    clearBtn.onclick = () => {
-      if (confirm('Delete this daily record?')) {
-        dailyData.splice(originalIndex, 1);
-        localStorage.setItem('dailyData', JSON.stringify(dailyData));
-        renderDailyRecords();
-      }
-    };
-    clearCell.appendChild(clearBtn);
-  });
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-}
-
 function renderDailyRecords() {
-  const table = document.getElementById('dailyTable');
-  table.innerHTML = `<tr>
-    <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th>
-    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Edit / Add</th><th>Clear</th>
-  </tr>`;
-  dailyTableRows([...dailyData].sort((a,b) => String(b.date).localeCompare(String(a.date))), table);
+    const table = document.getElementById('dailyTable');
+    table.innerHTML = `
+<tr>
+<th>Date</th>
+<th>Total Sales</th>
+<th>Total Expenses</th>
+<th>Net Balance</th>
+<th>Avg Unit Price</th>
+<th>Total Qty</th>
+<th>View</th>
+<th>Clear</th>
+</tr>`;
+
+    const sortedData = [...dailyData].reverse();
+
+    sortedData.forEach((d) => {
+        const index = dailyData.indexOf(d);
+
+        const totalQty = (d.sales || []).reduce((acc, s) => acc + Number(s.qty), 0);
+        const totalSales = Number(d.totalSales) || 0;
+
+        // ✅ FIXED: correct weighted average
+        const avgUnitPrice = totalQty ? (totalSales / totalQty) : 0;
+
+        const row = table.insertRow();
+        row.insertCell(0).innerText = d.date;
+        row.insertCell(1).innerText = formatMoney(d.totalSales);
+        row.insertCell(2).innerText = formatMoney(d.totalExpenses);
+        row.insertCell(3).innerText = formatMoney(d.net);
+
+        // show corrected value (not stored value)
+        row.insertCell(4).innerText = formatMoney(avgUnitPrice);
+
+        row.insertCell(5).innerText = totalQty;
+
+        // View button
+        const viewCell = row.insertCell(6);
+        const viewBtn = document.createElement('button');
+        viewBtn.innerText = 'View';
+        viewBtn.onclick = function() {
+            renderDailyRecordInvoice(d);
+        };
+        viewCell.appendChild(viewBtn);
+
+        // Clear button
+        const clearCell = row.insertCell(7);
+        const clearBtn = document.createElement('button');
+        clearBtn.innerText = 'Clear';
+        clearBtn.onclick = function() {
+            if(confirm('Delete this daily record?')) {
+                dailyData.splice(index, 1);
+                localStorage.setItem('dailyData', JSON.stringify(dailyData));
+                renderDailyRecords();
+            }
+        };
+        clearCell.appendChild(clearBtn);
+    });
 }
 
+
+// ====== FILTER DAILY RECORDS ======
 function filterDailyRecords() {
-  const from = document.getElementById('fromDate').value;
-  const to = document.getElementById('toDate').value;
-  if (!from || !to) { alert('Please select both From and To dates.'); return; }
-  const table = document.getElementById('dailyTable');
-  table.innerHTML = `<tr>
-    <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th>
-    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Edit / Add</th><th>Clear</th>
-  </tr>`;
-  dailyTableRows(dailyData.filter(d => String(d.date) >= from && String(d.date) <= to)
-    .sort((a,b) => String(b.date).localeCompare(String(a.date))), table);
+    const from = document.getElementById('fromDate').value;
+    const to = document.getElementById('toDate').value;
+
+    if (!from || !to) {
+        alert("Please select both From and To dates.");
+        return;
+    }
+
+    const filteredData = dailyData.filter(d => d.date >= from && d.date <= to);
+
+    const table = document.getElementById('dailyTable');
+    table.innerHTML = `
+<tr>
+<th>Date</th>
+<th>Total Sales</th>
+<th>Total Expenses</th>
+<th>Net Balance</th>
+<th>Avg Unit Price</th>
+<th>Total Qty</th>
+<th>View</th>
+<th>Clear</th>
+</tr>`;
+
+    filteredData.forEach(d => {
+        const row = table.insertRow();
+        row.insertCell(0).innerText = d.date;
+        row.insertCell(1).innerText = formatMoney(d.totalSales);
+row.insertCell(2).innerText = formatMoney(d.totalExpenses);
+row.insertCell(3).innerText = formatMoney(d.net);
+row.insertCell(4).innerText = formatMoney(d.avgUnitPrice);
+
+        const totalQty = (d.sales || []).reduce((acc, s) => acc + Number(s.qty), 0);
+        row.insertCell(5).innerText = totalQty;
+
+        // View button
+        const viewCell = row.insertCell(6);
+        const viewBtn = document.createElement('button');
+        viewBtn.innerText = 'View';
+        viewBtn.onclick = function() { renderDailyRecordInvoice(d); };
+        viewCell.appendChild(viewBtn);
+
+        // Clear button
+        const clearCell = row.insertCell(7);
+        const clearBtn = document.createElement('button');
+        clearBtn.innerText = 'Clear';
+        clearBtn.onclick = function() {
+            const originalIndex = dailyData.indexOf(d);
+            if(confirm('Delete this daily record?')) {
+                dailyData.splice(originalIndex, 1);
+                localStorage.setItem('dailyData', JSON.stringify(dailyData));
+                renderDailyRecords();
+            }
+        };
+        clearCell.appendChild(clearBtn);
+    });
 }
 
 function clearFilter() {
-  document.getElementById('fromDate').value = '';
-  document.getElementById('toDate').value = '';
-  renderDailyRecords();
-}
-
-// ==========================================
-// DAILY RECORD EDITOR: SALES + EXPENSES + ADD MORE
-// ==========================================
-function editDailyRecord(dailyIndex) {
-  const d = dailyData[dailyIndex];
-  if (!d) { alert('Daily record not found.'); return; }
-  if (!Array.isArray(d.sales)) d.sales = [];
-  if (!Array.isArray(d.expenses)) d.expenses = [];
-
-  const modal = document.createElement('div');
-  modal.className = 'daily-edit-modal';
-  Object.assign(modal.style, {position:'fixed',top:'0',left:'0',width:'100%',height:'100%',background:'rgba(0,0,0,.65)',zIndex:'9999',display:'flex',alignItems:'center',justifyContent:'center'});
-
-  const content = document.createElement('div');
-  Object.assign(content.style, {background:'#fff',color:'#000',width:'96%',maxWidth:'1100px',maxHeight:'92vh',overflow:'auto',padding:'20px',borderRadius:'10px',boxSizing:'border-box'});
-
-  const salesRows = d.sales.map((s,i)=>`<tr>
-    <td>${s.customer || ''}</td><td>${Number(s.qty||0)}</td><td>₦${formatMoney(s.total)}</td><td>₦${formatMoney(s.paid)}</td><td>₦${formatMoney(s.owing)}</td>
-    <td><button onclick="editOneDailySale(${dailyIndex},${i})">✏️ Edit</button>
-    <button onclick="deleteDailySale(${dailyIndex},${i})" style="background:red;color:#fff">🗑 Delete</button></td>
-  </tr>`).join('') || '<tr><td colspan="6">No sales yet.</td></tr>';
-
-  const expenseRows = d.expenses.map((e,i)=>`<tr>
-    <td>${e.type || ''}</td><td>${e.desc || ''}</td><td>₦${formatMoney(e.amount)}</td><td>${e.paidTo || ''}</td>
-    <td><button onclick="editDailyExpense(${dailyIndex},${i})">✏️ Edit</button>
-    <button onclick="deleteDailyExpense(${dailyIndex},${i})" style="background:red;color:#fff">🗑 Delete</button></td>
-  </tr>`).join('') || '<tr><td colspan="5">No expenses yet.</td></tr>';
-
-  content.innerHTML = `
-    <h2>✏️ Edit / Add Daily Record</h2>
-    <p><strong>DATE:</strong> ${d.date}</p>
-    <p style="color:#0066cc"><strong>This date is locked.</strong> Editing or adding entries here will stay on ${d.date}; it will NOT change to today's date.</p>
-
-    <h3>🛒 SALES</h3>
-    <table style="width:100%;border-collapse:collapse">
-      <tr style="background:#cceeff"><th>Customer</th><th>Qty</th><th>Total</th><th>Paid</th><th>Owing</th><th>Action</th></tr>
-      ${salesRows}
-    </table>
-    <br><button onclick="addSaleToDailyRecord(${dailyIndex})" style="background:#008000;color:#fff">➕ Add More Sale</button>
-
-    <h3>💰 EXPENSES</h3>
-    <table style="width:100%;border-collapse:collapse">
-      <tr style="background:#cceeff"><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Action</th></tr>
-      ${expenseRows}
-    </table>
-    <br><button onclick="addExpenseToDailyRecord(${dailyIndex})" style="background:#008000;color:#fff">➕ Add More Expense</button>
-
-    <hr>
-    <p><strong>Total Sales:</strong> ₦${formatMoney(d.totalSales)} &nbsp; <strong>Total Expenses:</strong> ₦${formatMoney(d.totalExpenses)} &nbsp; <strong>Net:</strong> ₦${formatMoney(d.net)} &nbsp; <strong>Avg Unit:</strong> ₦${formatMoney(d.avgUnitPrice)}</p>
-    <button onclick="this.closest('.daily-edit-modal').remove()" style="background:#555;color:#fff">Close</button>
-  `;
-  modal.appendChild(content);
-  document.body.appendChild(modal);
-}
-
-function addSaleToDailyRecord(dailyIndex) {
-  const d = dailyData[dailyIndex];
-  if (!d) return;
-  if (!Array.isArray(d.sales)) d.sales = [];
-
-  const customer = prompt('Customer Name:', '');
-  if (customer === null) return;
-  const qty = parseFloat(prompt('Quantity:', '10'));
-  if (isNaN(qty) || qty < 0) { alert('Invalid quantity.'); return; }
-  const total = parseFloat(prompt('Total Amount:', '2500'));
-  if (isNaN(total) || total < 0) { alert('Invalid total amount.'); return; }
-  const paid = parseFloat(prompt('Amount Paid:', String(total)));
-  if (isNaN(paid) || paid < 0 || paid > total) { alert('Invalid amount paid.'); return; }
-
-  const owing = total - paid;
-  const sale = {customer: customer || 'Unknown', qty, total, unit: qty ? total/qty : 0, paid, owing};
-  d.sales.push(sale);
-  updateDebtForDailySale(sale, d.date);
-  recalcDailyRecord(d);
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-  renderDailyRecords(); renderDebtors();
-  editDailyRecord(dailyIndex);
-}
-
-function updateDebtForDailySale(sale, recordDate) {
-  if (Number(sale.owing) <= 0 && Number(sale.paid) <= 0) return;
-  const idx = debtData.findIndex(d => String(d.customer).toLowerCase() === String(sale.customer).toLowerCase());
-  if (idx >= 0) {
-    debtData[idx].owing = Number(debtData[idx].owing || 0) + Number(sale.owing || 0);
-    debtData[idx].totalPaid = Number(debtData[idx].totalPaid || 0) + Number(sale.paid || 0);
-  } else {
-    debtData.push({customer:sale.customer, owing:Number(sale.owing||0), totalPaid:Number(sale.paid||0), history:[]});
-  }
-}
-
-function deleteDailySale(dailyIndex, saleIndex) {
-  const d = dailyData[dailyIndex];
-  const s = d && d.sales ? d.sales[saleIndex] : null;
-  if (!s || !confirm('Delete this sale from the daily record?')) return;
-  const idx = debtData.findIndex(x => String(x.customer).toLowerCase() === String(s.customer).toLowerCase());
-  if (idx >= 0) {
-    debtData[idx].owing = Math.max(0, Number(debtData[idx].owing||0) - (Number(s.total||0)-Number(s.paid||0)));
-    debtData[idx].totalPaid = Math.max(0, Number(debtData[idx].totalPaid||0) - Number(s.paid||0));
-    if (debtData[idx].owing <= 0 && debtData[idx].totalPaid <= 0) debtData.splice(idx,1);
-  }
-  d.sales.splice(saleIndex,1); recalcDailyRecord(d);
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-  renderDailyRecords(); renderDebtors(); editDailyRecord(dailyIndex);
-}
-
-function deleteDailyExpense(dailyIndex, expenseIndex) {
-  const d = dailyData[dailyIndex];
-  if (!d || !d.expenses || !confirm('Delete this expense from the daily record?')) return;
-  d.expenses.splice(expenseIndex,1); recalcDailyRecord(d);
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  renderDailyRecords(); editDailyRecord(dailyIndex);
-}
-
-// ==========================================
-// EDIT ONE SALE FROM DAILY RECORD
-// ==========================================
-function editOneDailySale(dailyIndex, saleIndex) {
-  const d = dailyData[dailyIndex];
-  const s = d && d.sales ? d.sales[saleIndex] : null;
-  if (!d || !s) return;
-
-  const oldCustomer = s.customer || 'Unknown';
-  const oldTotal = Number(s.total || 0), oldPaid = Number(s.paid || 0);
-  const oldDebt = oldTotal - oldPaid;
-  const newCustomer = prompt('Edit Customer Name:', oldCustomer); if (newCustomer === null) return;
-  const newQty = parseFloat(prompt('Edit Quantity:', s.qty)); if (isNaN(newQty) || newQty < 0) return alert('Invalid quantity.');
-  const newTotal = parseFloat(prompt('Edit Total Amount:', oldTotal)); if (isNaN(newTotal) || newTotal < 0) return alert('Invalid total.');
-  const newPaid = parseFloat(prompt('Edit Amount Paid:', oldPaid)); if (isNaN(newPaid) || newPaid < 0 || newPaid > newTotal) return alert('Invalid amount paid.');
-  const newOwing = newTotal - newPaid;
-
-  const idx = debtData.findIndex(x => String(x.customer).toLowerCase() === oldCustomer.toLowerCase());
-  if (idx >= 0) {
-    debtData[idx].owing = Math.max(0, Number(debtData[idx].owing||0) - oldDebt);
-    debtData[idx].totalPaid = Math.max(0, Number(debtData[idx].totalPaid||0) - oldPaid);
-    if (debtData[idx].owing <= 0 && debtData[idx].totalPaid <= 0) debtData.splice(idx,1);
-  }
-  if (newOwing > 0 || newPaid > 0) {
-    const ni = debtData.findIndex(x => String(x.customer).toLowerCase() === String(newCustomer).toLowerCase());
-    if (ni >= 0) { debtData[ni].owing += newOwing; debtData[ni].totalPaid += newPaid; }
-    else debtData.push({customer:newCustomer, owing:newOwing, totalPaid:newPaid, history:[]});
-  }
-
-  s.customer = newCustomer; s.qty = newQty; s.total = newTotal; s.paid = newPaid;
-  s.unit = newQty ? newTotal/newQty : 0; s.owing = newOwing;
-  recalcDailyRecord(d);
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-  renderDailyRecords(); renderDebtors(); renderSalesTable(); updateCustomerSuggestions();
-  editDailyRecord(dailyIndex);
+    document.getElementById('fromDate').value = '';
+    document.getElementById('toDate').value = '';
+    renderDailyRecords();
 }
 
 // ====== RENDER DAILY RECORD INVOICE ======
@@ -1529,7 +841,7 @@ function renderDailyRecordInvoice(d) {
     const win = window.open('', '', 'width=600,height=800');
     if (!win) { alert("Pop-up blocked! Please allow pop-ups for this site."); return; }
 
-    const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+    const totalQty = (d.sales || []).reduce((acc, s) => acc + Number(s.qty), 0);
 
     for (let i = 0; i < copies; i++) {
         const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
@@ -1549,7 +861,7 @@ function renderDailyRecordInvoice(d) {
                 </tr>
         `);
 
-        d.sales.forEach(s => {
+        (d.sales || []).forEach(s => {
             win.document.write(`
                 <tr>
                     <td>${s.customer}</td>
@@ -1571,7 +883,7 @@ function renderDailyRecordInvoice(d) {
                 <tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>
         `);
 
-        d.expenses.forEach(e => {
+        (d.expenses || []).forEach(e => {
             win.document.write(`
                 <tr>
                     <td>${e.type}</td>
@@ -1598,31 +910,39 @@ function renderDailyRecordInvoice(d) {
     win.close();
 }
 function endOfDay() {
-  if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const chosenDate = prompt('Enter the DATE for this record (YYYY-MM-DD):', todayStr);
-  if (!chosenDate) return;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) { alert('Use YYYY-MM-DD.'); return; }
+  if(!confirm("Close the day? Today's sales and expenses will be archived.")) return;
+  const todayStr=new Date().toISOString().split('T')[0];
+  const chosenDate=prompt("Confirm date for End of Day record (YYYY-MM-DD):",todayStr);
+  if(!chosenDate) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)){alert('Invalid date. Please use YYYY-MM-DD.');return;}
 
-  // Use the selected date exactly. If the date is yesterday, it stays yesterday.
-  // If a record already exists for that date, merge into it instead of creating a duplicate date.
-  let d = dailyData.find(x => x.date === chosenDate);
-  if (!d) {
-    d = {date:chosenDate, totalSales:0, totalExpenses:0, net:0, avgUnitPrice:0, sales:[], expenses:[]};
-    dailyData.push(d);
-  }
-  if (!Array.isArray(d.sales)) d.sales = [];
-  if (!Array.isArray(d.expenses)) d.expenses = [];
+  const totalSales=salesData.reduce((a,s)=>a+Number(s.total||0),0);
+  const totalExpenses=expenseData.reduce((a,e)=>a+Number(e.amount||0),0);
+  const totalQty=salesData.reduce((a,s)=>a+Number(s.qty||0),0);
+  const avgUnitPrice=totalQty?totalSales/totalQty:0;
 
-  salesData.forEach(s => d.sales.push({customer:s.customer, qty:Number(s.qty||0), total:Number(s.total||0), unit:Number(s.unit||0), paid:Number(s.paid||0), owing:Number(s.owing||0)}));
-  expenseData.forEach(e => d.expenses.push({type:e.type, desc:e.desc, amount:Number(e.amount||0), paidTo:e.paidTo}));
-  recalcDailyRecord(d);
+  // Use the selected End-of-Day date for every new debt created by these sales.
+  salesData.forEach(sale=>{
+    if(Number(sale.total||0)-Number(sale.paid||0)<=0) return;
+    const debtor=debtData.find(d=>d.customer.toLowerCase()===sale.customer.toLowerCase());
+    if(!debtor||!Array.isArray(debtor.history)) return;
+    const h=debtor.history.find(x=>x.type==='debt'&&x.saleId===sale.id);
+    if(h) h.date=chosenDate;
+  });
 
-  localStorage.setItem('dailyData', JSON.stringify(dailyData));
-  salesData = []; expenseData = [];
+  const record={date:chosenDate,totalSales,totalExpenses,net:totalSales-totalExpenses,avgUnitPrice,
+    sales:salesData.map(s=>({id:s.id,customer:s.customer,qty:Number(s.qty),total:Number(s.total),unit:Number(s.unit),paid:Number(s.paid),owing:Number(s.owing),prevDebt:Number(s.prevDebt||0),date:chosenDate,time:s.time||''})),
+    expenses:expenseData.map(e=>({type:e.type,desc:e.desc,amount:Number(e.amount),paidTo:e.paidTo}))};
+
+  const existingIndex=dailyData.findIndex(d=>d.date===chosenDate);
+  if(existingIndex>=0) dailyData[existingIndex]=record; else dailyData.push(record);
+  localStorage.setItem('dailyData',JSON.stringify(dailyData));
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+
+  salesData=[]; expenseData=[];
   localStorage.setItem('salesData','[]'); localStorage.setItem('expenseData','[]');
-  renderSalesTable(); renderExpenses(); renderDailyRecords();
-  alert('End of day completed! Record saved under ' + chosenDate + '.');
+  renderSalesTable(); renderExpenses(); renderDebtors(); renderDailyRecords();
+  alert('End of day completed! Record saved for '+chosenDate+' and debt dates now use this End-of-Day date.');
 }
 
 // ====== BAR CHART (TOP BUYING CUSTOMERS - TOTAL QUANTITIES) ======
@@ -1667,93 +987,35 @@ function renderChart() {
 
 // ====== EDIT SALE FUNCTION ======
 function editSale(index){
+  const s=salesData[index]; if(!s) return;
+  const oldCustomer=s.customer, oldDebt=Math.max(0,Number(s.total||0)-Number(s.paid||0)), oldPaid=Number(s.paid||0);
+  const newCustomer=prompt('Edit Customer Name:',s.customer); if(newCustomer===null)return;
+  const newQty=parseFloat(prompt('Edit Quantity:',s.qty)); if(isNaN(newQty))return;
+  const newTotal=parseFloat(prompt('Edit Total Amount:',s.total)); if(isNaN(newTotal))return;
+  const newPaid=parseFloat(prompt('Edit Amount Paid:',s.paid)); if(isNaN(newPaid))return;
+  const customer=newCustomer.trim()||oldCustomer, newDebt=Math.max(0,newTotal-newPaid), saleId=s.id||('S'+Date.now()+Math.random().toString(36).slice(2,8));
 
-  const s = salesData[index];
-
-  // STORE OLD VALUES
-  const oldCustomer = s.customer;
-  const oldDebt = Number(s.total) - Number(s.paid);
-
-  const newCustomer = prompt("Edit Customer Name:", s.customer);
-  if(newCustomer === null) return;
-
-  const newQty = parseFloat(prompt("Edit Quantity:", s.qty));
-  if(isNaN(newQty)) return;
-
-  const newTotal = parseFloat(prompt("Edit Total Amount:", s.total));
-  if(isNaN(newTotal)) return;
-
-  const newPaid = parseFloat(prompt("Edit Amount Paid:", s.paid));
-  if(isNaN(newPaid)) return;
-
-  const newUnit = newQty ? (newTotal / newQty).toFixed(2) : 0;
-  const newOwing = (newTotal - newPaid).toFixed(2);
-
-  // REMOVE OLD DEBT FROM debtData
-  const oldDebtIndex = debtData.findIndex(
-    d => d.customer.toLowerCase() === oldCustomer.toLowerCase()
-  );
-
-  if (oldDebtIndex >= 0) {
-
-    debtData[oldDebtIndex].owing -= oldDebt;
-    debtData[oldDebtIndex].totalPaid -= Number(s.paid);
-
-    if (debtData[oldDebtIndex].owing < 0) {
-      debtData[oldDebtIndex].owing = 0;
-    }
-
-    if (debtData[oldDebtIndex].totalPaid < 0) {
-      debtData[oldDebtIndex].totalPaid = 0;
-    }
-
-    // REMOVE CUSTOMER IF CLEARED
-    if (debtData[oldDebtIndex].owing <= 0) {
-      debtData.splice(oldDebtIndex, 1);
-    }
+  const oldIdx=debtData.findIndex(d=>d.customer.toLowerCase()===oldCustomer.toLowerCase());
+  if(oldIdx>=0){
+    debtData[oldIdx].owing=Math.max(0,Number(debtData[oldIdx].owing||0)-oldDebt);
+    debtData[oldIdx].totalPaid=Math.max(0,Number(debtData[oldIdx].totalPaid||0)-oldPaid);
+    if(Array.isArray(debtData[oldIdx].history)) debtData[oldIdx].history=debtData[oldIdx].history.filter(h=>!(h.type==='debt'&&h.saleId===saleId));
+    if(debtData[oldIdx].owing<=0) debtData.splice(oldIdx,1);
   }
 
-  // UPDATE SALE
-  s.customer = newCustomer;
-  s.qty = newQty;
-  s.total = newTotal;
-  s.paid = newPaid;
-  s.unit = parseFloat(newUnit);
-  s.owing = parseFloat(newOwing);
+  s.id=saleId; s.customer=customer; s.qty=newQty; s.total=newTotal; s.paid=newPaid; s.unit=newQty?Number((newTotal/newQty).toFixed(2)):0; s.owing=newDebt;
 
-  // ADD NEW DEBT
-  const newDebt = newTotal - newPaid;
-
-  if (newDebt > 0) {
-
-    const newDebtIndex = debtData.findIndex(
-      d => d.customer.toLowerCase() === newCustomer.toLowerCase()
-    );
-
-    if (newDebtIndex >= 0) {
-
-      debtData[newDebtIndex].owing += newDebt;
-      debtData[newDebtIndex].totalPaid += newPaid;
-
-    } else {
-
-      debtData.push({
-        customer: newCustomer,
-        owing: newDebt,
-        totalPaid: newPaid
-      });
-
-    }
+  if(newDebt>0){
+    let idx=debtData.findIndex(d=>d.customer.toLowerCase()===customer.toLowerCase());
+    if(idx<0){debtData.push({customer,owing:0,totalPaid:0,history:[]});idx=debtData.length-1;}
+    if(!Array.isArray(debtData[idx].history))debtData[idx].history=[];
+    const archived=dailyData.find(day=>(day.sales||[]).some(x=>x.id===saleId));
+    const before=Number(debtData[idx].owing||0);
+    debtData[idx].history.push({saleId,type:'debt',date:archived?archived.date:null,time:s.time||new Date().toLocaleTimeString('en-GB'),amount:newDebt,balanceBefore:before,balanceAfter:before+newDebt});
+    debtData[idx].owing=before+newDebt; debtData[idx].totalPaid=Number(debtData[idx].totalPaid||0)+newPaid;
   }
-
-  // SAVE
-  localStorage.setItem('salesData', JSON.stringify(salesData));
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-
-  // REFRESH
-  renderSalesTable();
-  renderDebtors();
-  updateCustomerSuggestions();
+  localStorage.setItem('salesData',JSON.stringify(salesData)); localStorage.setItem('debtData',JSON.stringify(debtData));
+  renderSalesTable(); renderDebtors(); updateCustomerSuggestions();
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
@@ -1838,7 +1100,7 @@ function printMonthlyStatement() {
     totalNet += Number(d.net) || 0;
 
     if (d.sales) {
-      d.sales.forEach(s => {
+      (d.sales || []).forEach(s => {
         totalQty += s.qty;
         unitSum += Number(s.unit) || 0;
         unitCount++;
@@ -1846,7 +1108,7 @@ function printMonthlyStatement() {
     }
 
     if (d.expenses) {
-      d.expenses.forEach(e => {
+      (d.expenses || []).forEach(e => {
         const amount = Number(e.amount) || 0;
         const type = (e.type || "").toLowerCase().trim();
         const desc = (e.desc || "").toLowerCase().trim();
@@ -2302,92 +1564,46 @@ function printWeeklyStatement() {
 
 
 
-// ==========================================
-// PERMANENT CUSTOMER SUGGESTIONS
-// Customers are saved even after End Of Day
-// ==========================================
-
-let customerData =
-JSON.parse(localStorage.getItem('customerData')) || [];
-
-
-// ==========================================
-// SAVE CUSTOMER NAME
-// ==========================================
-
-function saveCustomerSuggestion(name) {
-
-    if (!name) return;
-
-    name = name.trim();
-
-    if (!name) return;
-
-    // Check if customer already exists
-    const exists = customerData.some(
-        customer =>
-            customer.toLowerCase() === name.toLowerCase()
-    );
-
-    if (!exists) {
-
-        customerData.push(name);
-
-        localStorage.setItem(
-            'customerData',
-            JSON.stringify(customerData)
-        );
-    }
-}
-
-
-// ==========================================
-// UPDATE CUSTOMER SUGGESTIONS
-// ==========================================
-
 function updateCustomerSuggestions() {
+  const list = document.getElementById('customerList');
+  if (!list) return;
 
-    const list =
-        document.getElementById('customerList');
+  const names = new Set();
 
-    if (!list) return;
+  // collect names from sales
+  salesData.forEach(s => {
+    if (s.customer) names.add(s.customer);
+  });
 
-    // Save customers currently appearing in sales
-    salesData.forEach(s => {
+  // collect names from debtors
+  debtData.forEach(d => {
+    if (d.customer) names.add(d.customer);
+  });
 
-        if (s.customer) {
-            saveCustomerSuggestion(s.customer);
-        }
-
-    });
-
-
-    // Save customers currently appearing in debtors
-    debtData.forEach(d => {
-
-        if (d.customer) {
-            saveCustomerSuggestion(d.customer);
-        }
-
-    });
-
-
-    // Clear suggestion list
-    list.innerHTML = '';
-
-
-    // Add all permanently saved customers
-    customerData.forEach(name => {
-
-        const opt =
-            document.createElement('option');
-
-        opt.value = name;
-
-        list.appendChild(opt);
-
-    });
+  list.innerHTML = '';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    list.appendChild(opt);
+  });
 }
+
+// ====== MIGRATE OLD DEBT DATA ======
+function migrateDebtHistory(){
+  let changed=false;
+  debtData.forEach(d=>{if(!Array.isArray(d.history)){d.history=[];changed=true;}});
+  dailyData.forEach(day=>{
+    (day.sales||[]).forEach(s=>{
+      const debt=Number(s.total||0)-Number(s.paid||0); if(debt<=0)return;
+      const d=debtData.find(x=>x.customer.toLowerCase()===String(s.customer||'').toLowerCase()); if(!d)return;
+      if(!d.history.some(h=>h.type==='debt'&&h.date===day.date&&Math.abs(Number(h.amount||0)-debt)<0.01)){
+        d.history.push({saleId:s.id||null,type:'debt',date:day.date,time:s.time||'',amount:debt,balanceBefore:0,balanceAfter:0}); changed=true;
+      }
+    });
+  });
+  if(changed)localStorage.setItem('debtData',JSON.stringify(debtData));
+}
+migrateDebtHistory();
 
 // ====== INIT ======
 renderSalesTable();
