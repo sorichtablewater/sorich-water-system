@@ -80,9 +80,9 @@ body.dark-mode th {background-color:#003366;}
 </label>
 <datalist id="customerList"></datalist>
 
-<label>Qty: <input type="number" id="saleQty" value="10"></label>
-<label>Total Amount: <input type="number" id="saleTotal" value="2500"></label>
-<label>Amount Paid: <input type="number" id="salePaid" value="2000"></label>
+<label>Qty: <input type="number" id="saleQty" value="10" min="1"></label>
+<label>Total Amount: <input type="number" id="saleTotal" value="2500" min="0.01"></label>
+<label>Amount Paid: <input type="number" id="salePaid" value="2500" min="0"></label>
 <label>Previous Debt: <input type="number" id="salePrevDebt" value="0"></label> <!-- NEW FIELD -->
 <p>Unit Price: ₦<span id="saleUnitPrice">0</span> | Owing: ₦<span id="saleOwing">0</span></p>
 <button onclick="addSale()">Add Sale</button>
@@ -319,85 +319,130 @@ const saleQty = document.getElementById('saleQty'),
       salePrevDebt = document.getElementById('salePrevDebt'); // NEW
 
 function updateSaleCalc(){
-  const q = parseFloat(saleQty.value) || 0,
-        t = parseFloat(saleTotal.value) || 0,
-        p = parseFloat(salePaid.value) || 0,
-        prevDebt = parseFloat(salePrevDebt.value) || 0; // NEW
+  const q = parseFloat(saleQty.value) || 0;
+  const t = parseFloat(saleTotal.value) || 0;
+  const p = parseFloat(salePaid.value) || 0;
+  const prevDebt = parseFloat(salePrevDebt.value) || 0;
 
-  document.getElementById('saleUnitPrice').innerText = q ? (t/q).toFixed(2) : 0;
-  document.getElementById('saleOwing').innerText = (t - p + prevDebt).toFixed(2); // UPDATED
+  document.getElementById('saleUnitPrice').innerText = q ? (t/q).toFixed(2) : '0.00';
+  document.getElementById('saleOwing').innerText = (t - p + prevDebt).toFixed(2);
 }
 
-// add event listeners including Previous Debt input
-[saleQty, saleTotal, salePaid, salePrevDebt].forEach(e => e.addEventListener('input', updateSaleCalc));
-updateSaleCalc();
+// Total amount starts equal to Amount Paid.
+// Once the user changes Amount Paid manually, it is left under the user's control.
+let salePaidManuallyChanged = false;
+
+saleTotal.addEventListener('input', () => {
+  if (!salePaidManuallyChanged) salePaid.value = saleTotal.value;
+  updateSaleCalc();
+});
+
+salePaid.addEventListener('input', () => {
+  salePaidManuallyChanged = true;
+  updateSaleCalc();
+});
+
+[saleQty, salePrevDebt].forEach(e => e.addEventListener('input', updateSaleCalc));
+
+// Save every new customer name immediately as it is typed.
+// This means the suggestion remains available even before a sale is added.
+document.getElementById('saleCustomer').addEventListener('input', function(){
+  const name = this.value.trim();
+  if (name) {
+    saveCustomerSuggestion(name);
+    updateCustomerSuggestions();
+  }
+  prefillOwing();
+});
 
 function prefillOwing(){
-  const name = document.getElementById('saleCustomer').value;
-  const debt = debtData.find(d => d.customer.toLowerCase() === name.toLowerCase());
-  if(debt) { 
-    const total = parseFloat(saleTotal.value) || 0; 
-    salePaid.value = total - debt.owing; 
-    salePrevDebt.value = debt.owing; // NEW: auto-fill previous debt if customer exists
+  const name = document.getElementById('saleCustomer').value.trim();
+  const debt = debtData.find(d =>
+    String(d.customer || '').trim().toLowerCase() === name.toLowerCase()
+  );
+
+  if(debt) {
+    const total = parseFloat(saleTotal.value) || 0;
+    const currentDebt = Number(debt.owing || 0);
+
+    // Keep the old debt separate. The new sale starts fully paid unless
+    // the user changes Amount Paid.
+    salePrevDebt.value = currentDebt;
+    if (!salePaidManuallyChanged) salePaid.value = total;
+  } else {
+    salePrevDebt.value = 0;
+    if (!salePaidManuallyChanged) salePaid.value = saleTotal.value;
   }
+
   updateSaleCalc();
 }
 
 function addSale(){
- const customer = document.getElementById('saleCustomer').value || 'Unknown';
+  const customer = document.getElementById('saleCustomer').value.trim();
+  const qty = parseFloat(saleQty.value);
+  const total = parseFloat(saleTotal.value);
+  const paid = parseFloat(salePaid.value);
+  const prevDebt = parseFloat(salePrevDebt.value) || 0;
 
-saveCustomerSuggestion(customer);
+  // HARD VALIDATION: no blank/empty sales.
+  if (!customer) {
+    alert('Sales is blank. Please enter a customer name.');
+    document.getElementById('saleCustomer').focus();
+    return;
+  }
+  if (!Number.isFinite(qty) || qty <= 0) {
+    alert('Sales is blank or quantity is invalid. Please enter a quantity greater than 0.');
+    saleQty.focus();
+    return;
+  }
+  if (!Number.isFinite(total) || total <= 0) {
+    alert('Sales is blank. Please enter a Total Amount greater than 0.');
+    saleTotal.focus();
+    return;
+  }
+  if (!Number.isFinite(paid) || paid < 0 || paid > total) {
+    alert('Please enter a valid Amount Paid between ₦0.00 and the Total Amount.');
+    salePaid.focus();
+    return;
+  }
 
-const qty = parseFloat(saleQty.value) || 0;
-const total = parseFloat(saleTotal.value) || 0;
-const paid = parseFloat(salePaid.value) || 0;
-const prevDebt = parseFloat(salePrevDebt.value) || 0;
+  saveCustomerSuggestion(customer);
 
-  // Include previous debt in owing
-  const unit = qty ? (total / qty).toFixed(2) : 0;
-  const owing = (total - paid + prevDebt).toFixed(2);
+  const unit = total / qty;
+  const owing = total - paid;
 
-  // Current date and time
   const now = new Date();
   const debtDate = now.toLocaleDateString('en-GB');
   const debtTime = now.toLocaleTimeString('en-GB');
-
-  // ID links this sale to its debt-history entry. The actual debt date
-  // will be corrected to the End Of Day date when the day is closed.
   const debtHistoryId = Date.now() + '-' + Math.random().toString(36).slice(2);
 
-  // Push to sales data
   salesData.push({
     customer,
     qty,
     total,
-    unit: parseFloat(unit),
+    unit,
     paid,
-    owing: parseFloat(owing),
+    owing,
     prevDebt: prevDebt,
     date: debtDate,
     time: debtTime,
-    debtHistoryId: debtHistoryId
+    debtHistoryId
   });
 
   // ===== UPDATE DEBT DATA =====
   const debtIndex = debtData.findIndex(
-    d => d.customer.toLowerCase() === customer.toLowerCase()
+    d => String(d.customer || '').toLowerCase() === customer.toLowerCase()
   );
 
-  // ONLY the new debt from this sale
   const newDebt = total - paid;
 
   if (debtIndex >= 0) {
-
-    // Make sure old debtor has a history array
     if (!Array.isArray(debtData[debtIndex].history)) {
       debtData[debtIndex].history = [];
     }
 
-    const oldBalance = Number(debtData[debtIndex].owing);
+    const oldBalance = Number(debtData[debtIndex].owing || 0);
 
-    // Add this particular day's debt to history
     if (newDebt > 0) {
       debtData[debtIndex].history.push({
         type: 'debt',
@@ -410,67 +455,43 @@ const prevDebt = parseFloat(salePrevDebt.value) || 0;
       });
     }
 
-    // Add new debt to customer's total balance
-    debtData[debtIndex].owing =
-      oldBalance + Number(newDebt);
-
-    // Add payment to total paid
+    debtData[debtIndex].owing = oldBalance + Number(newDebt);
     debtData[debtIndex].totalPaid =
-      Number(debtData[debtIndex].totalPaid) + Number(paid);
+      Number(debtData[debtIndex].totalPaid || 0) + Number(paid);
 
-  } else {
-
-    // Create new debtor only if owing exists
-    if (newDebt > 0) {
-
-      debtData.push({
-        customer,
-        owing: Number(newDebt),
-        totalPaid: Number(paid),
-
-        // Store every debt separately
-        history: [
-          {
-            type: 'debt',
-            saleId: debtHistoryId,
-            date: debtDate,
-            time: debtTime,
-            amount: Number(newDebt),
-            balanceBefore: 0,
-            balanceAfter: Number(newDebt)
-          }
-        ]
-      });
-
-    }
+  } else if (newDebt > 0) {
+    debtData.push({
+      customer,
+      owing: Number(newDebt),
+      totalPaid: Number(paid),
+      history: [{
+        type: 'debt',
+        saleId: debtHistoryId,
+        date: debtDate,
+        time: debtTime,
+        amount: Number(newDebt),
+        balanceBefore: 0,
+        balanceAfter: Number(newDebt)
+      }]
+    });
   }
 
-  // Re-render tables
+  localStorage.setItem('salesData', JSON.stringify(salesData));
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+
   renderSalesTable();
   renderDebtors();
   updateCustomerSuggestions();
 
-  // Reset form
+  // Reset: Total Amount and Amount Paid start equal again.
   document.getElementById('saleCustomer').value = '';
   saleQty.value = 10;
   saleTotal.value = 2500;
-  salePaid.value = 2000;
+  salePaid.value = 2500;
   salePrevDebt.value = 0;
-
+  salePaidManuallyChanged = false;
   updateSaleCalc();
-
-  // Save to localStorage
-  localStorage.setItem(
-    'salesData',
-    JSON.stringify(salesData)
-  );
-
-  localStorage.setItem(
-    'debtData',
-    JSON.stringify(debtData)
-  );
 }
-
 
 function renderSalesTable(){
   const table=document.getElementById('salesTable');
@@ -717,180 +738,113 @@ function renderDebtors() {
 // SHOW DEBT HISTORY
 // ==========================================
 function showDebtHistory(index) {
-
   const d = debtData[index];
-
   if (!d) return;
 
-  // Make sure history exists
-  if (!Array.isArray(d.history)) {
-    d.history = [];
-  }
+  if (!Array.isArray(d.history)) d.history = [];
 
-  let historyRows = '';
+  // Group all debt/payment movements by the actual recorded date.
+  // Each row shows what was added, what was paid, and the balance owed
+  // after that day's activity.
+  const grouped = {};
 
-  if (d.history.length === 0) {
+  d.history.forEach(h => {
+    const date = h.date || '-';
+    if (!grouped[date]) {
+      grouped[date] = {
+        date,
+        debtAdded: 0,
+        payment: 0,
+        balance: 0,
+        firstTime: h.time || '00:00:00'
+      };
+    }
 
+    if (h.type === 'debt') grouped[date].debtAdded += Number(h.amount || 0);
+    if (h.type === 'payment') grouped[date].payment += Number(h.amount || 0);
+
+    grouped[date].balance = Number(h.balanceAfter || grouped[date].balance || 0);
+
+    if (h.time && h.time < grouped[date].firstTime) {
+      grouped[date].firstTime = h.time;
+    }
+  });
+
+  const rows = Object.values(grouped).sort((a,b) => {
+    const parseDate = value => {
+      const parts = String(value).split('/');
+      if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      return String(value);
+    };
+    return parseDate(a.date).localeCompare(parseDate(b.date));
+  });
+
+  let historyRows = rows.map(r => `
+    <tr>
+      <td style="padding:8px;border:1px solid #ccc;">${r.date}</td>
+      <td style="padding:8px;border:1px solid #ccc;">₦${formatMoney(r.debtAdded)}</td>
+      <td style="padding:8px;border:1px solid #ccc;">₦${formatMoney(r.payment)}</td>
+      <td style="padding:8px;border:1px solid #ccc;font-weight:bold;">₦${formatMoney(r.balance)}</td>
+    </tr>
+  `).join('');
+
+  if (!historyRows) {
     historyRows = `
       <tr>
-        <td colspan="5"
-            style="text-align:center;padding:15px;">
+        <td colspan="4" style="text-align:center;padding:15px;">
           No debt history available.
         </td>
-      </tr>
-    `;
-
-  } else {
-
-    d.history.forEach(h => {
-
-      let typeText = '';
-      let amountText = '';
-
-      if (h.type === 'debt') {
-
-        typeText = '🔴 Debt Added';
-
-        amountText =
-          '+ ₦' + formatMoney(h.amount);
-
-      } else if (h.type === 'payment') {
-
-        typeText = '💰 Payment';
-
-        amountText =
-          '- ₦' + formatMoney(h.amount);
-
-      }
-
-      historyRows += `
-        <tr>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${h.date || '-'}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${h.time || '-'}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${typeText}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ${amountText}
-          </td>
-
-          <td style="padding:8px;border:1px solid #ccc;">
-            ₦${formatMoney(h.balanceAfter || 0)}
-          </td>
-
-        </tr>
-      `;
-
-    });
-
+      </tr>`;
   }
 
-
-  // Create history window
   const modal = document.createElement('div');
-
   modal.className = 'debt-history-modal';
 
-  modal.style.position = 'fixed';
-  modal.style.top = '0';
-  modal.style.left = '0';
-  modal.style.width = '100%';
-  modal.style.height = '100%';
-  modal.style.background = 'rgba(0,0,0,0.65)';
-  modal.style.zIndex = '9999';
-  modal.style.display = 'flex';
-  modal.style.alignItems = 'center';
-  modal.style.justifyContent = 'center';
-
+  Object.assign(modal.style, {
+    position:'fixed', top:'0', left:'0', width:'100%', height:'100%',
+    background:'rgba(0,0,0,0.65)', zIndex:'9999', display:'flex',
+    alignItems:'center', justifyContent:'center'
+  });
 
   modal.innerHTML = `
-
     <div style="
-      background:#fff;
-      color:#000;
-      width:90%;
-      max-width:900px;
-      max-height:90vh;
-      overflow:auto;
-      padding:20px;
-      border-radius:10px;
+      background:#fff;color:#000;width:92%;max-width:900px;
+      max-height:90vh;overflow:auto;padding:20px;border-radius:10px;
       box-sizing:border-box;
     ">
-
-      <h2>
-        📅 Debt History - ${d.customer}
-      </h2>
+      <h2>📅 Debt History - ${d.customer}</h2>
 
       <p>
-        <strong>Current Balance:</strong>
+        <strong>Current Amount Owed:</strong>
         ₦${formatMoney(d.owing)}
       </p>
 
-      <table style="
-        width:100%;
-        border-collapse:collapse;
-        margin-top:15px;
-      ">
+      <p style="color:#0066cc;">
+        <strong>Daily history:</strong> each date shows the debt added,
+        payment made, and the amount still owed after that day's activity.
+      </p>
 
+      <table style="width:100%;border-collapse:collapse;margin-top:15px;">
         <tr style="background:#eee;">
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Date
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Time
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Type
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Amount
-          </th>
-
-          <th style="padding:8px;border:1px solid #ccc;">
-            Balance
-          </th>
-
+          <th style="padding:8px;border:1px solid #ccc;">Date Owed</th>
+          <th style="padding:8px;border:1px solid #ccc;">Debt Added</th>
+          <th style="padding:8px;border:1px solid #ccc;">Payment</th>
+          <th style="padding:8px;border:1px solid #ccc;">Amount Owed After Date</th>
         </tr>
-
         ${historyRows}
-
       </table>
 
       <br>
-
       <button
-        style="
-          background:#0066cc;
-          color:white;
-          border:none;
-          padding:10px 20px;
-          border-radius:5px;
-          cursor:pointer;
-        "
-        onclick="this.closest('.debt-history-modal').remove()"
-      >
+        style="background:#0066cc;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;"
+        onclick="this.closest('.debt-history-modal').remove()">
         Close
       </button>
-
     </div>
-
   `;
 
   document.body.appendChild(modal);
 }
-
 
 // ==========================================
 // PAY DEBT
@@ -1105,21 +1059,48 @@ function printInvoice(sale){
 
 // ====== ADD EXPENSE ======
 function addExpense() {
-  const type = document.getElementById('expenseType').value || 'General';
-  const desc = document.getElementById('expenseDesc').value || 'No description';
-  const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
-  const paidTo = document.getElementById('expensePaidTo').value || 'Unknown';
+  const typeEl = document.getElementById('expenseType');
+  const descEl = document.getElementById('expenseDesc');
+  const amountEl = document.getElementById('expenseAmount');
+  const paidToEl = document.getElementById('expensePaidTo');
+
+  const type = typeEl.value.trim();
+  const desc = descEl.value.trim();
+  const amount = parseFloat(amountEl.value);
+  const paidTo = paidToEl.value.trim();
+
+  // ONLY TYPE AND AMOUNT ARE REQUIRED.
+  // Description and Paid To may be left empty.
+  if (!type) {
+    alert('Expense Type is blank. Please enter the expense type.');
+    typeEl.focus();
+    return;
+  }
+
+  if (amountEl.value.trim() === '' || isNaN(amount) || amount <= 0) {
+    alert('Expense Amount is blank or invalid. Please enter an amount greater than 0.');
+    amountEl.focus();
+    return;
+  }
+
   const date = new Date().toLocaleString();
 
-  expenseData.push({ type, desc, amount, paidTo, date });
+  expenseData.push({
+    type,
+    desc: desc || '',
+    amount,
+    paidTo: paidTo || '',
+    date
+  });
+
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
 
-  // Clear form
-  document.getElementById('expenseType').value = '';
-  document.getElementById('expenseDesc').value = '';
-  document.getElementById('expenseAmount').value = '';
-  document.getElementById('expensePaidTo').value = '';
+  typeEl.value = '';
+  descEl.value = '';
+  amountEl.value = '';
+  paidToEl.value = '';
+  typeEl.focus();
 }
 
 // ====== RENDER EXPENSES WITH EDIT + ADD + DELETE ======
@@ -1170,19 +1151,28 @@ function renderExpenses() {
 function editExpense(index) {
   const e = expenseData[index];
   if (!e) return;
-  const type = prompt('Edit Expense Type:', e.type || 'General');
+  const type = prompt('Edit Expense Type:', e.type || '');
   if (type === null) return;
+  if (!type.trim()) { alert('Expense Type cannot be blank.'); return; }
+
   const desc = prompt('Edit Description:', e.desc || '');
   if (desc === null) return;
+  if (!desc.trim()) { alert('Expense Description cannot be blank.'); return; }
+
   const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
-  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert('Expense Amount must be greater than ₦0.00.');
+    return;
+  }
+
   const paidTo = prompt('Edit Paid To:', e.paidTo || '');
   if (paidTo === null) return;
+  if (!paidTo.trim()) { alert('Paid To cannot be blank.'); return; }
 
-  e.type = type || 'General';
-  e.desc = desc || 'No description';
+  e.type = type.trim();
+  e.desc = desc.trim();
   e.amount = amount;
-  e.paidTo = paidTo || 'Unknown';
+  e.paidTo = paidTo.trim();
   // IMPORTANT: editing an expense never changes its recorded date.
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
@@ -1193,16 +1183,42 @@ function addExpenseToDailyRecord(dailyIndex) {
   if (!d) return;
   if (!Array.isArray(d.expenses)) d.expenses = [];
 
-  const type = prompt('Expense Type:', 'General');
+  const type = prompt('Expense Type:', '');
   if (type === null) return;
+  if (!type.trim()) {
+    alert('Expense is blank. Expense Type is required.');
+    return;
+  }
+
   const desc = prompt('Expense Description:', '');
   if (desc === null) return;
-  const amount = parseFloat(prompt('Expense Amount:', '0'));
-  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
+  if (!desc.trim()) {
+    alert('Expense is blank. Description is required.');
+    return;
+  }
+
+  const amountRaw = prompt('Expense Amount:', '');
+  if (amountRaw === null) return;
+  const amount = parseFloat(amountRaw);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert('Expense is blank. Amount must be greater than ₦0.00.');
+    return;
+  }
+
   const paidTo = prompt('Paid To:', '');
   if (paidTo === null) return;
+  if (!paidTo.trim()) {
+    alert('Expense is blank. Paid To is required.');
+    return;
+  }
 
-  d.expenses.push({ type: type || 'General', desc: desc || 'No description', amount, paidTo: paidTo || 'Unknown' });
+  d.expenses.push({
+    type: type.trim(),
+    desc: desc.trim(),
+    amount,
+    paidTo: paidTo.trim()
+  });
+
   recalcDailyRecord(d);
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
   renderDailyRecords();
@@ -1214,19 +1230,28 @@ function editDailyExpense(dailyIndex, expenseIndex) {
   if (!d || !Array.isArray(d.expenses) || !d.expenses[expenseIndex]) return;
   const e = d.expenses[expenseIndex];
 
-  const type = prompt('Edit Expense Type:', e.type || 'General');
+  const type = prompt('Edit Expense Type:', e.type || '');
   if (type === null) return;
+  if (!type.trim()) { alert('Expense Type cannot be blank.'); return; }
+
   const desc = prompt('Edit Description:', e.desc || '');
   if (desc === null) return;
+  if (!desc.trim()) { alert('Expense Description cannot be blank.'); return; }
+
   const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
-  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert('Expense Amount must be greater than ₦0.00.');
+    return;
+  }
+
   const paidTo = prompt('Edit Paid To:', e.paidTo || '');
   if (paidTo === null) return;
+  if (!paidTo.trim()) { alert('Paid To cannot be blank.'); return; }
 
-  e.type = type || 'General';
-  e.desc = desc || 'No description';
+  e.type = type.trim();
+  e.desc = desc.trim();
   e.amount = amount;
-  e.paidTo = paidTo || 'Unknown';
+  e.paidTo = paidTo.trim();
   // IMPORTANT: the expense remains under the daily record's original date.
   recalcDailyRecord(d);
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
@@ -1439,21 +1464,56 @@ function addSaleToDailyRecord(dailyIndex) {
 
   const customer = prompt('Customer Name:', '');
   if (customer === null) return;
-  const qty = parseFloat(prompt('Quantity:', '10'));
-  if (isNaN(qty) || qty < 0) { alert('Invalid quantity.'); return; }
-  const total = parseFloat(prompt('Total Amount:', '2500'));
-  if (isNaN(total) || total < 0) { alert('Invalid total amount.'); return; }
-  const paid = parseFloat(prompt('Amount Paid:', String(total)));
-  if (isNaN(paid) || paid < 0 || paid > total) { alert('Invalid amount paid.'); return; }
+  const cleanCustomer = customer.trim();
+  if (!cleanCustomer) {
+    alert('Sales is blank. Customer Name is required.');
+    return;
+  }
+
+  const qtyRaw = prompt('Quantity:', '10');
+  if (qtyRaw === null) return;
+  const qty = parseFloat(qtyRaw);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    alert('Sales is blank or quantity is invalid. Quantity must be greater than 0.');
+    return;
+  }
+
+  const totalRaw = prompt('Total Amount:', '2500');
+  if (totalRaw === null) return;
+  const total = parseFloat(totalRaw);
+  if (!Number.isFinite(total) || total <= 0) {
+    alert('Sales is blank. Total Amount must be greater than 0.');
+    return;
+  }
+
+  // Total amount automatically becomes Amount Paid.
+  const paidRaw = prompt('Amount Paid (default is Total Amount):', String(total));
+  if (paidRaw === null) return;
+  const paid = parseFloat(paidRaw);
+  if (!Number.isFinite(paid) || paid < 0 || paid > total) {
+    alert('Invalid amount paid. It cannot be greater than Total Amount.');
+    return;
+  }
 
   const owing = total - paid;
-  const sale = {customer: customer || 'Unknown', qty, total, unit: qty ? total/qty : 0, paid, owing};
+  const sale = {
+    customer: cleanCustomer,
+    qty,
+    total,
+    unit: total / qty,
+    paid,
+    owing
+  };
+
+  saveCustomerSuggestion(cleanCustomer);
   d.sales.push(sale);
   updateDebtForDailySale(sale, d.date);
   recalcDailyRecord(d);
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
   localStorage.setItem('debtData', JSON.stringify(debtData));
-  renderDailyRecords(); renderDebtors();
+  updateCustomerSuggestions();
+  renderDailyRecords();
+  renderDebtors();
   editDailyRecord(dailyIndex);
 }
 
@@ -1538,10 +1598,17 @@ function editOneDailySale(dailyIndex, saleIndex) {
   const oldCustomer = s.customer || 'Unknown';
   const oldTotal = Number(s.total || 0), oldPaid = Number(s.paid || 0);
   const oldDebt = oldTotal - oldPaid;
-  const newCustomer = prompt('Edit Customer Name:', oldCustomer); if (newCustomer === null) return;
-  const newQty = parseFloat(prompt('Edit Quantity:', s.qty)); if (isNaN(newQty) || newQty < 0) return alert('Invalid quantity.');
-  const newTotal = parseFloat(prompt('Edit Total Amount:', oldTotal)); if (isNaN(newTotal) || newTotal < 0) return alert('Invalid total.');
-  const newPaid = parseFloat(prompt('Edit Amount Paid:', oldPaid)); if (isNaN(newPaid) || newPaid < 0 || newPaid > newTotal) return alert('Invalid amount paid.');
+  const newCustomer = prompt('Edit Customer Name:', oldCustomer);
+  if (newCustomer === null) return;
+  if (!newCustomer.trim()) return alert('Sales is blank. Customer Name is required.');
+
+  const newQty = parseFloat(prompt('Edit Quantity:', s.qty));
+  if (!Number.isFinite(newQty) || newQty <= 0) return alert('Quantity must be greater than 0.');
+
+  const newTotal = parseFloat(prompt('Edit Total Amount:', oldTotal));
+  if (!Number.isFinite(newTotal) || newTotal <= 0) return alert('Total Amount must be greater than 0.');
+  const newPaid = parseFloat(prompt('Edit Amount Paid:', oldPaid));
+  if (!Number.isFinite(newPaid) || newPaid < 0 || newPaid > newTotal) return alert('Invalid amount paid.');
   const newOwing = newTotal - newPaid;
 
   const idx = debtData.findIndex(x => String(x.customer).toLowerCase() === oldCustomer.toLowerCase());
@@ -1550,13 +1617,15 @@ function editOneDailySale(dailyIndex, saleIndex) {
     debtData[idx].totalPaid = Math.max(0, Number(debtData[idx].totalPaid||0) - oldPaid);
     if (debtData[idx].owing <= 0 && debtData[idx].totalPaid <= 0) debtData.splice(idx,1);
   }
+  saveCustomerSuggestion(newCustomer.trim());
+
   if (newOwing > 0 || newPaid > 0) {
     const ni = debtData.findIndex(x => String(x.customer).toLowerCase() === String(newCustomer).toLowerCase());
     if (ni >= 0) { debtData[ni].owing += newOwing; debtData[ni].totalPaid += newPaid; }
     else debtData.push({customer:newCustomer, owing:newOwing, totalPaid:newPaid, history:[]});
   }
 
-  s.customer = newCustomer; s.qty = newQty; s.total = newTotal; s.paid = newPaid;
+  s.customer = newCustomer.trim(); s.qty = newQty; s.total = newTotal; s.paid = newPaid;
   s.unit = newQty ? newTotal/newQty : 0; s.owing = newOwing;
   recalcDailyRecord(d);
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
@@ -2377,6 +2446,25 @@ function printWeeklyStatement() {
 
 let customerData =
 JSON.parse(localStorage.getItem('customerData')) || [];
+
+// Save a new customer immediately when the name is typed.
+// This does NOT wait for Add Sale or End Of Day.
+function saveCustomerFromInput() {
+  const input = document.getElementById('saleCustomer');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return;
+  saveCustomerSuggestion(name);
+  updateCustomerSuggestions();
+}
+
+const saleCustomerInput = document.getElementById('saleCustomer');
+if (saleCustomerInput) {
+  saleCustomerInput.addEventListener('input', saveCustomerFromInput);
+  saleCustomerInput.addEventListener('change', saveCustomerFromInput);
+  saleCustomerInput.addEventListener('blur', saveCustomerFromInput);
+}
+
 
 
 // ==========================================
