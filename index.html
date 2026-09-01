@@ -476,48 +476,156 @@ function renderDebtors(){
   const search=(document.getElementById('debtorSearch')?.value||'').toLowerCase().trim();
   if(!table)return;
 
-  // IMPORTANT: rebuild only the debtor ledger. NEVER clear salesData or dailyData here.
+  // Rebuild debtor ledger without touching salesData or dailyData
   rebuildAllDebts();
 
   table.innerHTML=`<tr>
-    <th>Customer</th><th>Current Debt</th><th>Total Paid (Current Debt)</th>
-    <th>Current Owing</th><th>Last Debt Date</th><th>Status</th><th>Action</th>
+    <th>Customer</th>
+    <th>Current Debt</th>
+    <th>Total Paid (Current Debt)</th>
+    <th>Current Owing</th>
+    <th>Last Debt Date</th>
+    <th>Status</th>
+    <th>Action</th>
   </tr>`;
 
-  debtData.filter(d=>Number(d.owing||0)>0)
-    .filter(d=>String(d.customer||'').toLowerCase().includes(search))
-    .sort((a,b)=>normalizeLedgerDate(b.lastDebtDate).localeCompare(normalizeLedgerDate(a.lastDebtDate)))
-    .forEach((d,index)=>{
+  /*
+    IMPORTANT FIX:
+
+    Do NOT use the index from filter/sort.
+
+    Instead, keep the actual debtor object and find its
+    real index inside debtData before opening History,
+    Pay, or Clear.
+
+    This prevents CUSTOMER A's button from opening CUSTOMER B.
+  */
+
+  debtData
+    .filter(d => Number(d.owing || 0) > 0)
+    .filter(d =>
+      String(d.customer || '')
+        .toLowerCase()
+        .includes(search)
+    )
+    .sort((a,b) =>
+      normalizeLedgerDate(b.lastDebtDate)
+        .localeCompare(
+          normalizeLedgerDate(a.lastDebtDate)
+        )
+    )
+    .forEach(d => {
+
+      // Get the REAL index in debtData
+      const realIndex = debtData.indexOf(d);
+
       const row=table.insertRow();
+
       row.insertCell(0).innerText=d.customer;
       row.insertCell(1).innerText=formatMoney(d.owing);
       row.insertCell(2).innerText=formatMoney(d.totalPaid);
       row.insertCell(3).innerText=formatMoney(d.owing);
-      row.insertCell(4).innerText=d.lastDebtDate||'-';
+      row.insertCell(4).innerText=d.lastDebtDate || '-';
       row.insertCell(5).innerText='❌ OWING';
+
       const action=row.insertCell(6);
 
+      // ==============================
+      // HISTORY BUTTON
+      // ==============================
       const historyBtn=document.createElement('button');
+
       historyBtn.innerText='📅 History';
-      historyBtn.style.background='#0066cc'; historyBtn.style.color='#fff';
-      historyBtn.style.border='none'; historyBtn.style.padding='6px 10px';
-      historyBtn.style.borderRadius='4px'; historyBtn.style.cursor='pointer';
-      historyBtn.onclick=()=>showDebtHistory(index);
+
+      historyBtn.style.background='#0066cc';
+      historyBtn.style.color='#fff';
+      historyBtn.style.border='none';
+      historyBtn.style.padding='6px 10px';
+      historyBtn.style.borderRadius='4px';
+      historyBtn.style.cursor='pointer';
+
+      historyBtn.onclick=()=>{
+
+        // Re-find the customer by name to make this extra safe
+        const currentIndex=debtData.findIndex(
+          x =>
+            String(x.customer || '').trim().toLowerCase() ===
+            String(d.customer || '').trim().toLowerCase()
+        );
+
+        if(currentIndex < 0){
+          alert('Customer record could not be found.');
+          return;
+        }
+
+        showDebtHistory(currentIndex);
+      };
+
       action.appendChild(historyBtn);
 
+
+      // ==============================
+      // PAY BUTTON
+      // ==============================
       const payBtn=document.createElement('button');
-      payBtn.innerText='💰 Pay Current'; payBtn.style.marginLeft='5px';
-      payBtn.onclick=()=>payDebt(index);
+
+      payBtn.innerText='💰 Pay Current';
+      payBtn.style.marginLeft='5px';
+
+      payBtn.onclick=()=>{
+
+        // Re-find the exact customer before paying
+        const currentIndex=debtData.findIndex(
+          x =>
+            String(x.customer || '').trim().toLowerCase() ===
+            String(d.customer || '').trim().toLowerCase()
+        );
+
+        if(currentIndex < 0){
+          alert('Customer record could not be found.');
+          return;
+        }
+
+        payDebt(currentIndex);
+      };
+
       action.appendChild(payBtn);
 
+
+      // ==============================
+      // CLEAR BUTTON
+      // ==============================
       const clearBtn=document.createElement('button');
-      clearBtn.innerText='🗑 Clear'; clearBtn.style.background='red';
-      clearBtn.style.color='#fff'; clearBtn.style.marginLeft='5px';
-      clearBtn.onclick=()=>clearDebtor(index);
+
+      clearBtn.innerText='🗑 Clear';
+      clearBtn.style.background='red';
+      clearBtn.style.color='#fff';
+      clearBtn.style.marginLeft='5px';
+
+      clearBtn.onclick=()=>{
+
+        // Re-find the exact customer before clearing
+        const currentIndex=debtData.findIndex(
+          x =>
+            String(x.customer || '').trim().toLowerCase() ===
+            String(d.customer || '').trim().toLowerCase()
+        );
+
+        if(currentIndex < 0){
+          alert('Customer record could not be found.');
+          return;
+        }
+
+        clearDebtor(currentIndex);
+      };
+
       action.appendChild(clearBtn);
     });
 
-  localStorage.setItem('debtData',JSON.stringify(debtData));
+  localStorage.setItem(
+    'debtData',
+    JSON.stringify(debtData)
+  );
 }
 
 // ==========================================
