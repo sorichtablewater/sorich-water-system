@@ -473,7 +473,6 @@ function renderSalesTable(){
 // ====== DEBTORS ======
 function renderDebtors() {
 
-  rebuildAllDebts();
   const table = document.getElementById('debtorsTable');
   const search = document.getElementById('debtorSearch').value.toLowerCase();
 
@@ -489,12 +488,12 @@ function renderDebtors() {
     </tr>
   `;
 
-  [...debtData]
-    .map((d,index)=>({d,index}))
-    .filter(x=>Number(x.d.owing||0)>0)
-    .filter(x=>String(x.d.customer||'').toLowerCase().includes(search))
-    .sort((a,b)=>Number(b.d.owing||0)-Number(a.d.owing||0))
-    .forEach(({d,index}) => {
+  debtData.forEach((d, index) => {
+
+    // ONLY SHOW CUSTOMERS THAT STILL OWE
+    if (Number(d.owing) <= 0) return;
+
+    if (!d.customer.toLowerCase().includes(search)) return;
 
     // Make sure history exists
     if (!Array.isArray(d.history)) {
@@ -601,91 +600,29 @@ function renderDebtors() {
 // SHOW DEBT HISTORY
 // ==========================================
 function showDebtHistory(index){
-  const d=debtData[index];
-  if(!d)return;
-  if(!Array.isArray(d.history))d.history=[];
-
-  const render=()=>{
-    const current=getCustomerCurrentOwing(d.customer);
-    const entries=[...d.history].sort((a,b)=>
-      ledgerTimestamp(b.date,b.time).localeCompare(ledgerTimestamp(a.date,a.time))
-    );
-    let rows='';
-    entries.forEach((h,i)=>{
-      const debt=h.type==='debt';
-      rows+=`<tr>
-        <td>${i+1}</td><td>${h.date||'-'}</td><td>${h.time||'-'}</td>
-        <td>${debt?'🔴 New Sale / Debt':'💰 Payment'}</td>
-        <td>${debt?'+':'-'} ₦${formatMoney(h.amount)}</td>
-        <td><strong>₦${formatMoney(h.balanceAfter)}</strong></td>
-      </tr>`;
-    });
-    if(!rows)rows='<tr><td colspan="6" style="text-align:center;padding:15px">No debt history available.</td></tr>';
-
-    const modal=document.querySelector('.debt-history-modal');
-    if(modal)modal.remove();
-    const m=document.createElement('div');
-    m.className='debt-history-modal';
-    Object.assign(m.style,{position:'fixed',top:'0',left:'0',width:'100%',height:'100%',
-      background:'rgba(0,0,0,.65)',zIndex:'9999',display:'flex',alignItems:'center',justifyContent:'center'});
-    m.innerHTML=`<div style="background:#fff;color:#000;width:94%;max-width:1000px;max-height:90vh;overflow:auto;padding:20px;border-radius:10px;box-sizing:border-box">
-      <h2>📅 Debt Ledger — ${d.customer}</h2>
-      <p><strong>CURRENT OWING:</strong> <span style="font-size:22px;color:#c00">₦${formatMoney(current)}</span></p>
-      <p style="color:#0066cc"><strong>Newest transactions are shown first. Balance is the real running amount after each transaction.</strong></p>
-      ${current>0?`<button id="historyPayBtn" style="background:#008000;color:#fff;font-weight:bold">💰 Pay Current Owing</button>`:''}
-      <table style="width:100%;border-collapse:collapse;margin-top:10px">
-        <tr style="background:#eee"><th>#</th><th>Date</th><th>Time</th><th>Transaction</th><th>Amount</th><th>Balance After</th></tr>
-        ${rows}
-      </table><br>
-      <button onclick="this.closest('.debt-history-modal').remove()" style="background:#555;color:#fff">Close</button>
-    </div>`;
-    document.body.appendChild(m);
-    const payBtn=document.getElementById('historyPayBtn');
-    if(payBtn)payBtn.onclick=()=>payDebtByCustomer(d.customer);
-  };
-  render();
+  const d=debtData[index]; if(!d)return; if(!Array.isArray(d.history))d.history=[];
+  const entries=[...d.history].sort((a,b)=>(normalizeLedgerDate(a.date)+' '+(a.time||'00:00:00')).localeCompare(normalizeLedgerDate(b.date)+' '+(b.time||'00:00:00')));
+  let rows=''; entries.forEach((h,i)=>{const debt=h.type==='debt'; rows+=`<tr><td>${i+1}</td><td>${h.date||'-'}</td><td>${h.time||'-'}</td><td>${debt?'🔴 New Sale / Debt':'💰 Payment'}</td><td>${debt?'+':'-'} ₦${formatMoney(h.amount)}</td><td><strong>₦${formatMoney(h.balanceAfter)}</strong></td></tr>`;});
+  if(!rows)rows='<tr><td colspan="6" style="text-align:center;padding:15px">No debt history available.</td></tr>';
+  const modal=document.createElement('div'); modal.className='debt-history-modal'; Object.assign(modal.style,{position:'fixed',top:'0',left:'0',width:'100%',height:'100%',background:'rgba(0,0,0,.65)',zIndex:'9999',display:'flex',alignItems:'center',justifyContent:'center'});
+  modal.innerHTML=`<div style="background:#fff;color:#000;width:94%;max-width:1000px;max-height:90vh;overflow:auto;padding:20px;border-radius:10px;box-sizing:border-box"><h2>📅 Debt Ledger — ${d.customer}</h2><p><strong>Current Balance:</strong> ₦${formatMoney(d.owing)}</p><p style="color:#0066cc"><strong>Each Balance is the running amount owed immediately after that transaction.</strong></p><table style="width:100%;border-collapse:collapse"><tr style="background:#eee"><th>#</th><th>Date</th><th>Time</th><th>Transaction</th><th>Amount</th><th>Balance</th></tr>${rows}</table><br><button onclick="this.closest('.debt-history-modal').remove()" style="background:#0066cc;color:#fff">Close</button></div>`;
+  document.body.appendChild(modal);
 }
 
-function payDebtByCustomer(customer){
-  rebuildAllDebts();
-  const index=debtData.findIndex(d=>String(d.customer||'').trim().toLowerCase()===String(customer||'').trim().toLowerCase());
-  if(index<0){alert('Customer debt record was not found.');return;}
-  payDebt(index);
-}
-
+// ==========================================
+// PAY DEBT
+// ==========================================
 function payDebt(index){
-  rebuildAllDebts();
-  const d=debtData[index]; if(!d)return;
-  const current=Math.max(0,Number(d.owing||0));
+  const d=debtData[index]; if(!d)return; const current=Number(d.owing||0);
   if(current<=0){alert('This customer has no outstanding debt.');return;}
-
-  const answer=prompt(`Enter amount to pay for ${d.customer}. Current owing: ₦${formatMoney(current)}`,current.toFixed(2));
-  if(answer===null)return;
-  const payment=parseFloat(answer);
+  const payment=parseFloat(prompt(`Enter amount to pay for ${d.customer}`,current.toFixed(2)));
   if(!Number.isFinite(payment)||payment<=0){alert('Invalid payment amount.');return;}
   if(payment>current){alert(`Customer only owes ₦${formatMoney(current)}`);return;}
-
-  if(!Array.isArray(d.history))d.history=[];
-  const now=new Date();
-  d.history.push({
-    type:'payment',
-    customer:d.customer,
-    date:now.toISOString().slice(0,10),
-    time:now.toLocaleTimeString('en-GB'),
-    amount:payment
-  });
-
+  if(!Array.isArray(d.history))d.history=[]; const now=new Date();
+  d.history.push({type:'payment',date:now.toLocaleDateString('en-GB'),time:now.toLocaleTimeString('en-GB'),amount:payment});
   rebuildAllDebts();
-  localStorage.setItem('debtData',JSON.stringify(debtData));
-  localStorage.setItem('salesData',JSON.stringify(salesData));
+  localStorage.setItem('debtData',JSON.stringify(debtData)); localStorage.setItem('salesData',JSON.stringify(salesData));
   renderDebtors(); renderSalesTable(); updateDashboard();
-
-  const updatedIndex=debtData.findIndex(x=>String(x.customer||'').trim().toLowerCase()===String(d.customer||'').trim().toLowerCase());
-  if(updatedIndex>=0)showDebtHistory(updatedIndex);
-  else{
-    const oldModal=document.querySelector('.debt-history-modal');
-    if(oldModal)oldModal.remove();
-  }
 }
 
 // ==========================================
@@ -1039,9 +976,8 @@ function editDailyRecord(dailyIndex) {
   const content = document.createElement('div');
   Object.assign(content.style, {background:'#fff',color:'#000',width:'96%',maxWidth:'1100px',maxHeight:'92vh',overflow:'auto',padding:'20px',borderRadius:'10px',boxSizing:'border-box'});
 
-  rebuildAllDebts();
   const salesRows = d.sales.map((s,i)=>`<tr>
-    <td>${s.customer || ''}</td><td>${Number(s.qty||0)}</td><td>₦${formatMoney(s.total)}</td><td>₦${formatMoney(s.paid)}</td><td>₦${formatMoney(getCustomerCurrentOwing(s.customer))}</td>
+    <td>${s.customer || ''}</td><td>${Number(s.qty||0)}</td><td>₦${formatMoney(s.total)}</td><td>₦${formatMoney(s.paid)}</td><td>₦${formatMoney(s.owing)}</td>
     <td><button onclick="editOneDailySale(${dailyIndex},${i})">✏️ Edit</button>
     <button onclick="deleteDailySale(${dailyIndex},${i})" style="background:red;color:#fff">🗑 Delete</button></td>
   </tr>`).join('') || '<tr><td colspan="6">No sales yet.</td></tr>';
@@ -1059,7 +995,7 @@ function editDailyRecord(dailyIndex) {
 
     <h3>🛒 SALES</h3>
     <table style="width:100%;border-collapse:collapse">
-      <tr style="background:#cceeff"><th>Customer</th><th>Qty</th><th>Total</th><th>Paid</th><th>CURRENT OWING</th><th>Action</th></tr>
+      <tr style="background:#cceeff"><th>Customer</th><th>Qty</th><th>Total</th><th>Paid</th><th>Owing</th><th>Action</th></tr>
       ${salesRows}
     </table>
     <br><button onclick="addSaleToDailyRecord(${dailyIndex})" style="background:#008000;color:#fff">➕ Add More Sale</button>
@@ -1126,11 +1062,6 @@ function renderDailyRecordInvoice(d) {
     const win = window.open('', '', 'width=600,height=800');
     if (!win) { alert("Pop-up blocked! Please allow pop-ups for this site."); return; }
 
-    rebuildAllDebts();
-    const currentOwingByCustomer = {};
-    debtData.forEach(x => {
-      currentOwingByCustomer[String(x.customer||'').trim().toLowerCase()] = Number(x.owing||0);
-    });
     const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
 
     for (let i = 0; i < copies; i++) {
@@ -1147,7 +1078,7 @@ function renderDailyRecordInvoice(d) {
             <h4>SALES</h4>
             <table border="1" cellpadding="5" cellspacing="0">
                 <tr>
-                    <th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>CURRENT OWING</th>
+                    <th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Daily Owing</th>
                 </tr>
         `);
 
@@ -1159,7 +1090,7 @@ function renderDailyRecordInvoice(d) {
                     <td>${s.unit}</td>
                     <td>${s.total}</td>
                     <td>${s.paid}</td>
-                    <td>${formatMoney(currentOwingByCustomer[String(s.customer||'').trim().toLowerCase()]||0)}</td>
+                    <td>${s.owing}</td>
                 </tr>
             `);
         });
@@ -1253,118 +1184,290 @@ function endOfDay() {
 }
 
 // ==========================================
-// DEBT LEDGER ENGINE — FIXED
-// Current owing is rebuilt from real sales/debt transactions.
-// Payments are preserved and applied chronologically.
-// History is displayed newest first.
+// DEBT LEDGER — DAILY RECORDS ARE THE SOURCE OF TRUTH
 // ==========================================
 function normalizeLedgerDate(date){
-  const value=String(date||'').trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const m=value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const v=String(date||'').trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if(m) return `${m[3]}-${m[2]}-${m[1]}`;
-  const parsed=new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().slice(0,10);
+  const d=new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toISOString().slice(0,10);
 }
-function ledgerTimestamp(date,time){
-  return `${normalizeLedgerDate(date)} ${String(time||'00:00:00').trim()}`;
+function ledgerTimestamp(date,time){ return `${normalizeLedgerDate(date)} ${String(time||'00:00:00')}`; }
+function ledgerCustomerKey(name){ return String(name||'').trim().toLowerCase(); }
+function ledgerSaleId(sale,date,index,prefix){
+  return String(sale.debtHistoryId || `${prefix||'daily'}-${normalizeLedgerDate(date)}-${index}`);
 }
+
+// DAILY RECORDS + CURRENT SALES.  The owing for every sale is always total - paid.
 function collectAllSalesForLedger(){
-  const rows=[],seen=new Set();
-  dailyData.forEach(day=>(day.sales||[]).forEach((sale,i)=>{
-    const customer=String(sale.customer||'').trim(); if(!customer)return;
-    const saleId=String(sale.debtHistoryId||`daily-${day.date}-${i}`);
-    if(seen.has(saleId))return; seen.add(saleId);
-    rows.push({customer,debt:Math.max(0,Number(sale.total||0)-Number(sale.paid||0)),
-      paid:Number(sale.paid||0),date:normalizeLedgerDate(day.date),time:sale.time||'00:00:00',saleId});
-  }));
+  const rows=[], seen=new Set();
+  dailyData.forEach(day=>{
+    (day.sales||[]).forEach((sale,i)=>{
+      const customer=String(sale.customer||'').trim(); if(!customer)return;
+      const saleId=ledgerSaleId(sale,day.date,i,'daily');
+      if(seen.has(saleId))return; seen.add(saleId);
+      const total=Math.max(0,Number(sale.total||0));
+      const paid=Math.max(0,Math.min(total,Number(sale.paid||0)));
+      rows.push({customer,total,paid,debt:Math.max(0,total-paid),date:normalizeLedgerDate(day.date),time:sale.time||'00:00:00',saleId});
+    });
+  });
   salesData.forEach((sale,i)=>{
     const customer=String(sale.customer||'').trim(); if(!customer)return;
-    const saleId=String(sale.debtHistoryId||`live-${sale.date||''}-${sale.time||''}-${i}`);
+    const saleId=ledgerSaleId(sale,sale.date||new Date().toISOString().slice(0,10),i,'live');
     if(seen.has(saleId))return; seen.add(saleId);
-    rows.push({customer,debt:Math.max(0,Number(sale.total||0)-Number(sale.paid||0)),
-      paid:Number(sale.paid||0),date:normalizeLedgerDate(sale.date),time:sale.time||'00:00:00',saleId});
+    const total=Math.max(0,Number(sale.total||0));
+    const paid=Math.max(0,Math.min(total,Number(sale.paid||0)));
+    rows.push({customer,total,paid,debt:Math.max(0,total-paid),date:normalizeLedgerDate(sale.date||new Date().toISOString().slice(0,10)),time:sale.time||'00:00:00',saleId});
   });
   return rows;
 }
-function rebuildAllDebts(){
-  // Never trust an old calculated "owing" value. Rebuild it from sales
-  // and preserve only genuine payment transactions.
-  const oldPayments={};
+
+function getOldLedgerPayments(){
+  const payments=[];
   (Array.isArray(debtData)?debtData:[]).forEach(d=>{
-    const key=String(d.customer||'').trim().toLowerCase(); if(!key)return;
-    const payments=Array.isArray(d.history)?d.history.filter(h=>h&&h.type==='payment'):[];
-    if(!oldPayments[key])oldPayments[key]=[];
-    oldPayments[key].push(...payments.map(h=>({...h})));
-  });
-
-  const sales=collectAllSalesForLedger().sort((a,b)=>
-    ledgerTimestamp(a.date,a.time).localeCompare(ledgerTimestamp(b.date,b.time))
-  );
-  const customers={};
-
-  sales.forEach(s=>{
-    const key=s.customer.toLowerCase();
-    if(!customers[key])customers[key]={customer:s.customer,history:[]};
-    customers[key].history.push({
-      type:'debt',saleId:s.saleId,date:s.date,time:s.time,
-      amount:Math.max(0,Number(s.debt||0))
+    (Array.isArray(d.history)?d.history:[]).forEach(h=>{
+      if(h && h.type==='payment' && Number(h.amount)>0){
+        payments.push({...h, customer:d.customer, amount:Number(h.amount)});
+      }
     });
   });
+  return payments;
+}
 
-  Object.entries(oldPayments).forEach(([key,payments])=>{
-    if(!customers[key]){
-      const name=payments.find(p=>p.customer)?.customer||key;
-      customers[key]={customer:name,history:[]};
-    }
-    customers[key].history.push(...payments.map(p=>({
-      ...p,type:'payment',amount:Math.max(0,Number(p.amount||0)),
-      date:normalizeLedgerDate(p.date)
-    })));
+function rebuildAllDebts(){
+  const sales=collectAllSalesForLedger().sort((a,b)=>ledgerTimestamp(a.date,a.time).localeCompare(ledgerTimestamp(b.date,b.time)));
+  const oldPayments=getOldLedgerPayments();
+  const paymentsByCustomer={};
+  oldPayments.forEach(p=>{
+    const k=ledgerCustomerKey(p.customer); if(!k)return;
+    if(!paymentsByCustomer[k])paymentsByCustomer[k]=[];
+    paymentsByCustomer[k].push({...p});
+  });
+
+  const customers={};
+  sales.forEach(s=>{
+    const k=ledgerCustomerKey(s.customer);
+    if(!customers[k])customers[k]={customer:s.customer,sales:[],payments:[]};
+    customers[k].sales.push({...s});
+  });
+  Object.entries(paymentsByCustomer).forEach(([k,payments])=>{
+    if(!customers[k])customers[k]={customer:payments[0].customer||k,sales:[],payments:[]};
+    customers[k].payments=payments;
   });
 
   Object.values(customers).forEach(c=>{
-    c.history.sort((a,b)=>{
-      const cmp=ledgerTimestamp(a.date,a.time).localeCompare(ledgerTimestamp(b.date,b.time));
-      if(cmp!==0)return cmp;
-      if(a.type===b.type)return 0;
-      return a.type==='debt'?-1:1;
-    });
-    let balance=0;
-    c.history.forEach(h=>{
-      h.balanceBefore=balance;
-      if(h.type==='debt'){
-        h.amount=Math.max(0,Number(h.amount||0));
-        balance+=h.amount;
-      }else{
-        const requested=Math.max(0,Number(h.amount||0));
-        h.amount=Math.min(requested,balance);
-        balance-=h.amount;
+    c.sales.sort((a,b)=>ledgerTimestamp(a.date,a.time).localeCompare(ledgerTimestamp(b.date,b.time)));
+    c.payments.sort((a,b)=>ledgerTimestamp(a.date,a.time).localeCompare(ledgerTimestamp(b.date,b.time)));
+
+    // First honour payments that were explicitly made against a particular daily sale/date.
+    const remaining={};
+    c.sales.forEach(s=>remaining[s.saleId]=s.debt);
+    const appliedPayments=[];
+    let unallocated=[];
+
+    c.payments.forEach(p=>{
+      let amount=Math.max(0,Number(p.amount||0));
+      if(amount<=0)return;
+      const target=p.targetSaleId||p.saleId;
+      if(target && Object.prototype.hasOwnProperty.call(remaining,target)){
+        const applied=Math.min(amount,remaining[target]);
+        remaining[target]-=applied;
+        if(applied>0)appliedPayments.push({...p,amount:applied,targetSaleId:target,targetDate:p.targetDate||c.sales.find(s=>s.saleId===target)?.date});
+        amount-=applied;
       }
-      h.balanceAfter=Math.max(0,balance);
+      if(amount>0) unallocated.push({...p,amount});
     });
 
-    const customerSales=sales.filter(s=>s.customer.toLowerCase()===c.customer.toLowerCase());
-    const salePaid=customerSales.reduce((sum,s)=>sum+Number(s.paid||0),0);
-    const debtPayments=c.history.filter(h=>h.type==='payment')
-      .reduce((sum,h)=>sum+Number(h.amount||0),0);
-    c.owing=Math.max(0,balance);
-    c.totalPaid=salePaid+debtPayments;
+    // Older payment records did not have a target day. Apply those to the oldest debt first.
+    unallocated.forEach(p=>{
+      let amount=p.amount;
+      for(const s of c.sales){
+        if(amount<=0)break;
+        const applied=Math.min(amount,remaining[s.saleId]);
+        if(applied>0){
+          remaining[s.saleId]-=applied;
+          appliedPayments.push({...p,amount:applied,targetSaleId:s.saleId,targetDate:s.date});
+          amount-=applied;
+        }
+      }
+    });
+
+    let totalCredit=0,totalSalePaid=0,currentBalance=0;
+    const history=[];
+    c.sales.forEach(s=>{
+      const dayPayments=appliedPayments.filter(p=>p.targetSaleId===s.saleId);
+      const paidForDebt=dayPayments.reduce((sum,p)=>sum+Number(p.amount||0),0);
+      const dayBalance=Math.max(0,Number(s.debt||0)-paidForDebt);
+      totalCredit+=Number(s.debt||0);
+      totalSalePaid+=Number(s.paid||0);
+      currentBalance+=dayBalance;
+      history.push({
+        type:'debt',saleId:s.saleId,date:s.date,time:s.time,amount:Number(s.debt||0),
+        paidForDay:paidForDebt,balanceAfter:dayBalance,
+        payments:dayPayments.map(p=>({date:normalizeLedgerDate(p.date),time:p.time||'00:00:00',amount:Number(p.amount||0),targetSaleId:s.saleId}))
+      });
+    });
+    appliedPayments.forEach(p=>history.push({type:'payment',saleId:p.targetSaleId,targetDate:p.targetDate,date:normalizeLedgerDate(p.date),time:p.time||'00:00:00',amount:Number(p.amount||0)}));
+
+    const totalDebtPayments=appliedPayments.reduce((sum,p)=>sum+Number(p.amount||0),0);
+    const latestOwed=[...c.sales].reverse().find(s=>Number(remaining[s.saleId]||0)>0);
+    c.owing=currentBalance;
+    c.totalCredit=totalCredit;
+    c.totalPaid=totalSalePaid+totalDebtPayments;
+    c.lastOwedDate=latestOwed?latestOwed.date:'-';
+    c.history=history;
   });
 
-  debtData=Object.values(customers).map(c=>({
-    customer:c.customer,owing:Number(c.owing||0),
-    totalPaid:Number(c.totalPaid||0),history:c.history
-  }));
+  debtData=Object.values(customers)
+    .filter(c=>c.totalCredit>0 || c.owing>0 || c.totalPaid>0)
+    .map(c=>({customer:c.customer,totalCredit:Number(c.totalCredit||0),owing:Number(c.owing||0),totalPaid:Number(c.totalPaid||0),lastOwedDate:c.lastOwedDate||'-',history:c.history||[]}));
   localStorage.setItem('debtData',JSON.stringify(debtData));
 }
-function getCustomerCurrentOwing(customer){
-  const d=debtData.find(x=>String(x.customer||'').trim().toLowerCase()===String(customer||'').trim().toLowerCase());
-  return d?Math.max(0,Number(d.owing||0)):0;
-}
+
 function getCustomerDebtRecord(customer){
-  return debtData.find(x=>String(x.customer||'').trim().toLowerCase()===String(customer||'').trim().toLowerCase())||null;
+  const k=ledgerCustomerKey(customer);
+  return debtData.find(d=>ledgerCustomerKey(d.customer)===k)||null;
 }
+function getCustomerCurrentOwing(customer){ const d=getCustomerDebtRecord(customer); return d?Number(d.owing||0):0; }
+
+// ==========================================
+// DEBTORS — SAME COLUMNS AS THE ORIGINAL VERSION
+// ==========================================
+function renderDebtors(){
+  rebuildAllDebts();
+  const table=document.getElementById('debtorsTable');
+  if(!table)return;
+  const search=(document.getElementById('debtorSearch')?.value||'').toLowerCase().trim();
+  table.innerHTML=`<tr>
+    <th>Customer</th><th>Total Credit / Owed</th><th>Total Paid</th><th>Current Balance</th>
+    <th>Last Debt Date</th><th>Status</th><th>Action</th>
+  </tr>`;
+  debtData.map((d,index)=>({d,index}))
+    .filter(x=>Number(x.d.owing||0)>0)
+    .filter(x=>String(x.d.customer||'').toLowerCase().includes(search))
+    .sort((a,b)=>ledgerTimestamp(b.d.lastOwedDate,'00:00:00').localeCompare(ledgerTimestamp(a.d.lastOwedDate,'00:00:00')))
+    .forEach(({d,index})=>{
+      const row=table.insertRow();
+      row.insertCell(0).innerText=d.customer;
+      row.insertCell(1).innerText=formatMoney(d.totalCredit||0);
+      row.insertCell(2).innerText=formatMoney(d.totalPaid||0);
+      row.insertCell(3).innerText=formatMoney(d.owing||0);
+      row.insertCell(4).innerText=d.lastOwedDate||'-';
+      row.insertCell(5).innerText='❌ Owing';
+      const action=row.insertCell(6);
+
+      const historyBtn=document.createElement('button');
+      historyBtn.innerText='📅 History'; historyBtn.style.background='#0066cc'; historyBtn.style.color='#fff';
+      historyBtn.onclick=()=>showDebtHistory(index); action.appendChild(historyBtn);
+
+      const payBtn=document.createElement('button');
+      payBtn.innerText='Pay Current Debt'; payBtn.style.marginLeft='5px'; payBtn.style.background='#008000'; payBtn.style.color='#fff';
+      payBtn.onclick=()=>payDebt(index); action.appendChild(payBtn);
+
+      const clearBtn=document.createElement('button');
+      clearBtn.innerText='🗑 Clear'; clearBtn.style.marginLeft='5px'; clearBtn.style.background='red'; clearBtn.style.color='#fff';
+      clearBtn.onclick=()=>clearDebtor(index); action.appendChild(clearBtn);
+    });
+}
+
+// ==========================================
+// DEBT HISTORY — NEWEST DATE ON TOP, PAY EACH DAY
+// ==========================================
+function showDebtHistory(index){
+  rebuildAllDebts();
+  const d=debtData[index]; if(!d)return;
+  const modalOld=document.querySelector('.debt-history-modal'); if(modalOld)modalOld.remove();
+  const dayRows=(d.history||[]).filter(h=>h.type==='debt').sort((a,b)=>ledgerTimestamp(b.date,b.time).localeCompare(ledgerTimestamp(a.date,a.time)));
+  let rows='';
+  dayRows.forEach((h,i)=>{
+    const balance=Number(h.balanceAfter||0), paid=Number(h.paidForDay||0);
+    const paymentDetails=(h.payments||[]).map(p=>`<div style="font-size:11px;color:#555">${p.date||''} ${p.time||''} — ₦${formatMoney(p.amount)}</div>`).join('') || '<span style="color:#777">No payment yet</span>';
+    rows+=`<tr>
+      <td>${i+1}</td><td><button class="debt-day-button" data-sale-id="${h.saleId}" style="cursor:pointer;background:#eef6ff;border:1px solid #0066cc;padding:6px 9px;border-radius:4px">📅 ${h.date}</button></td>
+      <td>₦${formatMoney(h.amount)}</td><td>₦${formatMoney(paid)}<br>${paymentDetails}</td><td><strong>₦${formatMoney(balance)}</strong></td>
+      <td>${balance>0?'<span style="color:#c00;font-weight:bold">❌ Owing</span>':'<span style="color:#008000;font-weight:bold">✅ Cleared</span>'}</td>
+      <td>${balance>0?`<button class="pay-day-button" data-sale-id="${h.saleId}" style="background:#008000;color:#fff">Pay / Clear Day</button>`:'—'}</td>
+    </tr>`;
+  });
+  if(!rows)rows='<tr><td colspan="7" style="text-align:center;padding:15px">No daily debt records.</td></tr>';
+  const m=document.createElement('div'); m.className='debt-history-modal';
+  Object.assign(m.style,{position:'fixed',top:'0',left:'0',width:'100%',height:'100%',background:'rgba(0,0,0,.65)',zIndex:'9999',display:'flex',alignItems:'center',justifyContent:'center'});
+  m.innerHTML=`<div style="background:#fff;color:#000;width:96%;max-width:1050px;max-height:92vh;overflow:auto;padding:20px;border-radius:10px;box-sizing:border-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0">📅 Debt History — ${d.customer}</h2><button onclick="this.closest('.debt-history-modal').remove()" style="background:#555;color:#fff;padding:8px 12px">✖ Close</button></div>
+    <p><strong>CURRENT DEBT:</strong> <span style="font-size:24px;color:#c00">₦${formatMoney(d.owing)}</span></p>
+    <p><strong>Newest debt date is on top. Each date is taken from the Daily Records.</strong></p>
+    <table style="width:100%;border-collapse:collapse"><tr style="background:#eee"><th>#</th><th>Daily Date</th><th>Total Owed That Day</th><th>Paid For That Day</th><th>Balance For That Day</th><th>Status</th><th>Action</th></tr>${rows}</table>
+    <br><button id="historyPayCurrent" style="background:#008000;color:#fff;font-weight:bold;padding:8px 12px">💰 Pay Current Debt</button>
+    <button onclick="this.closest('.debt-history-modal').remove()" style="background:#555;color:#fff;padding:8px 12px;margin-left:6px">Close</button>
+  </div>`;
+  document.body.appendChild(m);
+  m.querySelector('#historyPayCurrent').onclick=()=>payDebtByCustomer(d.customer);
+  m.querySelectorAll('.pay-day-button').forEach(btn=>btn.onclick=()=>payDebtForDay(d.customer,btn.dataset.saleId));
+  m.querySelectorAll('.debt-day-button').forEach(btn=>btn.onclick=()=>payDebtForDay(d.customer,btn.dataset.saleId));
+}
+
+function payDebtByCustomer(customer){
+  rebuildAllDebts();
+  const i=debtData.findIndex(d=>ledgerCustomerKey(d.customer)===ledgerCustomerKey(customer));
+  if(i>=0)payDebt(i);
+}
+
+function payDebt(index){
+  rebuildAllDebts();
+  const d=debtData[index]; if(!d)return;
+  const current=Number(d.owing||0); if(current<=0){alert('This customer has no outstanding debt.');return;}
+  const answer=prompt(`Enter payment for ${d.customer}.\nCURRENT DEBT: ₦${formatMoney(current)}`,current.toFixed(2));
+  if(answer===null)return;
+  const amount=parseFloat(answer);
+  if(!Number.isFinite(amount)||amount<=0){alert('Invalid payment amount.');return;}
+  if(amount>current){alert(`Customer only owes ₦${formatMoney(current)}`);return;}
+  const now=new Date();
+  const old=d.history||[];
+  // Current debt payments are deliberately left unassigned; rebuild allocates them oldest-first.
+  d.history=old;
+  d.history.push({type:'payment',customer:d.customer,date:now.toISOString().slice(0,10),time:now.toLocaleTimeString('en-GB'),amount});
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+  rebuildAllDebts(); renderDebtors(); renderSalesTable(); updateDashboard();
+  const i=debtData.findIndex(x=>ledgerCustomerKey(x.customer)===ledgerCustomerKey(d.customer));
+  if(i>=0)showDebtHistory(i);
+}
+
+function payDebtForDay(customer,saleId){
+  rebuildAllDebts();
+  const d=getCustomerDebtRecord(customer); if(!d)return;
+  const day=(d.history||[]).find(h=>h.type==='debt'&&h.saleId===saleId);
+  if(!day)return;
+  const balance=Number(day.balanceAfter||0);
+  if(balance<=0){alert('This day is already cleared.');showDebtHistory(debtData.indexOf(d));return;}
+  const answer=prompt(`Customer: ${d.customer}\nDate: ${day.date}\nBalance for this day: ₦${formatMoney(balance)}\n\nEnter amount to pay for this date:`,balance.toFixed(2));
+  if(answer===null)return;
+  const amount=parseFloat(answer);
+  if(!Number.isFinite(amount)||amount<=0){alert('Invalid payment amount.');return;}
+  if(amount>balance){alert(`This date only owes ₦${formatMoney(balance)}`);return;}
+  const now=new Date();
+  d.history.push({type:'payment',customer:d.customer,date:now.toISOString().slice(0,10),time:now.toLocaleTimeString('en-GB'),amount,targetSaleId:saleId,targetDate:day.date});
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+  rebuildAllDebts(); renderDebtors(); renderSalesTable(); updateDashboard();
+  const i=debtData.findIndex(x=>ledgerCustomerKey(x.customer)===ledgerCustomerKey(d.customer));
+  if(i>=0)showDebtHistory(i);
+}
+
+function clearDebtor(index){
+  rebuildAllDebts();
+  const d=debtData[index]; if(!d)return;
+  if(Number(d.owing||0)<=0){renderDebtors();return;}
+  if(!confirm(`Clear ALL current debt for ${d.customer}?\nCurrent debt: ₦${formatMoney(d.owing)}`))return;
+  const now=new Date();
+  const dayRows=(d.history||[]).filter(h=>h.type==='debt'&&Number(h.balanceAfter||0)>0);
+  dayRows.forEach(h=>d.history.push({type:'payment',customer:d.customer,date:now.toISOString().slice(0,10),time:now.toLocaleTimeString('en-GB'),amount:Number(h.balanceAfter||0),targetSaleId:h.saleId,targetDate:h.date}));
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+  rebuildAllDebts(); renderDebtors(); renderSalesTable(); updateDashboard();
+}
+
+document.getElementById('debtorSearch')?.addEventListener('input',renderDebtors);
+
 let chartInstances={};
 function destroyCharts(){Object.values(chartInstances).forEach(c=>{try{c.destroy()}catch(e){}});chartInstances={};}
 function chartBase(id,config){const el=document.getElementById(id);if(!el||typeof Chart==='undefined')return;chartInstances[id]=new Chart(el.getContext('2d'),config);}
