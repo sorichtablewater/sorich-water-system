@@ -470,365 +470,80 @@ function renderSalesTable(){
 }
 
 
-// ==========================================
-// DEBTORS — CURRENT DEBT CYCLE LEDGER
-// ==========================================
-
-function normalizeLedgerDate(date){
-  const value=String(date||'');
-  if(/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const m=value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if(m) return `${m[3]}-${m[2]}-${m[1]}`;
-  return value;
-}
-
-function ledgerDateTime(date,time){
-  return normalizeLedgerDate(date)+' '+(time||'00:00:00');
-}
-
-function collectAllSalesForLedger(){
-  const rows=[];
-
-  dailyData.forEach(day=>{
-    (day.sales||[]).forEach((sale,i)=>{
-      rows.push({
-        customer:String(sale.customer||'').trim(),
-        debt:Math.max(0,Number(sale.total||0)-Number(sale.paid||0)),
-        paid:Number(sale.paid||0),
-        date:normalizeLedgerDate(day.date),
-        time:sale.time||'00:00:00',
-        saleId:sale.debtHistoryId||`daily-${day.date}-${i}`
-      });
-    });
-  });
-
-  salesData.forEach((sale,i)=>{
-    rows.push({
-      customer:String(sale.customer||'').trim(),
-      debt:Math.max(0,Number(sale.total||0)-Number(sale.paid||0)),
-      paid:Number(sale.paid||0),
-      date:normalizeLedgerDate(sale.date),
-      time:sale.time||'00:00:00',
-      saleId:sale.debtHistoryId||`live-${i}`
-    });
-  });
-
-  return rows.filter(r=>r.customer);
-}
-
-/*
-  IMPORTANT:
-  A debtor is handled in SEPARATE DEBT CYCLES.
-
-  Example:
-  Cycle 1: Owes 100, pays 100 -> CLOSED.
-  Cycle 2: Owes 50, then owes another 30 -> CURRENT OWING = 80.
-
-  The old 100 is kept only in History.
-  It is NOT added to the current 80.
-*/
-function rebuildAllDebts(){
-  const oldPayments={};
-
-  // Permanent payment ledger.  This is kept separately from debtData so a
-  // customer who becomes fully paid can disappear from Debtors without
-  // losing the payment history needed when they owe again later.
-  let savedPayments=[];
-  try { savedPayments=JSON.parse(localStorage.getItem('debtPaymentsLedger')||'[]'); } catch(e){ savedPayments=[]; }
-  if(!Array.isArray(savedPayments)) savedPayments=[];
-
-  savedPayments.forEach(p=>{
-    const key=String(p.customer||'').trim().toLowerCase();
-    if(!key) return;
-    if(!oldPayments[key]) oldPayments[key]=[];
-    oldPayments[key].push({...p,type:'payment'});
-  });
-
-  // Keep only real payment transactions from the existing ledger.
-  // Debt entries are rebuilt from the actual sales records.
-  debtData.forEach(d=>{
-    const key=String(d.customer||'').trim().toLowerCase();
-    if(!key) return;
-    const legacy=(Array.isArray(d.history)?d.history:[])
-      .filter(h=>h && h.type==='payment')
-      .map(h=>({...h,type:'payment',customer:d.customer}));
-    if(!oldPayments[key]) oldPayments[key]=[];
-    oldPayments[key].push(...legacy);
-  });
-
-  // Remove duplicate copies of the same payment when migrating old data.
-  Object.keys(oldPayments).forEach(key=>{
-    const seen=new Set();
-    oldPayments[key]=oldPayments[key].filter(p=>{
-      const sig=p.paymentId || `${p.date}|${p.time||''}|${Number(p.amount||0)}`;
-      if(seen.has(sig)) return false;
-      seen.add(sig); return true;
-    });
-  });
-
-  // Keep the migrated payments permanently.  Otherwise a cleared customer
-  // would lose the payment record when they disappear from debtData.
-  const permanentPayments=[];
-  Object.values(oldPayments).forEach(list=>list.forEach(p=>{
-    permanentPayments.push({...p,type:'payment'});
-  }));
-  localStorage.setItem('debtPaymentsLedger',JSON.stringify(permanentPayments));
-
-  const sales=collectAllSalesForLedger();
-
-  const customerNames={};
-  sales.forEach(s=>{
-    const key=s.customer.toLowerCase();
-    if(!customerNames[key]) customerNames[key]=s.customer;
-  });
-
-  Object.keys(oldPayments).forEach(k=>{
-    if(!customerNames[k]) customerNames[k]=k;
-  });
-
-  const rebuilt=[];
-
-  Object.entries(customerNames).forEach(([key,customerName])=>{
-    const customerSales=sales
-      .filter(s=>s.customer.toLowerCase()===key);
-
-    const payments=(oldPayments[key]||[]).map((p,i)=>({
-      type:'payment',
-      paymentId:p.paymentId || `payment-${key}-${i}-${Date.now()}`,
-      date:normalizeLedgerDate(p.date),
-      time:p.time||'00:00:00',
-      amount:Math.max(0,Number(p.amount||0))
-    }));
-
-    // Sales and payments become one chronological stream.
-    const events=[];
-
-    customerSales.forEach(s=>{
-      // A fully paid sale is NOT a debt transaction.
-      // It also does not create a debtor cycle.
-      if(Number(s.debt)>0){
-        events.push({
-          kind:'sale',
-          type:'debt',
-          saleId:s.saleId,
-          date:s.date,
-          time:s.time,
-          amount:Number(s.debt),
-          salePaid:Number(s.paid||0)
-        });
-      }
-    });
-
-    payments.forEach(p=>{
-      events.push({
-        kind:'payment',
-        type:'payment',
-        paymentId:p.paymentId,
-        date:p.date,
-        time:p.time,
-        amount:p.amount
-      });
-    });
-
-    events.sort((a,b)=>ledgerDateTime(a.date,a.time).localeCompare(ledgerDateTime(b.date,b.time)));
-
-    let balance=0;
-    let cycleNumber=0;
-    let currentCycle=null;
-    const cycles=[];
-
-    events.forEach(event=>{
-      // A new debt after the previous balance reached zero starts a NEW cycle.
-      if(event.kind==='sale'){
-        if(balance<=0){
-          cycleNumber++;
-          currentCycle={
-            id:`${key}-cycle-${cycleNumber}`,
-            number:cycleNumber,
-            startDate:event.date,
-            paid:0,
-            owing:0,
-            closed:false,
-            history:[]
-          };
-          cycles.push(currentCycle);
-          balance=0;
-        }
-
-        const before=balance;
-        balance += Number(event.amount||0);
-
-        // Amount paid at the time of this sale belongs to THIS debt cycle.
-        currentCycle.paid += Number(event.salePaid||0);
-        currentCycle.owing=balance;
-
-        currentCycle.history.push({
-          type:'debt',
-          saleId:event.saleId,
-          date:event.date,
-          time:event.time,
-          amount:Number(event.amount||0),
-          salePaid:Number(event.salePaid||0),
-          balanceBefore:before,
-          balanceAfter:balance,
-          cycleId:currentCycle.id
-        });
-      }
-
-      if(event.kind==='payment'){
-        // Ignore an old payment if there is no outstanding debt to receive it.
-        if(balance<=0) return;
-
-        const before=balance;
-        const applied=Math.min(Number(event.amount||0),balance);
-
-        if(applied<=0) return;
-
-        balance-=applied;
-        currentCycle.paid += applied;
-        currentCycle.owing=balance;
-
-        currentCycle.history.push({
-          type:'payment',
-          paymentId:event.paymentId,
-          date:event.date,
-          time:event.time,
-          amount:applied,
-          balanceBefore:before,
-          balanceAfter:balance,
-          cycleId:currentCycle.id
-        });
-
-        if(balance<=0){
-          balance=0;
-          currentCycle.owing=0;
-          currentCycle.closed=true;
-          currentCycle.closedDate=event.date;
-        }
-      }
-    });
-
-    // Remove empty cycles.
-    const usefulCycles=cycles.filter(c=>c.history.length);
-
-    // The LAST cycle with a balance is the current debt.
-    // Older cleared cycles stay only in history.
-    let current=null;
-    for(let i=usefulCycles.length-1;i>=0;i--){
-      if(Number(usefulCycles[i].owing)>0){
-        current=usefulCycles[i];
-        break;
-      }
-    }
-
-    // If there is no current balance, do not show the customer as a debtor.
-    if(!current) return;
-
-    // Flatten all cycles into history, but keep the cycle information.
-    const history=[];
-    usefulCycles.forEach(c=>{
-      c.history.forEach(h=>history.push({...h,cycleId:c.id,cycleNumber:c.number,cycleClosed:c.closed}));
-    });
-
-    const lastDebt=history
-      .filter(h=>h.type==='debt' && Number(h.amount||0)>0)
-      .sort((a,b)=>ledgerDateTime(a.date,a.time).localeCompare(ledgerDateTime(b.date,b.time)))
-      .pop();
-
-    rebuilt.push({
-      customer:customerName,
-      owing:Number(current.owing||0),
-      // THIS IS ONLY WHAT THE CUSTOMER HAS PAID IN THE CURRENT DEBT CYCLE.
-      totalPaid:Number(current.paid||0),
-      lastDebtDate:lastDebt ? lastDebt.date : '-',
-      currentCycleId:current.id,
-      currentCycleNumber:current.number,
-      history
-    });
-  });
-
-  debtData=rebuilt;
-  localStorage.setItem('debtData',JSON.stringify(debtData));
-}
-
-
-// ==========================================
-// RENDER ONLY CUSTOMERS CURRENTLY OWING
-// ==========================================
-function renderDebtors(){
+// ====== DEBTORS ======
+function renderDebtors() {
   const table=document.getElementById('debtorsTable');
-  if(!table) return;
-
   const search=(document.getElementById('debtorSearch')?.value||'').toLowerCase().trim();
+
+  if(!table)return;
+
+  // Rebuild from sales + recorded payments every time Debtors is opened.
+  rebuildAllDebts();
 
   table.innerHTML=`
     <tr>
       <th>Customer</th>
-      <th>Current Owing</th>
+      <th>Current Debt</th>
       <th>Total Paid (Current Debt)</th>
+      <th>Current Owing</th>
       <th>Last Debt Date</th>
       <th>Status</th>
       <th>Action</th>
     </tr>
   `;
 
-  // ALWAYS rebuild first so the table represents CURRENT debt only.
-  rebuildAllDebts();
-
   debtData
     .filter(d=>Number(d.owing||0)>0)
     .filter(d=>String(d.customer||'').toLowerCase().includes(search))
-    .sort((a,b)=>{
-      const ad=normalizeLedgerDate(a.lastDebtDate);
-      const bd=normalizeLedgerDate(b.lastDebtDate);
-      return bd.localeCompare(ad);
-    })
-    .forEach(d=>{
+    .sort((a,b)=>normalizeLedgerDate(b.lastDebtDate).localeCompare(normalizeLedgerDate(a.lastDebtDate)))
+    .forEach((d,index)=>{
       const row=table.insertRow();
-      const realIndex=debtData.indexOf(d);
 
+      // IMPORTANT: Current Debt is NOT all historical debt.
+      // It is exactly what the customer currently owes.
       row.insertCell(0).innerText=d.customer;
       row.insertCell(1).innerText=formatMoney(d.owing);
       row.insertCell(2).innerText=formatMoney(d.totalPaid);
-      row.insertCell(3).innerText=d.lastDebtDate||'-';
-      row.insertCell(4).innerText='❌ OWING';
+      row.insertCell(3).innerText=formatMoney(d.owing);
+      row.insertCell(4).innerText=d.lastDebtDate||'-';
+      row.insertCell(5).innerText='❌ OWING';
 
-      const action=row.insertCell(5);
+      const action=row.insertCell(6);
 
       const historyBtn=document.createElement('button');
       historyBtn.innerText='📅 History';
       historyBtn.style.background='#0066cc';
       historyBtn.style.color='#fff';
-      historyBtn.onclick=()=>showDebtHistory(realIndex);
+      historyBtn.style.border='none';
+      historyBtn.style.padding='6px 10px';
+      historyBtn.style.borderRadius='4px';
+      historyBtn.style.cursor='pointer';
+      historyBtn.onclick=()=>showDebtHistory(index);
       action.appendChild(historyBtn);
 
       const payBtn=document.createElement('button');
       payBtn.innerText='💰 Pay';
       payBtn.style.marginLeft='5px';
-      payBtn.onclick=()=>payDebt(realIndex);
+      payBtn.onclick=()=>payDebt(index);
       action.appendChild(payBtn);
     });
 
   localStorage.setItem('debtData',JSON.stringify(debtData));
 }
 
-
 // ==========================================
-// DEBT HISTORY
-// CURRENT DEBT/CYCLE = TOP
-// OLD/CLOSED DEBT/CYCLES = BELOW
-// CLOSE BUTTON = TOP RIGHT
+// SHOW DEBT HISTORY
 // ==========================================
 function showDebtHistory(index){
   const d=debtData[index];
-  if(!d) return;
+  if(!d)return;
 
   const history=Array.isArray(d.history)?d.history:[];
 
-  // Group by debt cycle.
+  // Current cycle first. Old/closed cycles below it.
   const groups={};
   history.forEach(h=>{
-    const cycleId=h.cycleId||'old-cycle';
+    const cycleId=h.cycleId||'legacy-cycle';
     if(!groups[cycleId]){
       groups[cycleId]={
         id:cycleId,
@@ -837,21 +552,24 @@ function showDebtHistory(index){
         items:[]
       };
     }
-    groups[cycleId].items.push(h);
+    groups[cycleId].items.push({...h});
   });
 
-  const cycles=Object.values(groups).sort((a,b)=>b.number-a.number);
+  const cycles=Object.values(groups).sort((a,b)=>{
+    const ac=a.id===d.currentCycleId;
+    const bc=b.id===d.currentCycleId;
+    if(ac!==bc)return ac?-1:1;
+    return b.number-a.number;
+  });
 
   let cycleHtml='';
 
-  cycles.forEach((cycle,cycleIndex)=>{
+  cycles.forEach(cycle=>{
     const isCurrent=cycle.id===d.currentCycleId;
 
-    // NEWEST transaction first inside each cycle.
+    // Latest transaction at the TOP; oldest at the BOTTOM.
     cycle.items.sort((a,b)=>
-      ledgerDateTime(b.date,b.time).localeCompare(
-        ledgerDateTime(a.date,a.time)
-      )
+      ledgerDateTime(b.date,b.time).localeCompare(ledgerDateTime(a.date,a.time))
     );
 
     const rows=cycle.items.map((h,i)=>{
@@ -869,30 +587,15 @@ function showDebtHistory(index){
     }).join('');
 
     cycleHtml+=`
-      <div style="
-        margin-top:18px;
-        border:2px solid ${isCurrent?'#0066cc':'#aaa'};
-        border-radius:8px;
-        overflow:hidden;
-      ">
-        <div style="
-          padding:10px;
-          background:${isCurrent?'#cceeff':'#eeeeee'};
-          font-weight:bold;
-        ">
-          ${isCurrent?'🔵 CURRENT DEBT':'⚪ OLD / CLOSED DEBT'}
-          ${cycle.number?` — Debt Cycle ${cycle.number}`:''}
+      <div style="margin-top:18px;border:2px solid ${isCurrent?'#0066cc':'#aaa'};border-radius:8px;overflow:hidden;">
+        <div style="padding:10px;background:${isCurrent?'#cceeff':'#eee'};font-weight:bold;">
+          ${isCurrent?'🟢 CURRENT DEBT':'⚪ OLD / CLOSED DEBT'}
+          — Debt Cycle ${cycle.number}
           ${cycle.closed?' — CLOSED':''}
         </div>
-
         <table style="width:100%;border-collapse:collapse;">
           <tr style="background:#f5f5f5;">
-            <th>#</th>
-            <th>Date</th>
-            <th>Time</th>
-            <th>Transaction</th>
-            <th>Amount</th>
-            <th>Balance After</th>
+            <th>#</th><th>Date</th><th>Time</th><th>Transaction</th><th>Amount</th><th>Balance After</th>
           </tr>
           ${rows}
         </table>
@@ -913,105 +616,58 @@ function showDebtHistory(index){
     zIndex:'9999',
     display:'flex',
     alignItems:'center',
-    justifyContent:'center'
+    justifyContent:'center',
+    padding:'15px',
+    boxSizing:'border-box'
   });
 
   modal.innerHTML=`
-    <div style="
-      background:#fff;
-      color:#000;
-      width:94%;
-      max-width:1050px;
-      max-height:92vh;
-      overflow:auto;
-      padding:20px;
-      border-radius:10px;
-      box-sizing:border-box;
-      position:relative;
-    ">
+    <div style="background:#fff;color:#000;width:96%;max-width:1050px;max-height:92vh;overflow:auto;padding:20px;border-radius:10px;box-sizing:border-box;position:relative;">
 
-      <!-- CLOSE AT TOP -->
-      <button
-        onclick="this.closest('.debt-history-modal').remove()"
-        style="
-          position:absolute;
-          top:10px;
-          right:10px;
-          margin:0;
-          background:#d00;
-          color:#fff;
-          font-weight:bold;
-          padding:8px 14px;
-        "
-      >✖ Close</button>
+      <!-- CLOSE IS AT THE TOP -->
+      <button onclick="this.closest('.debt-history-modal').remove()"
+        style="position:absolute;right:15px;top:12px;background:#555;color:#fff;border:none;border-radius:5px;padding:8px 14px;font-weight:bold;cursor:pointer;">
+        ✖ Close
+      </button>
 
-      <h2 style="margin-top:0;padding-right:100px;">
-        📅 Debt History — ${d.customer}
-      </h2>
+      <h2 style="margin:0 90px 10px 0;">📅 Debt Ledger — ${d.customer}</h2>
 
-      <div style="
-        display:flex;
-        gap:15px;
-        flex-wrap:wrap;
-        margin-bottom:15px;
-      ">
-        <div style="padding:10px;background:#eaf7ea;border-radius:6px;">
-          <strong>CURRENT OWING</strong><br>
-          ₦${formatMoney(d.owing)}
-        </div>
-
-        <div style="padding:10px;background:#eaf7ea;border-radius:6px;">
-          <strong>PAID FOR CURRENT DEBT</strong><br>
-          ₦${formatMoney(d.totalPaid)}
-        </div>
-
-        <div style="padding:10px;background:#eaf7ea;border-radius:6px;">
-          <strong>LAST DEBT DATE</strong><br>
-          ${d.lastDebtDate||'-'}
-        </div>
+      <div style="background:#e8f5e9;border-radius:8px;padding:12px;margin-bottom:10px;">
+        <strong>🟢 CURRENT OWING:</strong> ₦${formatMoney(d.owing)}
+        &nbsp;&nbsp;
+        <strong>💰 PAID ON CURRENT DEBT:</strong> ₦${formatMoney(d.totalPaid)}
+        <br>
+        <strong>📅 LAST DEBT DATE:</strong> ${d.lastDebtDate||'-'}
       </div>
 
-      <p style="color:#0066cc;font-weight:bold;">
-        Only the current debt cycle is counted in CURRENT OWING and TOTAL PAID.
-        Old cleared debts remain below as history and are never added back to the current balance.
+      <p style="color:#0066cc;">
+        Old cleared debt is history only. It is NEVER added to the current owing.
       </p>
 
       ${cycleHtml||'<p>No debt history available.</p>'}
-
-      <br>
-
-      <!-- CLOSE ALSO AVAILABLE AT BOTTOM -->
-      <button
-        onclick="this.closest('.debt-history-modal').remove()"
-        style="background:#555;color:#fff;"
-      >Close</button>
     </div>
   `;
 
   document.body.appendChild(modal);
 }
 
-
 // ==========================================
-// PAY CURRENT DEBT
+// PAY DEBT
 // ==========================================
 function payDebt(index){
   const d=debtData[index];
-  if(!d) return;
+  if(!d)return;
 
   const current=Number(d.owing||0);
-
   if(current<=0){
     alert('This customer has no outstanding debt.');
     return;
   }
 
-  const payment=parseFloat(
-    prompt(
-      `Enter amount customer is paying for ${d.customer}\nCurrent owing: ₦${formatMoney(current)}`,
-      current.toFixed(2)
-    )
-  );
+  const payment=parseFloat(prompt(
+    `Enter amount customer is paying for ${d.customer}\nCurrent owing: ₦${formatMoney(current)}`,
+    current.toFixed(2)
+  ));
 
   if(!Number.isFinite(payment)||payment<=0){
     alert('Invalid payment amount.');
@@ -1023,30 +679,24 @@ function payDebt(index){
     return;
   }
 
+  if(!Array.isArray(d.history))d.history=[];
+
   const now=new Date();
-  const paymentEntry={
+
+  d.history.push({
     type:'payment',
     paymentId:'payment-'+Date.now()+'-'+Math.random().toString(36).slice(2),
-    customer:d.customer,
-    date:normalizeLedgerDate(now.toLocaleDateString('en-GB')),
+    date:now.toLocaleDateString('en-GB'),
     time:now.toLocaleTimeString('en-GB'),
-    amount:payment
-  };
+    amount:payment,
+    balanceBefore:current,
+    balanceAfter:Math.max(0,current-payment),
+    cycleId:d.currentCycleId,
+    cycleNumber:d.currentCycleNumber,
+    cycleClosed:(current-payment)<=0
+  });
 
-  // Permanent payment ledger: do NOT depend on the debtor row remaining
-  // visible.  When the debt reaches zero the customer can leave Debtors,
-  // but this payment must remain available for future debt cycles/history.
-  let paymentLedger=[];
-  try { paymentLedger=JSON.parse(localStorage.getItem('debtPaymentsLedger')||'[]'); } catch(e){ paymentLedger=[]; }
-  if(!Array.isArray(paymentLedger)) paymentLedger=[];
-  paymentLedger.push(paymentEntry);
-  localStorage.setItem('debtPaymentsLedger',JSON.stringify(paymentLedger));
-
-  // rebuildAllDebts will:
-  // 1. apply this payment to the current cycle
-  // 2. close the cycle if balance reaches zero
-  // 3. remove the customer from Debtors when fully paid
-  // 4. keep the old cycle in History
+  // Rebuild applies the payment to THIS current cycle only.
   rebuildAllDebts();
 
   localStorage.setItem('debtData',JSON.stringify(debtData));
@@ -1054,26 +704,895 @@ function payDebt(index){
 
   renderDebtors();
   renderSalesTable();
+  if(typeof updateDashboard==='function')updateDashboard();
 
-  if(typeof updateDashboard==='function') updateDashboard();
+  if(payment>=current){
+    alert(`${d.customer}'s current debt has been fully cleared. They will no longer appear in Debtors.`);
+  }else{
+    const latest=debtData.find(x=>String(x.customer).toLowerCase()===String(d.customer).toLowerCase());
+    alert(`Payment recorded. Current owing: ₦${formatMoney(latest?latest.owing:current-payment)}`);
+  }
+}
 
-  alert(
-    payment>=current
-      ? `${d.customer}'s debt has been fully cleared.`
-      : `Payment recorded. Current owing: ₦${formatMoney(current-payment)}`
+
+// Optional manual CLEAR.
+// It closes ONLY the current cycle; old history remains available and
+// a future sale starts a completely new debt cycle.
+function clearDebtor(index){
+  const d=debtData[index];
+  if(!d || Number(d.owing||0)<=0)return;
+
+  if(!confirm(`Clear the CURRENT debt for "${d.customer}"?\n\nThis will remove only the current owing from Debtors. Old history will remain.`))return;
+
+  if(!Array.isArray(d.history))d.history=[];
+
+  const now=new Date();
+  const current=Number(d.owing||0);
+
+  d.history.push({
+    type:'clear',
+    paymentId:'clear-'+Date.now()+'-'+Math.random().toString(36).slice(2),
+    date:now.toLocaleDateString('en-GB'),
+    time:now.toLocaleTimeString('en-GB'),
+    amount:current,
+    balanceBefore:current,
+    balanceAfter:0,
+    cycleId:d.currentCycleId,
+    cycleNumber:d.currentCycleNumber,
+    cycleClosed:true
+  });
+
+  // Save the clear as a payment-like settlement in the permanent archive.
+  const archive=JSON.parse(localStorage.getItem('debtPaymentArchive')||'{}');
+  const key=String(d.customer).trim().toLowerCase();
+  if(!Array.isArray(archive[key]))archive[key]=[];
+  archive[key].push({
+    type:'payment',
+    paymentId:'clear-'+Date.now()+'-'+Math.random().toString(36).slice(2),
+    date:now.toLocaleDateString('en-GB'),
+    time:now.toLocaleTimeString('en-GB'),
+    amount:current
+  });
+  localStorage.setItem('debtPaymentArchive',JSON.stringify(archive));
+
+  rebuildAllDebts();
+  renderDebtors();
+  renderSalesTable();
+  if(typeof updateDashboard==='function')updateDashboard();
+}
+
+// ==========================================
+// DEBTORS SEARCH LISTENER
+// ==========================================
+document
+  .getElementById('debtorSearch')
+  .addEventListener(
+    'input',
+    renderDebtors
   );
+
+// ====== INVOICE PRINTING ======
+function printInvoice(sale){
+  const copies=parseInt(document.getElementById('invoiceCopies').value)||4;
+  const m=document.getElementById('managerName').value||'Manager';
+  const f=document.getElementById('invoiceFooter').value||'Drink It. Love It.';
+  const now=new Date(); 
+  const customer=sale?sale.customer:document.getElementById('saleCustomer').value||'Customer';
+  const qty=sale?sale.qty:parseFloat(document.getElementById('saleQty').value)||0;
+  const total=sale?sale.total:parseFloat(document.getElementById('saleTotal').value)||0;
+  const paid=sale?sale.paid:parseFloat(document.getElementById('salePaid').value)||0;
+  const unit=sale?sale.unit:(qty?total/qty:0).toFixed(2);
+  const owing=(total-paid).toFixed(2);
+
+  const win=window.open('','PRINT','width=600,height=800');
+  for(let i=0;i<copies;i++){
+    const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
+    win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
+    win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
+  }
+  win.document.close(); win.focus(); win.print(); win.close();
+  invoiceNumber++; localStorage.setItem('invoiceNumber',invoiceNumber);
+}
+
+// ====== ADD EXPENSE ======
+function addExpense() {
+  const type = document.getElementById('expenseType').value.trim();
+  const desc = document.getElementById('expenseDesc').value.trim();
+  const amount = parseFloat(document.getElementById('expenseAmount').value);
+  const paidTo = document.getElementById('expensePaidTo').value.trim();
+  if (!type || !Number.isFinite(amount) || amount <= 0) { alert('Expense is blank: please enter Expense Type and Amount.'); return; }
+  const date = new Date().toLocaleString();
+
+  expenseData.push({ type, desc, amount, paidTo, date });
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+
+  // Clear form
+  document.getElementById('expenseType').value = '';
+  document.getElementById('expenseDesc').value = '';
+  document.getElementById('expenseAmount').value = '';
+  document.getElementById('expensePaidTo').value = '';
+}
+
+// ====== RENDER EXPENSES WITH EDIT + ADD + DELETE ======
+function renderExpenses() {
+  const table = document.getElementById('expensesTable');
+  table.innerHTML = `
+    <tr>
+      <th>S/N</th><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Date</th><th>Action</th>
+    </tr>`;
+
+  let totalExpense = 0;
+  expenseData.forEach((e, index) => {
+    const row = table.insertRow();
+    row.insertCell(0).innerText = index + 1;
+    row.insertCell(1).innerText = e.type || '';
+    row.insertCell(2).innerText = e.desc || '';
+    row.insertCell(3).innerText = formatMoney(e.amount);
+    row.insertCell(4).innerText = e.paidTo || '';
+    row.insertCell(5).innerText = e.date || '';
+    totalExpense += Number(e.amount || 0);
+
+    const action = row.insertCell(6);
+    const editBtn = document.createElement('button');
+    editBtn.innerText = '✏️ Edit';
+    editBtn.onclick = () => editExpense(index);
+    action.appendChild(editBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.innerText = '🗑 Delete';
+    deleteBtn.style.background = 'red';
+    deleteBtn.style.color = '#fff';
+    deleteBtn.onclick = () => {
+      if (confirm('Delete this expense?')) {
+        expenseData.splice(index, 1);
+        localStorage.setItem('expenseData', JSON.stringify(expenseData));
+        renderExpenses();
+      }
+    };
+    action.appendChild(deleteBtn);
+  });
+
+  document.getElementById('expenses').innerText = formatMoney(totalExpense);
+  const totalSales = salesData.reduce((acc, s) => acc + Number(s.total || 0), 0);
+  document.getElementById('expenseTotalSales').innerText = formatMoney(totalSales);
+  document.getElementById('expenseTotal').innerText = formatMoney(totalExpense);
+  document.getElementById('expenseProfit').innerText = formatMoney(totalSales - totalExpense);
+}
+
+function editExpense(index) {
+  const e = expenseData[index];
+  if (!e) return;
+  const type = prompt('Edit Expense Type:', e.type || 'General');
+  if (type === null) return;
+  const desc = prompt('Edit Description:', e.desc || '');
+  if (desc === null) return;
+  const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
+  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
+  const paidTo = prompt('Edit Paid To:', e.paidTo || '');
+  if (paidTo === null) return;
+
+  e.type = type || 'General';
+  e.desc = desc || 'No description';
+  e.amount = amount;
+  e.paidTo = paidTo || 'Unknown';
+  // IMPORTANT: editing an expense never changes its recorded date.
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  renderExpenses();
+}
+
+function addExpenseToDailyRecord(dailyIndex) {
+  const d = dailyData[dailyIndex];
+  if (!d) return;
+  if (!Array.isArray(d.expenses)) d.expenses = [];
+
+  const type = prompt('Expense Type:', '');
+  if (type === null) return;
+  if (!type.trim()) { alert('Expense is blank: Expense Type is required.'); return; }
+  const amount = parseFloat(prompt('Expense Amount:', ''));
+  if (!Number.isFinite(amount) || amount <= 0) { alert('Expense is blank: enter an Amount greater than 0.'); return; }
+  const desc = prompt('Expense Description (optional):', '');
+  if (desc === null) return;
+  const paidTo = prompt('Paid To (optional):', '');
+  if (paidTo === null) return;
+
+  d.expenses.push({ type: type.trim(), desc: desc.trim(), amount, paidTo: paidTo.trim() });
+  recalcDailyRecord(d);
+  localStorage.setItem('dailyData', JSON.stringify(dailyData));
+  renderDailyRecords();
+  editDailyRecord(dailyIndex);
+}
+
+function editDailyExpense(dailyIndex, expenseIndex) {
+  const d = dailyData[dailyIndex];
+  if (!d || !Array.isArray(d.expenses) || !d.expenses[expenseIndex]) return;
+  const e = d.expenses[expenseIndex];
+
+  const type = prompt('Edit Expense Type:', e.type || 'General');
+  if (type === null) return;
+  const desc = prompt('Edit Description:', e.desc || '');
+  if (desc === null) return;
+  const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
+  if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
+  const paidTo = prompt('Edit Paid To:', e.paidTo || '');
+  if (paidTo === null) return;
+
+  e.type = type || 'General';
+  e.desc = desc || 'No description';
+  e.amount = amount;
+  e.paidTo = paidTo || 'Unknown';
+  // IMPORTANT: the expense remains under the daily record's original date.
+  recalcDailyRecord(d);
+  localStorage.setItem('dailyData', JSON.stringify(dailyData));
+  renderDailyRecords();
+  editDailyRecord(dailyIndex);
+}
+
+// ====== CLEAR MONTHLY EXPENSES ======
+function clearMonthlyExpenses() {
+  if(confirm('Clear all expenses?')) {
+    expenseData = [];
+    localStorage.setItem('expenseData', '[]');
+    renderExpenses();
+    alert('All expenses cleared.');
+  }
+}
+
+// ====== CLEAR DAILY EXPENSES ======
+function clearDailyExpenses() {
+  if (!confirm("Clear today's expenses? This will archive them in daily records.")) return;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Archive today's expenses along with sales if any
+  const todaySales = salesData; // current sales
+  if (todaySales.length > 0 || expenseData.length > 0) {
+    const totalSales = todaySales.reduce((acc, s) => acc + Number(s.total), 0);
+    const totalExpenses = expenseData.reduce((acc, e) => acc + Number(e.amount), 0);
+    const avgUnitPrice = todaySales.length
+      ? todaySales.reduce((acc, s) => acc + Number(s.unit), 0) / todaySales.length
+      : 0;
+
+    dailyData.push({
+      date: todayStr,
+      totalSales,
+      totalExpenses,
+      net: totalSales - totalExpenses,
+      avgUnitPrice,
+      sales: todaySales.map(s => ({
+        customer: s.customer,
+        qty: Number(s.qty),
+        total: Number(s.total),
+        unit: Number(s.unit),
+        paid: Number(s.paid),
+        owing: Number(s.owing)
+      })),
+      expenses: expenseData.map(e => ({
+        type: e.type,
+        desc: e.desc,
+        amount: Number(e.amount),
+        paidTo: e.paidTo
+      }))
+    });
+
+    localStorage.setItem('dailyData', JSON.stringify(dailyData));
+  }
+
+  // Clear only today's expenses
+  expenseData = [];
+  localStorage.setItem('expenseData', JSON.stringify(expenseData));
+
+  // Refresh dashboard
+  renderExpenses();
+  renderDailyRecords();
+
+  alert("Today's expenses cleared and archived in daily records.");
 }
 
 
+function recalcDailyRecord(d) {
+  if (!d) return;
+  if (!Array.isArray(d.sales)) d.sales = [];
+  if (!Array.isArray(d.expenses)) d.expenses = [];
+  d.totalSales = d.sales.reduce((sum, s) => sum + Number(s.total || 0), 0);
+  d.totalExpenses = d.expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const totalQty = d.sales.reduce((sum, s) => sum + Number(s.qty || 0), 0);
+  d.avgUnitPrice = totalQty ? d.totalSales / totalQty : 0;
+  d.net = d.totalSales - d.totalExpenses;
+}
+
+function dailyTableRows(records, table) {
+  records.forEach(d => {
+    recalcDailyRecord(d);
+    const originalIndex = dailyData.indexOf(d);
+    const totalQty = d.sales.reduce((sum, s) => sum + Number(s.qty || 0), 0);
+    const row = table.insertRow();
+    row.insertCell(0).innerText = d.date;
+    row.insertCell(1).innerText = formatMoney(d.totalSales);
+    row.insertCell(2).innerText = formatMoney(d.totalExpenses);
+    row.insertCell(3).innerText = formatMoney(d.net);
+    row.insertCell(4).innerText = formatMoney(d.avgUnitPrice);
+    row.insertCell(5).innerText = totalQty;
+
+    const viewCell = row.insertCell(6);
+    const viewBtn = document.createElement('button');
+    viewBtn.innerText = 'View';
+    viewBtn.onclick = () => renderDailyRecordInvoice(d);
+    viewCell.appendChild(viewBtn);
+
+    const editCell = row.insertCell(7);
+    const editBtn = document.createElement('button');
+    editBtn.innerText = '✏️ Edit / Add';
+    editBtn.style.background = '#0066cc';
+    editBtn.style.color = '#fff';
+    editBtn.onclick = () => editDailyRecord(originalIndex);
+    editCell.appendChild(editBtn);
+
+    const clearCell = row.insertCell(8);
+    const clearBtn = document.createElement('button');
+    clearBtn.innerText = 'Clear';
+    clearBtn.onclick = () => {
+      if (confirm('Delete this daily record?')) {
+        dailyData.splice(originalIndex, 1);
+        localStorage.setItem('dailyData', JSON.stringify(dailyData));
+        renderDailyRecords();
+      }
+    };
+    clearCell.appendChild(clearBtn);
+  });
+  localStorage.setItem('dailyData', JSON.stringify(dailyData));
+}
+
+function renderDailyRecords() {
+  const table = document.getElementById('dailyTable');
+  table.innerHTML = `<tr>
+    <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th>
+    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Edit / Add</th><th>Clear</th>
+  </tr>`;
+  dailyTableRows([...dailyData].sort((a,b) => String(b.date).localeCompare(String(a.date))), table);
+}
+
+function filterDailyRecords() {
+  const from = document.getElementById('fromDate').value;
+  const to = document.getElementById('toDate').value;
+  if (!from || !to) { alert('Please select both From and To dates.'); return; }
+  const table = document.getElementById('dailyTable');
+  table.innerHTML = `<tr>
+    <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th>
+    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Edit / Add</th><th>Clear</th>
+  </tr>`;
+  dailyTableRows(dailyData.filter(d => String(d.date) >= from && String(d.date) <= to)
+    .sort((a,b) => String(b.date).localeCompare(String(a.date))), table);
+}
+
+function clearFilter() {
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  renderDailyRecords();
+}
+
 // ==========================================
-// DEBTOR SEARCH
+// DAILY RECORD EDITOR: SALES + EXPENSES + ADD MORE
 // ==========================================
-const debtorSearchEl=document.getElementById('debtorSearch');
-if(debtorSearchEl){
-  debtorSearchEl.addEventListener('input',renderDebtors);
+function editDailyRecord(dailyIndex) {
+  const d = dailyData[dailyIndex];
+  if (!d) { alert('Daily record not found.'); return; }
+  if (!Array.isArray(d.sales)) d.sales = [];
+  if (!Array.isArray(d.expenses)) d.expenses = [];
+
+  const modal = document.createElement('div');
+  modal.className = 'daily-edit-modal';
+  Object.assign(modal.style, {position:'fixed',top:'0',left:'0',width:'100%',height:'100%',background:'rgba(0,0,0,.65)',zIndex:'9999',display:'flex',alignItems:'center',justifyContent:'center'});
+
+  const content = document.createElement('div');
+  Object.assign(content.style, {background:'#fff',color:'#000',width:'96%',maxWidth:'1100px',maxHeight:'92vh',overflow:'auto',padding:'20px',borderRadius:'10px',boxSizing:'border-box'});
+
+  const salesRows = d.sales.map((s,i)=>`<tr>
+    <td>${s.customer || ''}</td><td>${Number(s.qty||0)}</td><td>₦${formatMoney(s.total)}</td><td>₦${formatMoney(s.paid)}</td><td>₦${formatMoney(s.owing)}</td>
+    <td><button onclick="editOneDailySale(${dailyIndex},${i})">✏️ Edit</button>
+    <button onclick="deleteDailySale(${dailyIndex},${i})" style="background:red;color:#fff">🗑 Delete</button></td>
+  </tr>`).join('') || '<tr><td colspan="6">No sales yet.</td></tr>';
+
+  const expenseRows = d.expenses.map((e,i)=>`<tr>
+    <td>${i+1}</td><td>${e.type || ''}</td><td>${e.desc || ''}</td><td>₦${formatMoney(e.amount)}</td><td>${e.paidTo || ''}</td>
+    <td><button onclick="editDailyExpense(${dailyIndex},${i})">✏️ Edit</button>
+    <button onclick="deleteDailyExpense(${dailyIndex},${i})" style="background:red;color:#fff">🗑 Delete</button></td>
+  </tr>`).join('') || '<tr><td colspan="5">No expenses yet.</td></tr>';
+
+  content.innerHTML = `
+    <h2>✏️ Edit / Add Daily Record</h2>
+    <p><strong>DATE:</strong> ${d.date}</p>
+    <p style="color:#0066cc"><strong>This date is locked.</strong> Editing or adding entries here will stay on ${d.date}; it will NOT change to today's date.</p>
+
+    <h3>🛒 SALES</h3>
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="background:#cceeff"><th>Customer</th><th>Qty</th><th>Total</th><th>Paid</th><th>Owing</th><th>Action</th></tr>
+      ${salesRows}
+    </table>
+    <br><button onclick="addSaleToDailyRecord(${dailyIndex})" style="background:#008000;color:#fff">➕ Add More Sale</button>
+
+    <h3>💰 EXPENSES</h3>
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="background:#cceeff"><th>S/N</th><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th><th>Action</th></tr>
+      ${expenseRows}
+    </table>
+    <br><button onclick="addExpenseToDailyRecord(${dailyIndex})" style="background:#008000;color:#fff">➕ Add More Expense</button>
+
+    <hr>
+    <p><strong>Total Sales:</strong> ₦${formatMoney(d.totalSales)} &nbsp; <strong>Total Expenses:</strong> ₦${formatMoney(d.totalExpenses)} &nbsp; <strong>Net:</strong> ₦${formatMoney(d.net)} &nbsp; <strong>Avg Unit:</strong> ₦${formatMoney(d.avgUnitPrice)}</p>
+    <button onclick="this.closest('.daily-edit-modal').remove()" style="background:#555;color:#fff">Close</button>
+  `;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+}
+
+function addSaleToDailyRecord(dailyIndex){
+  const d=dailyData[dailyIndex]; if(!d)return; if(!Array.isArray(d.sales))d.sales=[];
+  const customer=prompt('Customer Name:',''); if(customer===null)return; if(!customer.trim()){alert('Sales is blank: please enter the customer name.');return;}
+  const qty=parseFloat(prompt('Quantity:','10')); if(!Number.isFinite(qty)||qty<=0){alert('Sales is blank: please enter a quantity greater than 0.');return;}
+  const total=parseFloat(prompt('Total Amount:','2500')); if(!Number.isFinite(total)||total<=0){alert('Sales is blank: please enter a Total Amount greater than 0.');return;}
+  const paid=parseFloat(prompt('Amount Paid:',String(total))); if(!Number.isFinite(paid)||paid<0||paid>total){alert('Please enter a valid Amount Paid.');return;}
+  saveCustomerSuggestion(customer.trim()); d.sales.push({customer:customer.trim(),qty,total,unit:total/qty,paid,owing:total-paid,debtHistoryId:Date.now()+'-'+Math.random().toString(36).slice(2)});
+  recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
+  renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();editDailyRecord(dailyIndex);
+}
+function updateDebtForDailySale(sale,recordDate){rebuildAllDebts();}
+function deleteDailySale(dailyIndex,saleIndex){
+  const d=dailyData[dailyIndex], s=d&&d.sales?d.sales[saleIndex]:null; if(!s||!confirm('Delete this sale from the daily record?'))return;
+  d.sales.splice(saleIndex,1); recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
+  renderDailyRecords();renderDebtors();renderSalesTable();editDailyRecord(dailyIndex);
+}
+
+function deleteDailyExpense(dailyIndex, expenseIndex) {
+  const d = dailyData[dailyIndex];
+  if (!d || !d.expenses || !confirm('Delete this expense from the daily record?')) return;
+  d.expenses.splice(expenseIndex,1); recalcDailyRecord(d);
+  localStorage.setItem('dailyData', JSON.stringify(dailyData));
+  renderDailyRecords(); editDailyRecord(dailyIndex);
+}
+
+// ==========================================
+// EDIT ONE SALE FROM DAILY RECORD
+// ==========================================
+function editOneDailySale(dailyIndex,saleIndex){
+  const d=dailyData[dailyIndex], sale=d&&d.sales?d.sales[saleIndex]:null; if(!d||!sale)return;
+  const customer=prompt('Edit Customer Name:',sale.customer||''); if(customer===null)return; if(!customer.trim())return alert('Sales is blank: customer name is required.');
+  const qty=parseFloat(prompt('Edit Quantity:',sale.qty)); if(!Number.isFinite(qty)||qty<=0)return alert('Sales is blank: quantity must be greater than 0.');
+  const total=parseFloat(prompt('Edit Total Amount:',sale.total)); if(!Number.isFinite(total)||total<=0)return alert('Sales is blank: total amount must be greater than 0.');
+  const paid=parseFloat(prompt('Edit Amount Paid:',sale.paid)); if(!Number.isFinite(paid)||paid<0||paid>total)return alert('Invalid amount paid.');
+  saveCustomerSuggestion(customer.trim()); Object.assign(sale,{customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); recalcDailyRecord(d); rebuildAllDebts();
+  localStorage.setItem('dailyData',JSON.stringify(dailyData));localStorage.setItem('debtData',JSON.stringify(debtData)); renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();editDailyRecord(dailyIndex);
+}
+
+// ====== RENDER DAILY RECORD INVOICE ======
+function renderDailyRecordInvoice(d) {
+    const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
+    const manager = document.getElementById('managerName').value || 'Manager';
+    const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
+
+    const win = window.open('', '', 'width=600,height=800');
+    if (!win) { alert("Pop-up blocked! Please allow pop-ups for this site."); return; }
+
+    const totalQty = d.sales.reduce((acc, s) => acc + Number(s.qty), 0);
+
+    for (let i = 0; i < copies; i++) {
+        const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
+
+        win.document.write(`
+            <h2>SORICH CLASSY SERVICES</h2>
+            <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+            <p>08164084402, 07012623006, 08067338211</p>
+            <h3>DAILY RECORD - ${copyName.toUpperCase()} COPY</h3>
+            <p>DATE: ${d.date}</p>
+            <p>ISSUER: ${manager}</p>
+            <hr>
+            <h4>SALES</h4>
+            <table border="1" cellpadding="5" cellspacing="0">
+                <tr>
+                    <th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th>
+                </tr>
+        `);
+
+        d.sales.forEach(s => {
+            win.document.write(`
+                <tr>
+                    <td>${s.customer}</td>
+                    <td>${s.qty}</td>
+                    <td>${s.unit}</td>
+                    <td>${s.total}</td>
+                    <td>${s.paid}</td>
+                    <td>${s.owing}</td>
+                </tr>
+            `);
+        });
+
+        win.document.write(`</table>`);
+        win.document.write(`<p><strong>Total Quantity Sold: ${totalQty}</strong></p>`);
+
+        win.document.write(`
+            <h4>EXPENSES</h4>
+            <table border="1" cellpadding="5" cellspacing="0">
+                <tr><th>Type</th><th>Description</th><th>Amount</th><th>Paid To</th></tr>
+        `);
+
+        d.expenses.forEach(e => {
+            win.document.write(`
+                <tr>
+                    <td>${e.type}</td>
+                    <td>${e.desc}</td>
+                    <td>${e.amount}</td>
+                    <td>${e.paidTo}</td>
+                </tr>
+            `);
+        });
+
+        win.document.write(`</table>`);
+        win.document.write(`
+            <p>Total Sales: ₦${d.totalSales.toFixed(2)}</p>
+            <p>Total Expenses: ₦${d.totalExpenses.toFixed(2)}</p>
+            <p>Net: ₦${d.net.toFixed(2)}</p>
+            <p>${footer}</p>
+            <hr>
+        `);
+    }
+
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+}
+function endOfDay() {
+  if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const chosenDate = prompt('Enter the DATE for this record (YYYY-MM-DD):', todayStr);
+  if (!chosenDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) { alert('Use YYYY-MM-DD.'); return; }
+
+  // IMPORTANT: the date entered here is the actual date of the debt.
+  // If today's work is being closed as yesterday, debt history must show yesterday.
+  salesData.forEach(sale => {
+    const customerName = String(sale.customer || '').toLowerCase();
+    const debt = debtData.find(d => String(d.customer || '').toLowerCase() === customerName);
+    if (!debt || !Array.isArray(debt.history)) return;
+
+    if (sale.debtHistoryId) {
+      const historyItem = debt.history.find(
+        h => h.type === 'debt' && h.saleId === sale.debtHistoryId
+      );
+      if (historyItem) historyItem.date = chosenDate;
+    }
+  });
+
+  // Use the selected date exactly. If a record already exists for that date, merge into it.
+  let d = dailyData.find(x => x.date === chosenDate);
+  if (!d) {
+    d = {date:chosenDate, totalSales:0, totalExpenses:0, net:0, avgUnitPrice:0, sales:[], expenses:[]};
+    dailyData.push(d);
+  }
+  if (!Array.isArray(d.sales)) d.sales = [];
+  if (!Array.isArray(d.expenses)) d.expenses = [];
+
+  salesData.forEach(s => d.sales.push({
+    customer:s.customer,
+    qty:Number(s.qty||0),
+    total:Number(s.total||0),
+    unit:Number(s.unit||0),
+    paid:Number(s.paid||0),
+    owing:Number(s.owing||0),
+    debtHistoryId:s.debtHistoryId || null
+  }));
+  expenseData.forEach(e => d.expenses.push({type:e.type, desc:e.desc, amount:Number(e.amount||0), paidTo:e.paidTo}));
+  recalcDailyRecord(d);
+
+  localStorage.setItem('dailyData', JSON.stringify(dailyData));
+  rebuildAllDebts();
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+  salesData = []; expenseData = [];
+  rebuildAllDebts();
+  localStorage.setItem('salesData','[]'); localStorage.setItem('expenseData','[]');
+  renderSalesTable(); renderExpenses(); renderDebtors(); renderDailyRecords();
+  alert('End of day completed! Record saved under ' + chosenDate + '.');
+}
+
+// ==========================================
+// DEBT LEDGER ENGINE
+// ==========================================
+function normalizeLedgerDate(date){
+  const value=String(date||''); if(/^\d{4}-\d{2}-\d{2}$/.test(value))return value;
+  const m=value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m)return `${m[3]}-${m[2]}-${m[1]}`; return value;
+}
+function collectAllSalesForLedger(){
+  const rows=[];
+  const seen=new Set();
+
+  function addSale(sale,date,fallbackId){
+    const customer=String(sale.customer||'').trim();
+    if(!customer)return;
+
+    /*
+      CRITICAL DUPLICATE PROTECTION:
+      End Of Day can temporarily have the same sale in salesData and dailyData.
+      Count a sale once by debtHistoryId.
+    */
+    const saleId=String(sale.debtHistoryId||fallbackId||'');
+    const uniqueKey=saleId||[
+      customer.toLowerCase(),
+      normalizeLedgerDate(date),
+      String(sale.time||'00:00:00'),
+      Number(sale.qty||0),
+      Number(sale.total||0),
+      Number(sale.paid||0)
+    ].join('|');
+
+    if(seen.has(uniqueKey))return;
+    seen.add(uniqueKey);
+
+    rows.push({
+      customer,
+      debt:Math.max(0,Number(sale.total||0)-Number(sale.paid||0)),
+      paid:Number(sale.paid||0),
+      date:normalizeLedgerDate(date),
+      time:sale.time||'00:00:00',
+      saleId:uniqueKey
+    });
+  }
+
+  dailyData.forEach(day=>{
+    (day.sales||[]).forEach((sale,i)=>{
+      addSale(sale,day.date,`daily-${day.date}-${i}`);
+    });
+  });
+
+  salesData.forEach((sale,i)=>{
+    addSale(sale,sale.date,`live-${i}`);
+  });
+
+  return rows;
 }
 
 
+/*
+  CURRENT DEBT LEDGER
+  -------------------
+  A customer has separate debt cycles.
+
+  Example:
+    Old debt: ₦100,000
+    Payment:  ₦100,000
+    => cycle CLOSED, current owing = ₦0
+
+    Later new debt: ₦17,000
+    => NEW cycle, current owing = ₦17,000
+
+  The old ₦100,000 is history only.
+*/
+function rebuildAllDebts(){
+  const archivedPayments=JSON.parse(localStorage.getItem('debtPaymentArchive')||'{}');
+  const paymentMap={};
+
+  function rememberPayment(customer,p){
+    const key=String(customer||'').trim().toLowerCase();
+    if(!key || !p)return;
+
+    // 'clear' is a settlement, so it also reduces debt to zero.
+    const isPayment=p.type==='payment' || p.type==='clear';
+    if(!isPayment)return;
+
+    const amount=Math.max(0,Number(p.amount||0));
+    if(amount<=0)return;
+
+    const paymentId=String(p.paymentId||'');
+    const unique=paymentId||[
+      key,
+      normalizeLedgerDate(p.date),
+      String(p.time||'00:00:00'),
+      amount
+    ].join('|');
+
+    if(!paymentMap[key])paymentMap[key]={};
+
+    if(!paymentMap[key][unique]){
+      paymentMap[key][unique]={
+        type:'payment',
+        paymentId:paymentId||('payment-legacy-'+unique),
+        date:normalizeLedgerDate(p.date),
+        time:p.time||'00:00:00',
+        amount
+      };
+    }
+  }
+
+  // Permanent payment archive.
+  Object.entries(archivedPayments||{}).forEach(([key,list])=>{
+    (Array.isArray(list)?list:[]).forEach(p=>rememberPayment(key,p));
+  });
+
+  // Current debtor history.
+  debtData.forEach(d=>{
+    const customer=String(d.customer||'').trim();
+    (Array.isArray(d.history)?d.history:[]).forEach(p=>rememberPayment(customer,p));
+  });
+
+  const sales=collectAllSalesForLedger();
+  const customerNames={};
+
+  sales.forEach(s=>{
+    const key=s.customer.toLowerCase();
+    if(!customerNames[key])customerNames[key]=s.customer;
+  });
+
+  Object.keys(paymentMap).forEach(key=>{
+    if(!customerNames[key]){
+      const existing=debtData.find(d=>String(d.customer||'').trim().toLowerCase()===key);
+      customerNames[key]=existing?existing.customer:key;
+    }
+  });
+
+  const rebuilt=[];
+  const finalPaymentArchive={};
+
+  Object.entries(customerNames).forEach(([key,customerName])=>{
+    const customerSales=sales.filter(s=>s.customer.toLowerCase()===key);
+    const payments=Object.values(paymentMap[key]||{});
+    const events=[];
+
+    // Every unpaid sale is a debt event.
+    customerSales.forEach(s=>{
+      const debtAmount=Math.max(0,Number(s.debt||0));
+      if(debtAmount<=0)return;
+
+      events.push({
+        kind:'sale',
+        type:'debt',
+        saleId:s.saleId,
+        date:normalizeLedgerDate(s.date),
+        time:s.time||'00:00:00',
+        amount:debtAmount,
+        salePaid:Number(s.paid||0)
+      });
+    });
+
+    payments.forEach(p=>{
+      events.push({
+        kind:'payment',
+        type:'payment',
+        paymentId:p.paymentId,
+        date:normalizeLedgerDate(p.date),
+        time:p.time||'00:00:00',
+        amount:Number(p.amount||0)
+      });
+    });
+
+    events.sort((a,b)=>{
+      const cmp=ledgerDateTime(a.date,a.time).localeCompare(
+        ledgerDateTime(b.date,b.time)
+      );
+      if(cmp!==0)return cmp;
+
+      // Same timestamp: sale is processed before payment.
+      return a.kind===b.kind?0:(a.kind==='sale'?-1:1);
+    });
+
+    let balance=0;
+    let cycleNumber=0;
+    let currentCycle=null;
+    const cycles=[];
+
+    events.forEach(event=>{
+      if(event.kind==='sale'){
+        // If previous cycle is at zero, this sale starts a new cycle.
+        if(balance<=0){
+          cycleNumber++;
+          currentCycle={
+            id:`${key}-cycle-${cycleNumber}`,
+            number:cycleNumber,
+            startDate:event.date,
+            paid:0,
+            owing:0,
+            closed:false,
+            history:[]
+          };
+          cycles.push(currentCycle);
+          balance=0;
+        }
+
+        const before=balance;
+        balance+=Number(event.amount||0);
+        currentCycle.owing=balance;
+
+        currentCycle.history.push({
+          type:'debt',
+          saleId:event.saleId,
+          date:event.date,
+          time:event.time,
+          amount:Number(event.amount||0),
+          salePaid:Number(event.salePaid||0),
+          balanceBefore:before,
+          balanceAfter:balance,
+          cycleId:currentCycle.id,
+          cycleNumber:currentCycle.number,
+          cycleClosed:false
+        });
+      }
+
+      if(event.kind==='payment'){
+        // A payment cannot revive a cleared/old debt.
+        if(balance<=0)return;
+
+        const before=balance;
+        const applied=Math.min(Number(event.amount||0),balance);
+        if(applied<=0)return;
+
+        balance-=applied;
+        currentCycle.paid+=applied;
+        currentCycle.owing=balance;
+
+        currentCycle.history.push({
+          type:'payment',
+          paymentId:event.paymentId,
+          date:event.date,
+          time:event.time,
+          amount:applied,
+          balanceBefore:before,
+          balanceAfter:balance,
+          cycleId:currentCycle.id,
+          cycleNumber:currentCycle.number,
+          cycleClosed:balance<=0
+        });
+
+        if(balance<=0){
+          balance=0;
+          currentCycle.owing=0;
+          currentCycle.closed=true;
+          currentCycle.closedDate=event.date;
+        }
+      }
+    });
+
+    // Save payments permanently so clearing a debtor does not erase history.
+    finalPaymentArchive[key]=payments.map(p=>({...p}));
+
+    const usefulCycles=cycles.filter(c=>c.history.length);
+
+    // ONLY the latest cycle that still has a positive balance is current.
+    let current=null;
+    for(let i=usefulCycles.length-1;i>=0;i--){
+      if(Number(usefulCycles[i].owing||0)>0){
+        current=usefulCycles[i];
+        break;
+      }
+    }
+
+    // Fully cleared customer is NOT in debtData / Debtors.
+    if(!current)return;
+
+    const history=[];
+    usefulCycles.forEach(c=>{
+      c.history.forEach(h=>history.push({...h}));
+    });
+
+    const lastDebt=history
+      .filter(h=>h.type==='debt' && Number(h.amount||0)>0)
+      .sort((a,b)=>ledgerDateTime(a.date,a.time).localeCompare(
+        ledgerDateTime(b.date,b.time)
+      ))
+      .pop();
+
+    rebuilt.push({
+      customer:customerName,
+      owing:Number(current.owing||0),
+      totalPaid:Number(current.paid||0),
+      lastDebtDate:lastDebt?lastDebt.date:'-',
+      currentCycleId:current.id,
+      currentCycleNumber:current.number,
+      history
+    });
+  });
+
+  localStorage.setItem('debtPaymentArchive',JSON.stringify(finalPaymentArchive));
+  debtData=rebuilt;
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+}
 let chartInstances={};
 function destroyCharts(){Object.values(chartInstances).forEach(c=>{try{c.destroy()}catch(e){}});chartInstances={};}
 function chartBase(id,config){const el=document.getElementById(id);if(!el||typeof Chart==='undefined')return;chartInstances[id]=new Chart(el.getContext('2d'),config);}
