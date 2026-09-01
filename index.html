@@ -25,8 +25,7 @@ body.dark-mode th {background-color:#003366;}
 .invoice-content {background:#fff;padding:20px;width:90%;max-width:600px;border-radius:10px;overflow:auto;max-height:90%;}
 .close-btn {float:right;background:red;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Fully offline: no external libraries required. -->
 </head>
 <body>
 
@@ -76,6 +75,7 @@ body.dark-mode th {background-color:#003366;}
 <div id="salesPage" class="section" style="display:none;">
 <h2>Sales</h2>
 
+<label>Product Type: <input type="text" id="saleProductType" value="Rich Table Water" readonly style="font-weight:bold;"></label>
 <label>Customer: 
   <input type="text" id="saleCustomer" list="customerList" placeholder="New or select customer" oninput="handleCustomerTyping()">
 </label>
@@ -343,6 +343,7 @@ function handleCustomerTyping(){
 }
 function prefillOwing(){handleCustomerTyping();}
 function addSale(){
+  try {
   const customer=document.getElementById('saleCustomer').value.trim();
   const qty=parseFloat(saleQty.value), total=parseFloat(saleTotal.value), paid=parseFloat(salePaid.value);
   if(!customer){alert('Sales is blank: please enter the customer name.');return;}
@@ -351,11 +352,13 @@ function addSale(){
   if(!Number.isFinite(paid)||paid<0||paid>total){alert('Please enter a valid Amount Paid.');return;}
   saveCustomerSuggestion(customer);
   const now=new Date(), debtHistoryId=Date.now()+'-'+Math.random().toString(36).slice(2);
-  salesData.push({customer,qty,total,unit:total/qty,paid,owing:total-paid,prevDebt:0,date:now.toLocaleDateString('en-GB'),time:now.toLocaleTimeString('en-GB'),debtHistoryId});
+  salesData.push({productType:'Rich Table Water',customer,qty,total,unit:total/qty,paid,owing:total-paid,prevDebt:0,date:now.toLocaleDateString('en-GB'),time:now.toLocaleTimeString('en-GB'),debtHistoryId});
   rebuildAllDebts();
   localStorage.setItem('salesData',JSON.stringify(salesData)); localStorage.setItem('debtData',JSON.stringify(debtData));
   renderSalesTable(); renderDebtors(); updateCustomerSuggestions();
   document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2500; salePrevDebt.value=0; updateSaleCalc();
+  alert('Sale added successfully.');
+  } catch(error) { console.error(error); alert('Could not add sale. Please refresh the page and try again.'); }
 }
 
 function renderSalesTable(){
@@ -474,9 +477,10 @@ function renderSalesTable(){
 function renderDebtors(){
   const table=document.getElementById('debtorsTable');
   const search=(document.getElementById('debtorSearch')?.value||'').toLowerCase().trim();
+
   if(!table)return;
 
-  // Rebuild debtor ledger without touching salesData or dailyData
+  // Rebuild the debt ledger first
   rebuildAllDebts();
 
   table.innerHTML=`<tr>
@@ -488,18 +492,6 @@ function renderDebtors(){
     <th>Status</th>
     <th>Action</th>
   </tr>`;
-
-  /*
-    IMPORTANT FIX:
-
-    Do NOT use the index from filter/sort.
-
-    Instead, keep the actual debtor object and find its
-    real index inside debtData before opening History,
-    Pay, or Clear.
-
-    This prevents CUSTOMER A's button from opening CUSTOMER B.
-  */
 
   debtData
     .filter(d => Number(d.owing || 0) > 0)
@@ -516,23 +508,35 @@ function renderDebtors(){
     )
     .forEach(d => {
 
-      // Get the REAL index in debtData
-      const realIndex = debtData.indexOf(d);
-
       const row=table.insertRow();
 
+      // ==========================================
+      // CURRENT DEBT = ORIGINAL TOTAL DEBT
+      // CURRENT OWING = REMAINING BALANCE
+      // ==========================================
+
       row.insertCell(0).innerText=d.customer;
-      row.insertCell(1).innerText=formatMoney(d.owing);
-      row.insertCell(2).innerText=formatMoney(d.totalPaid);
-      row.insertCell(3).innerText=formatMoney(d.owing);
-      row.insertCell(4).innerText=d.lastDebtDate || '-';
+
+      row.insertCell(1).innerText=
+        '₦' + formatMoney(d.currentDebt || 0);
+
+      row.insertCell(2).innerText=
+        '₦' + formatMoney(d.totalPaid || 0);
+
+      row.insertCell(3).innerText=
+        '₦' + formatMoney(d.owing || 0);
+
+      row.insertCell(4).innerText=
+        d.lastDebtDate || '-';
+
       row.insertCell(5).innerText='❌ OWING';
 
       const action=row.insertCell(6);
 
-      // ==============================
-      // HISTORY BUTTON
-      // ==============================
+      // ==========================================
+      // HISTORY
+      // ==========================================
+
       const historyBtn=document.createElement('button');
 
       historyBtn.innerText='📅 History';
@@ -546,7 +550,6 @@ function renderDebtors(){
 
       historyBtn.onclick=()=>{
 
-        // Re-find the customer by name to make this extra safe
         const currentIndex=debtData.findIndex(
           x =>
             String(x.customer || '').trim().toLowerCase() ===
@@ -564,9 +567,10 @@ function renderDebtors(){
       action.appendChild(historyBtn);
 
 
-      // ==============================
-      // PAY BUTTON
-      // ==============================
+      // ==========================================
+      // PAY CURRENT
+      // ==========================================
+
       const payBtn=document.createElement('button');
 
       payBtn.innerText='💰 Pay Current';
@@ -574,7 +578,6 @@ function renderDebtors(){
 
       payBtn.onclick=()=>{
 
-        // Re-find the exact customer before paying
         const currentIndex=debtData.findIndex(
           x =>
             String(x.customer || '').trim().toLowerCase() ===
@@ -592,9 +595,10 @@ function renderDebtors(){
       action.appendChild(payBtn);
 
 
-      // ==============================
-      // CLEAR BUTTON
-      // ==============================
+      // ==========================================
+      // CLEAR
+      // ==========================================
+
       const clearBtn=document.createElement('button');
 
       clearBtn.innerText='🗑 Clear';
@@ -604,7 +608,6 @@ function renderDebtors(){
 
       clearBtn.onclick=()=>{
 
-        // Re-find the exact customer before clearing
         const currentIndex=debtData.findIndex(
           x =>
             String(x.customer || '').trim().toLowerCase() ===
@@ -791,6 +794,7 @@ function printInvoice(sale){
   const f=document.getElementById('invoiceFooter').value||'Drink It. Love It.';
   const now=new Date(); 
   const customer=sale?sale.customer:document.getElementById('saleCustomer').value||'Customer';
+  const productType=sale?sale.productType||'Rich Table Water':'Rich Table Water';
   const qty=sale?sale.qty:parseFloat(document.getElementById('saleQty').value)||0;
   const total=sale?sale.total:parseFloat(document.getElementById('saleTotal').value)||0;
   const paid=sale?sale.paid:parseFloat(document.getElementById('salePaid').value)||0;
@@ -800,7 +804,7 @@ function printInvoice(sale){
   const win=window.open('','PRINT','width=600,height=800');
   for(let i=0;i<copies;i++){
     const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
-    win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
+    win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p><strong>PRODUCT:</strong> ${productType}</p><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
     win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
   }
   win.document.close(); win.focus(); win.print(); win.close();
@@ -1101,10 +1105,10 @@ function editDailyRecord(dailyIndex) {
   Object.assign(content.style, {background:'#fff',color:'#000',width:'96%',maxWidth:'1100px',maxHeight:'92vh',overflow:'auto',padding:'20px',borderRadius:'10px',boxSizing:'border-box'});
 
   const salesRows = d.sales.map((s,i)=>`<tr>
-    <td>${s.customer || ''}</td><td>${Number(s.qty||0)}</td><td>₦${formatMoney(s.total)}</td><td>₦${formatMoney(s.paid)}</td><td>₦${formatMoney(s.owing)}</td>
+    <td>${s.productType || 'Rich Table Water'}</td><td>${s.customer || ''}</td><td>${Number(s.qty||0)}</td><td>₦${formatMoney(s.total)}</td><td>₦${formatMoney(s.paid)}</td><td>₦${formatMoney(s.owing)}</td>
     <td><button onclick="editOneDailySale(${dailyIndex},${i})">✏️ Edit</button>
     <button onclick="deleteDailySale(${dailyIndex},${i})" style="background:red;color:#fff">🗑 Delete</button></td>
-  </tr>`).join('') || '<tr><td colspan="6">No sales yet.</td></tr>';
+  </tr>`).join('') || '<tr><td colspan="7">No sales yet.</td></tr>';
 
   const expenseRows = d.expenses.map((e,i)=>`<tr>
     <td>${i+1}</td><td>${e.type || ''}</td><td>${e.desc || ''}</td><td>₦${formatMoney(e.amount)}</td><td>${e.paidTo || ''}</td>
@@ -1119,7 +1123,7 @@ function editDailyRecord(dailyIndex) {
 
     <h3>🛒 SALES</h3>
     <table style="width:100%;border-collapse:collapse">
-      <tr style="background:#cceeff"><th>Customer</th><th>Qty</th><th>Total</th><th>Paid</th><th>Owing</th><th>Action</th></tr>
+      <tr style="background:#cceeff"><th>Product</th><th>Customer</th><th>Qty</th><th>Total</th><th>Paid</th><th>Owing</th><th>Action</th></tr>
       ${salesRows}
     </table>
     <br><button onclick="addSaleToDailyRecord(${dailyIndex})" style="background:#008000;color:#fff">➕ Add More Sale</button>
@@ -1145,7 +1149,7 @@ function addSaleToDailyRecord(dailyIndex){
   const qty=parseFloat(prompt('Quantity:','10')); if(!Number.isFinite(qty)||qty<=0){alert('Sales is blank: please enter a quantity greater than 0.');return;}
   const total=parseFloat(prompt('Total Amount:','2500')); if(!Number.isFinite(total)||total<=0){alert('Sales is blank: please enter a Total Amount greater than 0.');return;}
   const paid=parseFloat(prompt('Amount Paid:',String(total))); if(!Number.isFinite(paid)||paid<0||paid>total){alert('Please enter a valid Amount Paid.');return;}
-  saveCustomerSuggestion(customer.trim()); d.sales.push({customer:customer.trim(),qty,total,unit:total/qty,paid,owing:total-paid,debtHistoryId:Date.now()+'-'+Math.random().toString(36).slice(2)});
+  saveCustomerSuggestion(customer.trim()); d.sales.push({productType:'Rich Table Water',customer:customer.trim(),qty,total,unit:total/qty,paid,owing:total-paid,debtHistoryId:Date.now()+'-'+Math.random().toString(36).slice(2)});
   recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
   renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();editDailyRecord(dailyIndex);
 }
@@ -1173,7 +1177,7 @@ function editOneDailySale(dailyIndex,saleIndex){
   const qty=parseFloat(prompt('Edit Quantity:',sale.qty)); if(!Number.isFinite(qty)||qty<=0)return alert('Sales is blank: quantity must be greater than 0.');
   const total=parseFloat(prompt('Edit Total Amount:',sale.total)); if(!Number.isFinite(total)||total<=0)return alert('Sales is blank: total amount must be greater than 0.');
   const paid=parseFloat(prompt('Edit Amount Paid:',sale.paid)); if(!Number.isFinite(paid)||paid<0||paid>total)return alert('Invalid amount paid.');
-  saveCustomerSuggestion(customer.trim()); Object.assign(sale,{customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); recalcDailyRecord(d); rebuildAllDebts();
+  saveCustomerSuggestion(customer.trim()); Object.assign(sale,{productType:'Rich Table Water',customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); recalcDailyRecord(d); rebuildAllDebts();
   localStorage.setItem('dailyData',JSON.stringify(dailyData));localStorage.setItem('debtData',JSON.stringify(debtData)); renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();editDailyRecord(dailyIndex);
 }
 
@@ -1202,13 +1206,14 @@ function renderDailyRecordInvoice(d) {
             <h4>SALES</h4>
             <table border="1" cellpadding="5" cellspacing="0">
                 <tr>
-                    <th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th>
+                    <th>Product</th><th>Customer</th><th>Qty</th><th>Unit</th><th>Total</th><th>Paid</th><th>Owing</th>
                 </tr>
         `);
 
         d.sales.forEach(s => {
             win.document.write(`
                 <tr>
+                    <td>${s.productType || 'Rich Table Water'}</td>
                     <td>${s.customer}</td>
                     <td>${s.qty}</td>
                     <td>${s.unit}</td>
@@ -1468,14 +1473,14 @@ function editSale(index){
   const qty=parseFloat(prompt('Edit Quantity:',sale.qty)); if(!Number.isFinite(qty)||qty<=0)return alert('Sales is blank: quantity must be greater than 0.');
   const total=parseFloat(prompt('Edit Total Amount:',sale.total)); if(!Number.isFinite(total)||total<=0)return alert('Sales is blank: total amount must be greater than 0.');
   const paid=parseFloat(prompt('Edit Amount Paid:',sale.paid)); if(!Number.isFinite(paid)||paid<0||paid>total)return alert('Invalid amount paid.');
-  saveCustomerSuggestion(customer.trim()); Object.assign(sale,{customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); rebuildAllDebts();
+  saveCustomerSuggestion(customer.trim()); Object.assign(sale,{productType:'Rich Table Water',customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); rebuildAllDebts();
   localStorage.setItem('salesData',JSON.stringify(salesData));localStorage.setItem('debtData',JSON.stringify(debtData));renderSalesTable();renderDebtors();updateCustomerSuggestions();
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
 let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
-  username: 'admin',
-  password: 'admin'
+  username: 'manager',
+  password: '1234'
 };
 
 
