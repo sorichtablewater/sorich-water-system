@@ -1310,21 +1310,70 @@ function collectAllSalesForLedger(){
 
 function getOldPaymentRecords(){
   const result=[];
-  (Array.isArray(debtData)?debtData:[]).forEach(d=>{
+
+  // Read the LAST saved debt ledger before rebuild. This is important because
+  // older versions of the app used clearDebtor() by setting owing to 0 only.
+  // We preserve that old "cleared" state instead of letting rebuild resurrect
+  // the old debt from Daily Records.
+  let savedDebts=[];
+  try{
+    const raw=JSON.parse(localStorage.getItem('debtData')||'[]');
+    if(Array.isArray(raw)) savedDebts=raw;
+  }catch(e){ savedDebts=[]; }
+
+  savedDebts.forEach(d=>{
     const customer=String(d.customer||'').trim();
     if(!customer)return;
-    (Array.isArray(d.history)?d.history:[]).forEach(h=>{
+    const history=Array.isArray(d.history)?d.history:[];
+
+    let recordedPayments=0;
+    history.forEach(h=>{
       if(h && h.type==='payment' && Number(h.amount||0)>0){
+        const amount=Number(h.amount||0);
+        recordedPayments+=amount;
         result.push({
-          type:'payment', customer,
-          date:normalizeLedgerDate(h.date), time:h.time||'00:00:00',
-          amount:Number(h.amount||0),
+          type:'payment',
+          customer,
+          date:normalizeLedgerDate(h.date),
+          time:h.time||'00:00:00',
+          amount,
           targetDate:normalizeLedgerDate(h.targetDate||h.debtDate||h.date),
           paymentId:h.paymentId||(`old-payment-${customer}-${h.date}-${h.time||''}-${Math.random()}`)
         });
       }
     });
+
+    // LEGACY CLEAR MIGRATION:
+    // If an older version saved this customer with owing = 0, but the Daily
+    // Records still contain more debt than the recorded payments, the user
+    // had already cleared that remaining debt. Create a permanent payment
+    // record for that residual amount so rebuild cannot bring it back.
+    const savedOwing=Number(d.owing);
+    const debtFromHistory=history
+      .filter(h=>h && h.type==='debt')
+      .reduce((sum,h)=>sum+Math.max(0,Number(h.amount||0)),0);
+
+    if(savedOwing===0 && debtFromHistory>recordedPayments+0.000001){
+      const residual=debtFromHistory-recordedPayments;
+      const debtDates=history
+        .filter(h=>h && h.type==='debt' && h.date)
+        .map(h=>normalizeLedgerDate(h.date))
+        .filter(Boolean)
+        .sort();
+      const clearDate=debtDates.length?debtDates[debtDates.length-1]:normalizeLedgerDate(new Date());
+      result.push({
+        type:'payment',
+        customer,
+        date:clearDate,
+        time:'23:59:59',
+        amount:residual,
+        targetDate:clearDate,
+        paymentId:`legacy-clear-${ledgerCustomerKey(customer)}-${clearDate}-${residual.toFixed(2)}`,
+        legacyClear:true
+      });
+    }
   });
+
   return result;
 }
 
