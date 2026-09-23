@@ -255,6 +255,7 @@ body.dark-mode th {background-color:#003366;}
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;">
     <div style="background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><h3>📊 Sales by Day</h3><canvas id="salesByDayChart"></canvas></div>
     <div style="background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><h3>💰 Expenses by Day</h3><canvas id="expensesByDayChart"></canvas></div>
+    <div style="background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><h3>📊 Expense Breakdown (%)</h3><canvas id="expenseBreakdownChart"></canvas></div>
     <div style="background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><h3>📈 Sales vs Expenses</h3><canvas id="salesVsExpensesChart"></canvas></div>
     <div style="background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><h3>🏆 Top Customers by Sales Value</h3><canvas id="topCustomersChart"></canvas></div>
     <div style="background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><h3>📦 Quantity Sold by Customer</h3><canvas id="quantityByCustomerChart"></canvas></div>
@@ -1744,6 +1745,21 @@ function renderChart(){
   const ts=Object.entries(cs).sort((a,b)=>b[1]-a[1]).slice(0,10),tq=Object.entries(cq).sort((a,b)=>b[1]-a[1]).slice(0,10);
   chartBase('topCustomersChart',{type:'bar',data:{labels:ts.map(x=>x[0]),datasets:[{label:'Sales Value (₦)',data:ts.map(x=>x[1])}]},options:{indexAxis:'y',responsive:true}});
   chartBase('quantityByCustomerChart',{type:'bar',data:{labels:tq.map(x=>x[0]),datasets:[{label:'Quantity',data:tq.map(x=>x[1])}]},options:{indexAxis:'y',responsive:true}});
+
+  const expenseBreakdown = buildExpenseBreakdown(
+    dailyData.length ? dailyData : [{ expenses: expenseData }]
+  );
+  chartBase('expenseBreakdownChart',{
+    type:'doughnut',
+    data:{
+      labels:expenseBreakdown.map(x=>x.category),
+      datasets:[{label:'Expense Share (%)',data:expenseBreakdown.map(x=>Number(x.percent.toFixed(2)))}]
+    },
+    options:{
+      responsive:true,
+      plugins:{tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${Number(ctx.raw).toFixed(1)}%`}}}
+    }
+  });
 }
 
 // ====== EDIT SALE FUNCTION ======
@@ -1763,6 +1779,259 @@ let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
   password: 'admin'
 };
 
+
+
+// ====== EXPENSE BREAKDOWN HELPERS ======
+function getExpenseCategory(expense) {
+  const type = String(expense?.type || '').trim();
+  const desc = String(expense?.desc || '').trim();
+  const paidTo = String(expense?.paidTo || '').trim();
+  const raw = `${type} ${desc} ${paidTo}`.toLowerCase().replace(/[^a-z0-9&+ ]/g, ' ');
+
+  // Consolidate similar expense names so repeated entries appear ONCE in the summary.
+  if (/\b(borrow|borrowed|borrowing|loan|loans)\b/.test(raw)) return 'Borrow';
+  if (/\b(fuel|diesel|petrol|gas|generator fuel)\b/.test(raw)) return 'Fuel';
+  if (/\b(supply|supplies|supply money|material|materials|raw material|packaging material)\b/.test(raw)) return 'Supply Money';
+  if (/\b(bagging|bagger|bagging fee|operator|operators|machine operator|production operator)\b/.test(raw)) return 'Bagging & Operator';
+  if (/\b(salary|salaries|wage|wages|staff pay|worker pay|workers pay|staff)\b/.test(raw)) return 'Salaries / Wages';
+  if (/\b(transport|transportation|delivery|dispatch|fare)\b/.test(raw)) return 'Transport / Delivery';
+  if (/\b(electricity|power|nepa|phcn|light bill)\b/.test(raw)) return 'Electricity / Power';
+  if (/\b(repair|repairs|maintenance|fix)\b/.test(raw)) return 'Repairs / Maintenance';
+  if (/\b(water|water bill)\b/.test(raw)) return 'Water';
+
+  // If no known family matches, retain the entered type as its own summary bucket.
+  return type || desc || 'Other';
+}
+
+function buildExpenseBreakdown(records) {
+  const totals = {};
+  let grandTotal = 0;
+
+  (records || []).forEach(d => {
+    (d.expenses || []).forEach(e => {
+      const amount = Number(e.amount) || 0;
+      if (amount <= 0) return;
+      const category = getExpenseCategory(e);
+      totals[category] = (totals[category] || 0) + amount;
+      grandTotal += amount;
+    });
+  });
+
+  return Object.entries(totals)
+    .map(([category, amount]) => ({
+      category,
+      amount,
+      percent: grandTotal ? (amount / grandTotal) * 100 : 0
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function getExpenseSummaryComment(breakdown) {
+  if (!breakdown.length) return 'No expense was recorded for this period.';
+  const highest = breakdown[0];
+  const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
+  return `Highest expense: ${escapeReportHtml(highest.category)} — ₦${highest.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} (${highest.percent.toFixed(1)}% of total expenses). Total expenses: ₦${total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}.`;
+}
+
+function escapeReportHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function buildExpenseBreakdownChart(breakdown) {
+  if (!breakdown.length) {
+    return '<div class="expense-chart-empty">No expense entries recorded.</div>';
+  }
+
+  const colors = [
+    '#ff6384','#36a2eb','#ffce56','#4bc0c0','#9966ff',
+    '#ff9f40','#22c55e','#ef4444','#06b6d4','#8b5cf6',
+    '#f97316','#14b8a6','#eab308','#ec4899','#64748b'
+  ];
+
+  let start = 0;
+  const segments = breakdown.map((item, index) => {
+    const end = start + item.percent;
+    const segment = `${colors[index % colors.length]} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+    start = end;
+    return segment;
+  });
+
+  const legend = breakdown.map((item, index) => `
+    <div class="expense-legend-item">
+      <span class="expense-dot" style="background:${colors[index % colors.length]}"></span>
+      <span class="expense-legend-name">${escapeReportHtml(item.category)}</span>
+      <strong>${item.percent.toFixed(1)}%</strong>
+      <span>₦${item.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+    </div>
+  `).join('');
+
+  return `
+    <div class="expense-breakdown-wrap">
+      <div class="expense-donut" style="background:conic-gradient(${segments.join(',')})">
+        <div class="expense-donut-hole">
+          <strong>100%</strong>
+          <span>Expenses</span>
+        </div>
+      </div>
+      <div class="expense-legend">${legend}</div>
+    </div>
+  `;
+}
+
+function buildReportStyles() {
+  return `
+    <style>
+      @page { margin: 12mm; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(to bottom,#cceeff,#fff);
+        color: #111;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        padding: 20px;
+        min-height: 100vh;
+      }
+      .report-copy {
+        background: linear-gradient(to bottom,#cceeff,#fff);
+        border: 1px solid #8ccff0;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.08);
+        page-break-after: always;
+      }
+      .report-copy:last-child { page-break-after: auto; }
+      .report-header {
+        text-align: center;
+        color: #0066cc;
+        background: rgba(255,255,255,.72);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      h2 { margin: 4px 0 8px; color:#0066cc; }
+      h3 { color:#0057a8; margin-top:20px; }
+      h4 { color:#0066cc; margin-bottom:8px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0 14px;
+        background: rgba(255,255,255,.9);
+      }
+      th, td {
+        border: 1px solid #6fbce5;
+        padding: 7px;
+        text-align: center;
+      }
+      th {
+        background: #cceeff;
+        color: #004f8f;
+      }
+      .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 12px 0;
+      }
+      .summary-card {
+        background: #f0f8ff;
+        border: 1px solid #b8e1f5;
+        border-radius: 9px;
+        padding: 10px;
+        text-align: center;
+      }
+      .summary-card strong { display:block; color:#0066cc; font-size:17px; }
+      .expense-breakdown {
+        background: rgba(255,255,255,.92);
+        border: 1px solid #8ccff0;
+        border-radius: 12px;
+        padding: 14px;
+        margin: 16px 0;
+      }
+      .expense-breakdown-wrap {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .expense-donut {
+        width: 210px;
+        height: 210px;
+        border-radius: 50%;
+        position: relative;
+        flex: 0 0 210px;
+      }
+      .expense-donut-hole {
+        position: absolute;
+        inset: 38px;
+        border-radius: 50%;
+        background: #fff;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        text-align:center;
+        box-shadow: 0 0 0 1px #d7edf8;
+      }
+      .expense-donut-hole strong { font-size:28px; color:#0066cc; }
+      .expense-donut-hole span { font-size:12px; color:#555; }
+      .expense-legend {
+        flex: 1;
+        min-width: 280px;
+      }
+      .expense-legend-item {
+        display: grid;
+        grid-template-columns: 14px minmax(100px,1fr) 60px 110px;
+        gap: 7px;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px dashed #c9e5f3;
+      }
+      .expense-legend-item:last-child { border-bottom: 0; }
+      .expense-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .expense-legend-item strong { color:#0057a8; }
+      .expense-legend-item span:last-child { text-align:right; }
+      .highest-expense-comment {
+        margin: 12px 0 0;
+        padding: 10px 12px;
+        border-left: 5px solid #2563eb;
+        background: #eef6ff;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      .expense-chart-empty {
+        padding: 25px;
+        text-align:center;
+        color:#666;
+      }
+      .total-row { font-weight:bold; background:#e8f6ff; }
+      .section-note {
+        background:#fff8d9;
+        border-left:5px solid #ffce56;
+        padding:9px 12px;
+        border-radius:6px;
+      }
+      @media print {
+        body { padding: 0; }
+        .report-copy { box-shadow:none; }
+      }
+    </style>
+  `;
+}
 
 // ====== MONTHLY STATEMENT FUNCTION ======
 function printMonthlyStatement() {
@@ -1800,6 +2069,7 @@ function printMonthlyStatement() {
 
   let materialTotal = 0, packingBagTotal = 0, dieselTotal = 0;
   let materialRows = "", packingRows = "", dieselRows = "";
+  const monthlyExpenseBreakdown = buildExpenseBreakdown(monthRecords);
 
   // PEOPLE PAYMENTS PER DATE
   const payments = {
@@ -1983,6 +2253,15 @@ const dailyAvgUnit = dailyQty
       </table>
     `);
 
+    win.document.write(`
+      <section class="expense-breakdown">
+        <h3>📊 ${year}-${monthStr} EXPENSE BREAKDOWN — 100%</h3>
+        <p class="section-note">Each percentage shows how much of the month's total recorded expenses went to that expense category.</p>
+        ${buildExpenseBreakdownChart(monthlyExpenseBreakdown)}
+        <p class="highest-expense-comment">🔎 <strong>Summary:</strong> ${getExpenseSummaryComment(monthlyExpenseBreakdown)}</p>
+      </section>
+    `);
+
     // MATERIAL, PACKING, DIESEL TABLES
     const renderExpenseTable = (title, rows, total) => {
       win.document.write(`<br><h4>${title}</h4>
@@ -2045,9 +2324,10 @@ const dailyAvgUnit = dailyQty
       </table>
     `);
 
-    win.document.write(`<p>${footer}</p><hr>`);
+    win.document.write(`<p>${escapeReportHtml(footer)}</p><hr></div>`);
   }
 
+  win.document.write('</body></html>');
   win.document.close();
   win.focus();
   win.print();
@@ -2073,7 +2353,47 @@ const dailyAvgUnit = dailyQty
 
 
 
-function printWeeklyStatement() {
+async function showWeeklyProfitDeductionDialog() {
+  return new Promise(resolve => {
+    const existing = document.getElementById('weeklyProfitDeductionModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'weeklyProfitDeductionModal';
+    modal.style.cssText = `
+      position:fixed; inset:0; z-index:999999;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55); padding:20px;
+      font-family:Arial,sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <div style="background:#fff; width:min(520px,95vw); border-radius:16px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.3); text-align:center;">
+        <div style="font-size:42px; margin-bottom:8px;">💰</div>
+        <h2 style="margin:0 0 12px; color:#123;">Material / Packing Bag Deduction</h2>
+        <p style="font-size:17px; line-height:1.5; margin:0 0 24px;">
+          Do you want to deduct a <strong>Material / Packing Bag</strong> amount from the Net Profit for this Weekly Statement?
+        </p>
+        <div style="display:flex; gap:14px; justify-content:center;">
+          <button type="button" id="weeklyDeductYes" style="min-width:140px; padding:14px 22px; border:0; border-radius:10px; background:#16a34a; color:#fff; font-size:17px; font-weight:bold; cursor:pointer;">YES</button>
+          <button type="button" id="weeklyDeductNo" style="min-width:140px; padding:14px 22px; border:0; border-radius:10px; background:#dc2626; color:#fff; font-size:17px; font-weight:bold; cursor:pointer;">NO</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const finish = value => {
+      modal.remove();
+      resolve(value);
+    };
+
+    modal.querySelector('#weeklyDeductYes').addEventListener('click', () => finish(true));
+    modal.querySelector('#weeklyDeductNo').addEventListener('click', () => finish(false));
+  });
+}
+
+async function printWeeklyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
     return;
@@ -2102,6 +2422,50 @@ function printWeeklyStatement() {
     return;
   }
 
+  // OPTIONAL MATERIAL / PACKING-BAG DEDUCTION FOR PROFIT SHARING
+  // The normal weekly net remains unchanged unless the user chooses YES.
+  let materialPackingDeduction = 0;
+  weekRecords.forEach(d => {
+    (d.expenses || []).forEach(e => {
+      const amount = Number(e.amount) || 0;
+      const type = (e.type || '').toLowerCase().trim();
+      const desc = (e.desc || '').toLowerCase().trim();
+
+      if (
+        type.includes('material') ||
+        desc.includes('material') ||
+        type.includes('packing') ||
+        desc.includes('packing') ||
+        desc.includes('packing bag') ||
+        desc.includes('bag')
+      ) {
+        materialPackingDeduction += amount;
+      }
+    });
+  });
+
+  // Ask the user with a real YES / NO popup. The amount is entered only after YES.
+  const deductMaterialPacking = await showWeeklyProfitDeductionDialog();
+  let sharingDeductionAmount = 0;
+
+  if (deductMaterialPacking) {
+    const enteredAmount = prompt(
+      `Enter the Material / Packing Bag amount to deduct from Net Profit for this week.\n\n` +
+      `Suggested reference from recorded expenses: ₦${materialPackingDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      materialPackingDeduction > 0 ? materialPackingDeduction.toFixed(2) : ''
+    );
+
+    if (enteredAmount === null) {
+      return;
+    }
+
+    sharingDeductionAmount = Number(String(enteredAmount).replace(/[^0-9.-]/g, ''));
+    if (!Number.isFinite(sharingDeductionAmount) || sharingDeductionAmount < 0) {
+      alert('Please enter a valid positive amount.');
+      return;
+    }
+  }
+
   const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
@@ -2112,6 +2476,7 @@ function printWeeklyStatement() {
   let totalQty = 0;
 
   const weekCustomers = new Set();
+  const weeklyExpenseBreakdown = buildExpenseBreakdown(weekRecords);
 
   weekRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
@@ -2154,12 +2519,23 @@ function printWeeklyStatement() {
     ? (totalSales / totalQty).toFixed(2)
     : "0.00";
 
-  const win = window.open('', '', 'width=1000,height=800');
+  const normalNetProfit = totalNet;
+  const totalSharingProfit = deductMaterialPacking
+    ? normalNetProfit - sharingDeductionAmount
+    : normalNetProfit;
+
+  const sharingProfitLabel = deductMaterialPacking
+    ? 'Total Sharing Profit'
+    : 'Normal Net Profit';
+
+  const win = window.open('', '', 'width=1100,height=900');
 
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
     return;
   }
+
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">' + buildReportStyles() + '</head><body>');
 
   for (let i = 0; i < copies; i++) {
 
@@ -2167,16 +2543,17 @@ function printWeeklyStatement() {
       ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
-      <h2>SORICH CLASSY SERVICES</h2>
-      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-      <p>08164084402, 07012623006, 08067338211</p>
+      <div class="report-copy">
+      <div class="report-header">
+        <h2>SORICH CLASSY SERVICES</h2>
+        <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+        <p>08164084402, 07012623006, 08067338211</p>
 
-      <h3>DATE RANGE SALES REPORT - ${copyName.toUpperCase()} COPY</h3>
+        <h3>DATE RANGE SALES REPORT - ${copyName.toUpperCase()} COPY</h3>
 
-      <p><strong>Period:</strong> ${start} TO ${end}</p>
-      <p><strong>ISSUER:</strong> ${manager}</p>
-
-      <hr>
+        <p><strong>Period:</strong> ${start} TO ${end}</p>
+        <p><strong>ISSUER:</strong> ${escapeReportHtml(manager)}</p>
+      </div>
     `);
 
     // DEBTORS
@@ -2279,8 +2656,23 @@ function printWeeklyStatement() {
       <p><strong>Total Expenses:</strong>
       ₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
 
-      <p><strong>Net Balance:</strong>
-      ₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+      <p><strong>Normal Net Profit:</strong>
+      ₦${normalNetProfit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+
+      ${deductMaterialPacking ? `
+      <p><strong>Material / Packing Bag Deduction:</strong>
+      -₦${sharingDeductionAmount.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+
+      <p style="font-size:18px; font-weight:bold;">
+        <strong>Total Sharing Profit:</strong>
+        ₦${totalSharingProfit.toLocaleString(undefined,{minimumFractionDigits:2})}
+      </p>
+      ` : `
+      <p style="font-size:18px; font-weight:bold;">
+        <strong>Normal Net Profit:</strong>
+        ₦${totalSharingProfit.toLocaleString(undefined,{minimumFractionDigits:2})}
+      </p>
+      `}
 
       <p><strong>Total Quantity Sold:</strong>
       ${totalQty}</p>
@@ -2288,12 +2680,21 @@ function printWeeklyStatement() {
       <p><strong>Average Unit Price:</strong>
       ₦${avgUnitPrice}</p>
 
-      <p>${footer}</p>
+    `);
 
-      <hr>
+    win.document.write(`
+      <section class="expense-breakdown">
+        <h3>📊 EXPENSE BREAKDOWN — 100%</h3>
+        <p class="section-note">Every recorded expense category is shown by its share of total expenses for this selected period.</p>
+        ${buildExpenseBreakdownChart(weeklyExpenseBreakdown)}
+        <p class="highest-expense-comment">🔎 <strong>Summary:</strong> ${getExpenseSummaryComment(weeklyExpenseBreakdown)}</p>
+      </section>
+      <p>${escapeReportHtml(footer)}</p>
+      <hr></div>
     `);
   }
 
+  win.document.write('</body></html>');
   win.document.close();
   win.focus();
   win.print();
