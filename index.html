@@ -2173,6 +2173,57 @@ function buildReportStyles() {
         text-align:center;
         color:#666;
       }
+      .monthly-daily-expenses {
+        background: rgba(255,255,255,.92);
+        border: 1px solid #8ccff0;
+        border-radius: 12px;
+        padding: 14px;
+        margin: 16px 0;
+      }
+      .category-daily-card {
+        background:#f8fcff;
+        border:1px solid #b8e1f5;
+        border-radius:10px;
+        padding:10px;
+        margin:12px 0;
+        page-break-inside: avoid;
+      }
+      .category-daily-heading {
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:center;
+        background:#e8f6ff;
+        padding:9px 12px;
+        border-radius:8px;
+        color:#0057a8;
+      }
+      .category-daily-heading span { color:#111; font-weight:bold; }
+      .category-daily-table { margin:8px 0 0; }
+      .daily-bar-cell {
+        min-width:220px;
+        white-space:nowrap;
+      }
+      .daily-bar-track {
+        display:inline-block;
+        width:75%;
+        height:15px;
+        background:#e5eef5;
+        border-radius:999px;
+        overflow:hidden;
+        vertical-align:middle;
+        margin-right:7px;
+      }
+      .daily-bar-fill {
+        height:100%;
+        background:linear-gradient(90deg,#36a2eb,#0066cc);
+        border-radius:999px;
+      }
+      .category-total-row {
+        font-weight:bold;
+        background:#e8f6ff;
+        color:#0057a8;
+      }
       .total-row { font-weight:bold; background:#e8f6ff; }
       .section-note {
         background:#fff8d9;
@@ -2189,6 +2240,37 @@ function buildReportStyles() {
 }
 
 // ====== MONTHLY STATEMENT FUNCTION ======
+async function showMonthlyYesNoDialog(icon, title, message) {
+  return new Promise(resolve => {
+    const existing = document.getElementById('monthlyYesNoModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'monthlyYesNoModal';
+    modal.style.cssText = `
+      position:fixed; inset:0; z-index:999999;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55); padding:20px;
+      font-family:Arial,sans-serif;
+    `;
+    modal.innerHTML = `
+      <div style="background:#fff; width:min(520px,95vw); border-radius:16px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.3); text-align:center;">
+        <div style="font-size:42px; margin-bottom:8px;">${icon}</div>
+        <h2 style="margin:0 0 12px; color:#123;">${escapeReportHtml(title)}</h2>
+        <p style="font-size:17px; line-height:1.5; margin:0 0 24px;">${message}</p>
+        <div style="display:flex; gap:14px; justify-content:center;">
+          <button type="button" id="monthlyYes" style="min-width:140px; padding:14px 22px; border:0; border-radius:10px; background:#16a34a; color:#fff; font-size:17px; font-weight:bold; cursor:pointer;">YES</button>
+          <button type="button" id="monthlyNo" style="min-width:140px; padding:14px 22px; border:0; border-radius:10px; background:#dc2626; color:#fff; font-size:17px; font-weight:bold; cursor:pointer;">NO</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const finish = value => { modal.remove(); resolve(value); };
+    modal.querySelector('#monthlyYes').addEventListener('click', () => finish(true));
+    modal.querySelector('#monthlyNo').addEventListener('click', () => finish(false));
+  });
+}
+
 async function printMonthlyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
@@ -2217,44 +2299,37 @@ async function printMonthlyStatement() {
     return;
   }
 
-  // MONTHLY OPTIONAL DEDUCTIONS
-  // Salary is an additional monthly expense and therefore appears in the breakdown.
-  const includeSalary = confirm(
-    "Do you want to include SALARY FOR WORKERS in the Monthly Statement?\n\n" +
-    "Click YES to enter the total salary amount for the month.\n" +
-    "Click NO to continue without salary."
+  // MONTHLY OPTIONAL DEDUCTIONS — use the same clickable YES/NO design as Weekly Statement.
+  const includeSalary = await showMonthlyYesNoDialog(
+    '👷',
+    'Salary for Workers',
+    'Do you want to include <strong>SALARY FOR WORKERS</strong> in the Monthly Statement?'
   );
 
   let monthlySalary = 0;
   if (includeSalary) {
-    const salaryInput = prompt(
-      "Enter TOTAL SALARY FOR WORKERS for this month:",
-      ""
-    );
+    const salaryInput = prompt('Enter TOTAL SALARY FOR WORKERS for this month:', '');
     if (salaryInput === null) return;
     monthlySalary = Number(String(salaryInput).replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(monthlySalary) || monthlySalary < 0) {
-      alert("Please enter a valid salary amount.");
+      alert('Please enter a valid salary amount.');
       return;
     }
   }
 
-  const includeMaterial = confirm(
-    "Do you want to add TOTAL MATERIAL BOUGHT for the month?\n\n" +
-    "Click YES to enter the total material amount to subtract from profit.\n" +
-    "Click NO to continue without an additional material deduction."
+  const includeMaterial = await showMonthlyYesNoDialog(
+    '📦',
+    'Total Material Bought',
+    'Do you want to add <strong>TOTAL MATERIAL BOUGHT</strong> for the month?'
   );
 
   let monthlyMaterial = 0;
   if (includeMaterial) {
-    const materialInput = prompt(
-      "Enter TOTAL MATERIAL BOUGHT for this month:",
-      ""
-    );
+    const materialInput = prompt('Enter TOTAL MATERIAL BOUGHT for this month:', '');
     if (materialInput === null) return;
     monthlyMaterial = Number(String(materialInput).replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(monthlyMaterial) || monthlyMaterial < 0) {
-      alert("Please enter a valid material amount.");
+      alert('Please enter a valid material amount.');
       return;
     }
   }
@@ -2337,7 +2412,7 @@ async function printMonthlyStatement() {
           // worker name there.
           worker: (String(e.type || '').trim() && !EXPENSE_CATEGORIES.includes(String(e.type || '').trim())
             ? String(e.type).trim()
-            : (String(e.worker || '').trim() || String(e.paidTo || '').trim() || 'Unknown Worker')),
+            : (String(e.paidTo || '').trim() || String(e.worker || '').trim() || 'Unknown Worker')),
           description: (String(e.desc || '').trim() && e.desc !== 'Borrow' ? e.desc : 'Borrow'),
           amount: Number(e.amount || 0)
         });
@@ -2345,6 +2420,55 @@ async function printMonthlyStatement() {
     });
   });
   const totalWorkerBorrowed = workerBorrows.reduce((sum, b) => sum + b.amount, 0);
+
+  // MONTHLY CATEGORY DAILY DETAILS: every category lists the exact days
+  // money was spent, the amount for each day, the category total, and a
+  // visual bar showing how large each day's expense was compared with the
+  // highest day in that same category.
+  const categoryDailyDetails = EXPENSE_CATEGORIES.map(category => {
+    const rows = [];
+    monthRecords.forEach(d => {
+      (d.expenses || []).forEach(e => {
+        if (getExpenseCategory(e) === category && Number(e.amount || 0) > 0) {
+          rows.push({
+            date: d.date || '',
+            amount: Number(e.amount || 0),
+            details: String(e.type || e.desc || '').trim() || category
+          });
+        }
+      });
+    });
+    const total = rows.reduce((sum, r) => sum + r.amount, 0);
+    const highestDay = rows.reduce((max, r) => Math.max(max, r.amount), 0);
+    return { category, rows, total, highestDay };
+  });
+
+  const buildMonthlyCategoryDailyCharts = () => {
+    const active = categoryDailyDetails.filter(c => c.rows.length);
+    if (!active.length) return '<div class="expense-chart-empty">No categorized daily expenses recorded for this month.</div>';
+
+    return active.map(c => `
+      <div class="category-daily-card">
+        <div class="category-daily-heading">
+          <strong>${escapeReportHtml(c.category)}</strong>
+          <span>Total: ₦${c.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        </div>
+        <table class="category-daily-table">
+          <tr><th>Date</th><th>Details</th><th>Amount</th><th>Daily Chart</th></tr>
+          ${c.rows.map(r => {
+            const pct = c.highestDay ? (r.amount / c.highestDay) * 100 : 0;
+            return `<tr>
+              <td>${escapeReportHtml(r.date)}</td>
+              <td>${escapeReportHtml(r.details)}</td>
+              <td><strong>₦${r.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></td>
+              <td class="daily-bar-cell"><div class="daily-bar-track"><div class="daily-bar-fill" style="width:${Math.max(2,pct)}%"></div></div><span>${pct.toFixed(0)}%</span></td>
+            </tr>`;
+          }).join('')}
+          <tr class="category-total-row"><td colspan="2">${escapeReportHtml(c.category)} TOTAL</td><td colspan="2">₦${c.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+        </table>
+      </div>
+    `).join('');
+  };
 
   const avgUnitPrice = totalQty
     ? (totalSales / totalQty).toFixed(2)
@@ -2468,6 +2592,13 @@ async function printMonthlyStatement() {
             <td>₦${avgUnitPrice}</td>
           </tr>
         </table>
+
+        <br>
+        <section class="monthly-daily-expenses">
+          <h3>📅 DAILY EXPENSES BY CATEGORY</h3>
+          <p class="section-note">Each category below shows the exact days the expense was bought/paid, the amount for each day, the category total, and a daily bar chart. The longest bar is the highest spending day for that category.</p>
+          ${buildMonthlyCategoryDailyCharts()}
+        </section>
 
         <br>
         <h3>SUMMARY</h3>
