@@ -2398,29 +2398,6 @@ async function printMonthlyStatement() {
     }
   });
 
-  // WORKERS WHO BORROWED DURING THE MONTH.
-  // The borrower is taken from Paid To; description/type remains visible.
-  const workerBorrows = [];
-  monthRecords.forEach(d => {
-    (d.expenses || []).forEach(e => {
-      if (getExpenseCategory(e) === 'Borrow' && Number(e.amount || 0) > 0) {
-        workerBorrows.push({
-          date: d.date || '',
-          // For BORROW expenses, the worker's name is taken from the
-          // Type / Details field first (where the worker name is entered).
-          // Paid To remains a fallback for older records that stored the
-          // worker name there.
-          worker: (String(e.type || '').trim() && !EXPENSE_CATEGORIES.includes(String(e.type || '').trim())
-            ? String(e.type).trim()
-            : (String(e.paidTo || '').trim() || String(e.worker || '').trim() || 'Unknown Worker')),
-          description: (String(e.desc || '').trim() && e.desc !== 'Borrow' ? e.desc : 'Borrow'),
-          amount: Number(e.amount || 0)
-        });
-      }
-    });
-  });
-  const totalWorkerBorrowed = workerBorrows.reduce((sum, b) => sum + b.amount, 0);
-
   // MONTHLY CATEGORY DAILY DETAILS: every category lists the exact days
   // money was spent, the amount for each day, the category total, and a
   // visual bar showing how large each day's expense was compared with the
@@ -2522,34 +2499,6 @@ async function printMonthlyStatement() {
           <tr style="font-weight:bold;">
             <td>TOTAL</td><td>-</td><td>-</td>
             <td>₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-          </tr>
-        </table>
-
-        <br>
-        <h3>WORKERS WHO BORROWED</h3>
-        <table border="1" width="100%" cellpadding="5">
-          <tr><th>Date</th><th>Worker / Borrower</th><th>Description</th><th>Amount</th></tr>
-    `);
-
-    if (workerBorrows.length) {
-      workerBorrows.forEach(b => {
-        win.document.write(`
-          <tr>
-            <td>${escapeReportHtml(b.date)}</td>
-            <td>${escapeReportHtml(b.worker)}</td>
-            <td>${escapeReportHtml(b.description)}</td>
-            <td>₦${b.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-          </tr>
-        `);
-      });
-    } else {
-      win.document.write('<tr><td colspan="4">No worker borrow recorded for this month.</td></tr>');
-    }
-
-    win.document.write(`
-          <tr style="font-weight:bold;">
-            <td colspan="3">TOTAL WORKER BORROWED</td>
-            <td>₦${totalWorkerBorrowed.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           </tr>
         </table>
 
