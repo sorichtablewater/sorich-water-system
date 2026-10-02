@@ -2189,7 +2189,7 @@ function buildReportStyles() {
 }
 
 // ====== MONTHLY STATEMENT FUNCTION ======
-function printMonthlyStatement() {
+async function printMonthlyStatement() {
   if (!dailyData.length) {
     alert("No daily records available.");
     return;
@@ -2217,12 +2217,54 @@ function printMonthlyStatement() {
     return;
   }
 
+  // MONTHLY OPTIONAL DEDUCTIONS
+  // Salary is an additional monthly expense and therefore appears in the breakdown.
+  const includeSalary = confirm(
+    "Do you want to include SALARY FOR WORKERS in the Monthly Statement?\n\n" +
+    "Click YES to enter the total salary amount for the month.\n" +
+    "Click NO to continue without salary."
+  );
+
+  let monthlySalary = 0;
+  if (includeSalary) {
+    const salaryInput = prompt(
+      "Enter TOTAL SALARY FOR WORKERS for this month:",
+      ""
+    );
+    if (salaryInput === null) return;
+    monthlySalary = Number(String(salaryInput).replace(/[^0-9.-]/g, ''));
+    if (!Number.isFinite(monthlySalary) || monthlySalary < 0) {
+      alert("Please enter a valid salary amount.");
+      return;
+    }
+  }
+
+  const includeMaterial = confirm(
+    "Do you want to add TOTAL MATERIAL BOUGHT for the month?\n\n" +
+    "Click YES to enter the total material amount to subtract from profit.\n" +
+    "Click NO to continue without an additional material deduction."
+  );
+
+  let monthlyMaterial = 0;
+  if (includeMaterial) {
+    const materialInput = prompt(
+      "Enter TOTAL MATERIAL BOUGHT for this month:",
+      ""
+    );
+    if (materialInput === null) return;
+    monthlyMaterial = Number(String(materialInput).replace(/[^0-9.-]/g, ''));
+    if (!Number.isFinite(monthlyMaterial) || monthlyMaterial < 0) {
+      alert("Please enter a valid material amount.");
+      return;
+    }
+  }
+
   const copies = parseInt(document.getElementById('invoiceCopies').value) || 4;
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
   let totalSales = 0;
-  let totalExpenses = 0;
+  let recordedExpenses = 0;
   let totalNet = 0;
   let totalQty = 0;
 
@@ -2231,7 +2273,7 @@ function printMonthlyStatement() {
 
   monthRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
-    totalExpenses += Number(d.totalExpenses) || 0;
+    recordedExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
 
     (d.sales || []).forEach(s => {
@@ -2240,6 +2282,29 @@ function printMonthlyStatement() {
     });
   });
 
+  // Add manually entered monthly salary to the same percentage/amount breakdown.
+  if (monthlySalary > 0) {
+    monthlyExpenseBreakdown.push({
+      category: 'Salary',
+      amount: monthlySalary,
+      percent: 0
+    });
+  }
+
+  const breakdownGrandTotal = monthlyExpenseBreakdown.reduce(
+    (sum, item) => sum + Number(item.amount || 0), 0
+  );
+  monthlyExpenseBreakdown.forEach(item => {
+    item.percent = breakdownGrandTotal
+      ? (Number(item.amount || 0) / breakdownGrandTotal) * 100
+      : 0;
+  });
+
+  // Keep the normal recorded net profit, then subtract the optional monthly items.
+  const mainProfit = totalNet - monthlySalary - monthlyMaterial;
+  const totalExpensesWithSalary = recordedExpenses + monthlySalary;
+
+  // LIVE DEBTORS
   const monthDebtors = {};
   let totalMonthDebt = 0;
 
@@ -2257,6 +2322,23 @@ function printMonthlyStatement() {
       totalMonthDebt += Number(debt.owing || 0);
     }
   });
+
+  // WORKERS WHO BORROWED DURING THE MONTH.
+  // The borrower is taken from Paid To; description/type remains visible.
+  const workerBorrows = [];
+  monthRecords.forEach(d => {
+    (d.expenses || []).forEach(e => {
+      if (getExpenseCategory(e) === 'Borrow' && Number(e.amount || 0) > 0) {
+        workerBorrows.push({
+          date: d.date || '',
+          worker: e.paidTo || e.worker || 'Unknown Worker',
+          description: e.desc || e.type || 'Borrow',
+          amount: Number(e.amount || 0)
+        });
+      }
+    });
+  });
+  const totalWorkerBorrowed = workerBorrows.reduce((sum, b) => sum + b.amount, 0);
 
   const avgUnitPrice = totalQty
     ? (totalSales / totalQty).toFixed(2)
@@ -2291,10 +2373,7 @@ function printMonthlyStatement() {
         <h3>LIVE DEBTORS</h3>
         <table border="1" width="100%" cellpadding="5">
           <tr>
-            <th>Customer</th>
-            <th>Total Owed</th>
-            <th>Total Paid</th>
-            <th>Balance</th>
+            <th>Customer</th><th>Total Owed</th><th>Total Paid</th><th>Balance</th>
           </tr>
     `);
 
@@ -2317,15 +2396,39 @@ function printMonthlyStatement() {
         </table>
 
         <br>
+        <h3>WORKERS WHO BORROWED</h3>
+        <table border="1" width="100%" cellpadding="5">
+          <tr><th>Date</th><th>Worker / Borrower</th><th>Description</th><th>Amount</th></tr>
+    `);
+
+    if (workerBorrows.length) {
+      workerBorrows.forEach(b => {
+        win.document.write(`
+          <tr>
+            <td>${escapeReportHtml(b.date)}</td>
+            <td>${escapeReportHtml(b.worker)}</td>
+            <td>${escapeReportHtml(b.description)}</td>
+            <td>₦${b.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          </tr>
+        `);
+      });
+    } else {
+      win.document.write('<tr><td colspan="4">No worker borrow recorded for this month.</td></tr>');
+    }
+
+    win.document.write(`
+          <tr style="font-weight:bold;">
+            <td colspan="3">TOTAL WORKER BORROWED</td>
+            <td>₦${totalWorkerBorrowed.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          </tr>
+        </table>
+
+        <br>
         <h3>SALES SUMMARY</h3>
         <table border="1" width="100%" cellpadding="5">
           <tr>
-            <th>Date</th>
-            <th>Total Sales</th>
-            <th>Total Expenses</th>
-            <th>Net Balance</th>
-            <th>Total Qty</th>
-            <th>Avg Unit Price</th>
+            <th>Date</th><th>Total Sales</th><th>Total Expenses</th>
+            <th>Net Balance</th><th>Total Qty</th><th>Avg Unit Price</th>
           </tr>
     `);
 
@@ -2353,8 +2456,8 @@ function printMonthlyStatement() {
           <tr style="font-weight:bold;">
             <td>TOTAL</td>
             <td>₦${totalSales.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-            <td>₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-            <td>₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td>₦${totalExpensesWithSalary.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td>₦${mainProfit.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
             <td>${totalQty}</td>
             <td>₦${avgUnitPrice}</td>
           </tr>
@@ -2363,16 +2466,19 @@ function printMonthlyStatement() {
         <br>
         <h3>SUMMARY</h3>
         <p><strong>Total Sales:</strong> ₦${totalSales.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
-        <p><strong>Total Expenses:</strong> ₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
-        <p style="font-size:18px;font-weight:bold;"><strong>Net Profit:</strong> ₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+        <p><strong>Recorded Expenses:</strong> ₦${recordedExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+        ${monthlySalary > 0 ? `<p><strong>Workers Salary Added:</strong> ₦${monthlySalary.toLocaleString(undefined,{minimumFractionDigits:2})}</p>` : ''}
+        ${monthlyMaterial > 0 ? `<p><strong>Total Material Bought Deduction:</strong> ₦${monthlyMaterial.toLocaleString(undefined,{minimumFractionDigits:2})}</p>` : ''}
+        <p><strong>Total Expenses Including Salary:</strong> ₦${totalExpensesWithSalary.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+        <p style="font-size:18px;font-weight:bold;color:#0066cc;"><strong>MAIN PROFIT:</strong> ₦${mainProfit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
         <p><strong>Total Quantity Sold:</strong> ${totalQty}</p>
         <p><strong>Average Unit Price:</strong> ₦${avgUnitPrice}</p>
 
         <section class="expense-breakdown">
-          <h3>📊 EXPENSE BREAKDOWN — 8 CATEGORIES</h3>
+          <h3>📊 EXPENSE BREAKDOWN — ${monthlySalary > 0 ? '8 CATEGORIES + SALARY' : '8 CATEGORIES'}</h3>
           <p class="section-note">
-            Expenses are automatically grouped into the eight fixed categories used by the system.
-            Each category appears once with its total amount and percentage of total expenses.
+            Each category shows its total amount and percentage of the month's recorded expenses.
+            ${monthlySalary > 0 ? 'The manually entered workers salary is included as Salary.' : ''}
           </p>
           ${buildExpenseBreakdownChart(monthlyExpenseBreakdown)}
           <p class="highest-expense-comment">
