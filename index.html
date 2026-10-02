@@ -2331,8 +2331,14 @@ async function printMonthlyStatement() {
       if (getExpenseCategory(e) === 'Borrow' && Number(e.amount || 0) > 0) {
         workerBorrows.push({
           date: d.date || '',
-          worker: e.paidTo || e.worker || 'Unknown Worker',
-          description: e.desc || e.type || 'Borrow',
+          // For BORROW expenses, the worker's name is taken from the
+          // Type / Details field first (where the worker name is entered).
+          // Paid To remains a fallback for older records that stored the
+          // worker name there.
+          worker: (String(e.type || '').trim() && !EXPENSE_CATEGORIES.includes(String(e.type || '').trim())
+            ? String(e.type).trim()
+            : (String(e.worker || '').trim() || String(e.paidTo || '').trim() || 'Unknown Worker')),
+          description: (String(e.desc || '').trim() && e.desc !== 'Borrow' ? e.desc : 'Borrow'),
           amount: Number(e.amount || 0)
         });
       }
