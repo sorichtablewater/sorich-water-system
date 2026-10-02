@@ -175,8 +175,35 @@ body.dark-mode th {background-color:#003366;}
 <!-- EXPENSES PAGE -->
 <div id="expensesPage" class="section" style="display:none;">
   <h2>Expenses & Profit</h2>
-  <label>Type: <input type="text" id="expenseType"></label>
-  <label>Description: <input type="text" id="expenseDesc"></label>
+  <label>Type / Details:
+    <input type="text" id="expenseType" list="expenseTypeList"
+      placeholder="e.g. fuel, repair, ticket, borrow"
+      oninput="autoSetExpenseCategory()">
+  </label>
+  <datalist id="expenseTypeList">
+    <option value="Fuel"></option>
+    <option value="Supply Money"></option>
+    <option value="Maintenance / Repair"></option>
+    <option value="Bagging / Operator"></option>
+    <option value="Borrow"></option>
+    <option value="Ticket"></option>
+    <option value="Feeding Money / Late Night Supply"></option>
+    <option value="Other"></option>
+  </datalist>
+
+  <label>Description:
+    <select id="expenseDesc" onchange="manualExpenseCategoryChange()">
+      <option value="">-- Select Expense Category --</option>
+      <option value="Fuel">Fuel</option>
+      <option value="Supply Money">Supply Money</option>
+      <option value="Maintenance / Repair">Maintenance / Repair</option>
+      <option value="Bagging / Operator">Bagging / Operator</option>
+      <option value="Borrow">Borrow</option>
+      <option value="Ticket">Ticket</option>
+      <option value="Feeding Money / Late Night Supply">Feeding Money / Late Night Supply</option>
+      <option value="Other">Other</option>
+    </select>
+  </label>
   <label>Amount: <input type="number" id="expenseAmount"></label>
   <label>Paid To: <input type="text" id="expensePaidTo"></label>
   <button onclick="addExpense()">Add Expense</button>
@@ -753,14 +780,34 @@ function addExpense() {
   const desc = document.getElementById('expenseDesc').value.trim();
   const amount = parseFloat(document.getElementById('expenseAmount').value);
   const paidTo = document.getElementById('expensePaidTo').value.trim();
-  if (!type || !Number.isFinite(amount) || amount <= 0) { alert('Expense is blank: please enter Expense Type and Amount.'); return; }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert('Expense is blank: please enter an Amount greater than 0.');
+    return;
+  }
+
+  // The selected Description is the saved category. If nothing is selected,
+  // detect the category automatically from Type / Details / Paid To.
+  const detected = normalizeExpenseCategory(`${type} ${paidTo}`);
+  const category = desc && EXPENSE_CATEGORIES.includes(desc)
+    ? desc
+    : (detected || 'Other');
+
   const date = new Date().toLocaleString();
 
-  expenseData.push({ type, desc, amount, paidTo, date });
+  expenseData.push({
+    type: type || category,
+    desc: category,
+    category,
+    categoryManual: !!(desc && EXPENSE_CATEGORIES.includes(desc)),
+    amount,
+    paidTo,
+    date
+  });
+
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
 
-  // Clear form
   document.getElementById('expenseType').value = '';
   document.getElementById('expenseDesc').value = '';
   document.getElementById('expenseAmount').value = '';
@@ -780,7 +827,7 @@ function renderExpenses() {
     const row = table.insertRow();
     row.insertCell(0).innerText = index + 1;
     row.insertCell(1).innerText = e.type || '';
-    row.insertCell(2).innerText = e.desc || '';
+    row.insertCell(2).innerText = getExpenseCategory(e);
     row.insertCell(3).innerText = formatMoney(e.amount);
     row.insertCell(4).innerText = e.paidTo || '';
     row.insertCell(5).innerText = e.date || '';
@@ -816,20 +863,38 @@ function renderExpenses() {
 function editExpense(index) {
   const e = expenseData[index];
   if (!e) return;
-  const type = prompt('Edit Expense Type:', e.type || 'General');
+
+  const type = prompt('Edit Expense Type / Details:', e.type || e.desc || '');
   if (type === null) return;
-  const desc = prompt('Edit Description:', e.desc || '');
-  if (desc === null) return;
+
+  const currentCategory = getExpenseCategory(e);
+  const categoryInput = prompt(
+    'Edit Description Category:\n\n' +
+    EXPENSE_CATEGORIES.map((c,i) => `${i + 1}. ${c}`).join('\n') +
+    '\n\nEnter the category number:',
+    String(Math.max(1, EXPENSE_CATEGORIES.indexOf(currentCategory) + 1))
+  );
+  if (categoryInput === null) return;
+
+  const categoryIndex = parseInt(categoryInput, 10) - 1;
+  if (categoryIndex < 0 || categoryIndex >= EXPENSE_CATEGORIES.length) {
+    alert('Invalid expense category.');
+    return;
+  }
+
   const amount = parseFloat(prompt('Edit Amount:', Number(e.amount || 0)));
   if (isNaN(amount) || amount < 0) { alert('Invalid amount.'); return; }
+
   const paidTo = prompt('Edit Paid To:', e.paidTo || '');
   if (paidTo === null) return;
 
-  e.type = type || 'General';
-  e.desc = desc || 'No description';
+  e.type = type || EXPENSE_CATEGORIES[categoryIndex];
+  e.desc = EXPENSE_CATEGORIES[categoryIndex];
+  e.category = EXPENSE_CATEGORIES[categoryIndex];
+  e.categoryManual = true;
   e.amount = amount;
   e.paidTo = paidTo || 'Unknown';
-  // IMPORTANT: editing an expense never changes its recorded date.
+
   localStorage.setItem('expenseData', JSON.stringify(expenseData));
   renderExpenses();
 }
@@ -849,7 +914,8 @@ function addExpenseToDailyRecord(dailyIndex) {
   const paidTo = prompt('Paid To (optional):', '');
   if (paidTo === null) return;
 
-  d.expenses.push({ type: type.trim(), desc: desc.trim(), amount, paidTo: paidTo.trim() });
+  const dailyCategory = normalizeExpenseCategory(`${type.trim()} ${desc.trim()} ${paidTo.trim()}`) || 'Other';
+  d.expenses.push({ type: type.trim(), desc: dailyCategory, category: dailyCategory, amount, paidTo: paidTo.trim() });
   recalcDailyRecord(d);
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
   renderDailyRecords();
@@ -871,7 +937,8 @@ function editDailyExpense(dailyIndex, expenseIndex) {
   if (paidTo === null) return;
 
   e.type = type || 'General';
-  e.desc = desc || 'No description';
+  e.desc = normalizeExpenseCategory(`${type} ${desc} ${e.paidTo || ''}`) || desc || 'Other';
+  e.category = e.desc;
   e.amount = amount;
   e.paidTo = paidTo || 'Unknown';
   // IMPORTANT: the expense remains under the daily record's original date.
@@ -922,7 +989,9 @@ function clearDailyExpenses() {
       })),
       expenses: expenseData.map(e => ({
         type: e.type,
-        desc: e.desc,
+        desc: getExpenseCategory(e),
+        category: getExpenseCategory(e),
+        categoryManual: e.categoryManual === true,
         amount: Number(e.amount),
         paidTo: e.paidTo
       }))
@@ -1240,7 +1309,7 @@ function endOfDay() {
     owing:Number(s.owing||0),
     debtHistoryId:s.debtHistoryId || null
   }));
-  expenseData.forEach(e => d.expenses.push({type:e.type, desc:e.desc, amount:Number(e.amount||0), paidTo:e.paidTo}));
+  expenseData.forEach(e => d.expenses.push({type:e.type, desc:getExpenseCategory(e), category:getExpenseCategory(e), categoryManual:e.categoryManual === true, amount:Number(e.amount||0), paidTo:e.paidTo}));
   recalcDailyRecord(d);
 
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
@@ -1781,55 +1850,141 @@ let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
 
 
 
-// ====== EXPENSE BREAKDOWN HELPERS ======
-function getExpenseCategory(expense) {
-  const type = String(expense?.type || '').trim();
-  const desc = String(expense?.desc || '').trim();
-  const paidTo = String(expense?.paidTo || '').trim();
-  const raw = `${type} ${desc} ${paidTo}`.toLowerCase().replace(/[^a-z0-9&+ ]/g, ' ');
+// ====== EXPENSE CATEGORY SYSTEM ======
+const EXPENSE_CATEGORIES = [
+  'Fuel',
+  'Supply Money',
+  'Maintenance / Repair',
+  'Bagging / Operator',
+  'Borrow',
+  'Ticket',
+  'Feeding Money / Late Night Supply',
+  'Other'
+];
 
-  // Consolidate similar expense names so repeated entries appear ONCE in the summary.
-  if (/\b(borrow|borrowed|borrowing|loan|loans)\b/.test(raw)) return 'Borrow';
+function normalizeExpenseCategory(value) {
+  const raw = String(value || '').toLowerCase().trim();
+  if (!raw) return '';
+
   if (/\b(fuel|diesel|petrol|gas|generator fuel)\b/.test(raw)) return 'Fuel';
   if (/\b(supply|supplies|supply money|material|materials|raw material|packaging material)\b/.test(raw)) return 'Supply Money';
-  if (/\b(bagging|bagger|bagging fee|operator|operators|machine operator|production operator)\b/.test(raw)) return 'Bagging & Operator';
-  if (/\b(salary|salaries|wage|wages|staff pay|worker pay|workers pay|staff)\b/.test(raw)) return 'Salaries / Wages';
-  if (/\b(transport|transportation|delivery|dispatch|fare)\b/.test(raw)) return 'Transport / Delivery';
-  if (/\b(electricity|power|nepa|phcn|light bill)\b/.test(raw)) return 'Electricity / Power';
-  if (/\b(repair|repairs|maintenance|fix)\b/.test(raw)) return 'Repairs / Maintenance';
-  if (/\b(water|water bill)\b/.test(raw)) return 'Water';
+  if (/\b(repair|repairs|maintenance|maintainance|fix|fixed)\b/.test(raw)) return 'Maintenance / Repair';
+  if (/\b(bagging|bagger|bagging fee|operator|operators|machine operator|production operator)\b/.test(raw)) return 'Bagging / Operator';
+  if (/\b(borrow|borrowed|borrowing|loan|loans)\b/.test(raw)) return 'Borrow';
+  if (/\b(ticket|tickets|transport ticket|fare ticket)\b/.test(raw)) return 'Ticket';
+  if (/\b(feeding|food|feeding money|late night|night supply|late-night supply)\b/.test(raw)) return 'Feeding Money / Late Night Supply';
 
-  // If no known family matches, retain the entered type as its own summary bucket.
-  return type || desc || 'Other';
+  return '';
 }
+
+function getExpenseCategory(expense) {
+  const explicit = String(expense?.category || '').trim();
+  const desc = String(expense?.desc || '').trim();
+  const type = String(expense?.type || '').trim();
+  const paidTo = String(expense?.paidTo || '').trim();
+
+  // A category explicitly chosen by the user is authoritative, including Other.
+  if (expense?.categoryManual === true && EXPENSE_CATEGORIES.includes(explicit)) {
+    return explicit;
+  }
+
+  // Any real fixed category saved in the record is authoritative.
+  if (EXPENSE_CATEGORIES.includes(explicit) && explicit !== 'Other') return explicit;
+
+  // Older records may have the category stored in Description only.
+  const exactDesc = EXPENSE_CATEGORIES.find(c => c.toLowerCase() === desc.toLowerCase());
+  if (exactDesc && exactDesc !== 'Other') return exactDesc;
+
+  // IMPORTANT: if an older record was saved as "Other" but the Type/Details
+  // clearly says Fuel, Repair, Ticket, etc., re-classify it for reports.
+  const detected = normalizeExpenseCategory(`${type} ${desc} ${paidTo}`);
+  return detected || 'Other';
+}
+
+
+function migrateExpenseCategories() {
+  let expenseChanged = false;
+  (expenseData || []).forEach(e => {
+    const category = getExpenseCategory(e);
+    if (e.category !== category || e.desc !== category) {
+      e.category = category;
+      e.desc = category;
+      expenseChanged = true;
+    }
+  });
+
+  let dailyChanged = false;
+  (dailyData || []).forEach(d => {
+    (d.expenses || []).forEach(e => {
+      const category = getExpenseCategory(e);
+      if (e.category !== category || e.desc !== category) {
+        e.category = category;
+        e.desc = category;
+        dailyChanged = true;
+      }
+    });
+  });
+
+  if (expenseChanged) localStorage.setItem('expenseData', JSON.stringify(expenseData));
+  if (dailyChanged) localStorage.setItem('dailyData', JSON.stringify(dailyData));
+}
+
+function autoSetExpenseCategory() {
+  const typeEl = document.getElementById('expenseType');
+  const descEl = document.getElementById('expenseDesc');
+  if (!typeEl || !descEl) return;
+
+  const detected = normalizeExpenseCategory(typeEl.value);
+  if (detected) {
+    descEl.value = detected;
+    descEl.dataset.autoDetected = 'true';
+  } else {
+    descEl.dataset.autoDetected = 'false';
+  }
+}
+
+function manualExpenseCategoryChange() {
+  const descEl = document.getElementById('expenseDesc');
+  if (descEl) descEl.dataset.autoDetected = 'false';
+}
+
+function setExpenseCategoryFromValue(value, descElement) {
+  const detected = normalizeExpenseCategory(value);
+  if (detected && descElement) descElement.value = detected;
+  return detected || (descElement?.value || 'Other');
+}
+
+migrateExpenseCategories();
 
 function buildExpenseBreakdown(records) {
   const totals = {};
+  EXPENSE_CATEGORIES.forEach(category => totals[category] = 0);
+
   let grandTotal = 0;
 
   (records || []).forEach(d => {
     (d.expenses || []).forEach(e => {
       const amount = Number(e.amount) || 0;
       if (amount <= 0) return;
+
       const category = getExpenseCategory(e);
       totals[category] = (totals[category] || 0) + amount;
       grandTotal += amount;
     });
   });
 
-  return Object.entries(totals)
-    .map(([category, amount]) => ({
-      category,
-      amount,
-      percent: grandTotal ? (amount / grandTotal) * 100 : 0
-    }))
-    .sort((a, b) => b.amount - a.amount);
+  return EXPENSE_CATEGORIES.map(category => ({
+    category,
+    amount: totals[category] || 0,
+    percent: grandTotal ? ((totals[category] || 0) / grandTotal) * 100 : 0
+  }));
 }
 
 function getExpenseSummaryComment(breakdown) {
-  if (!breakdown.length) return 'No expense was recorded for this period.';
-  const highest = breakdown[0];
-  const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
+  const active = (breakdown || []).filter(item => Number(item.amount) > 0);
+  if (!active.length) return 'No expense was recorded for this period.';
+  const highest = active.reduce((best, item) => item.amount > best.amount ? item : best, active[0]);
+  const total = active.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   return `Highest expense: ${escapeReportHtml(highest.category)} — ₦${highest.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} (${highest.percent.toFixed(1)}% of total expenses). Total expenses: ₦${total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}.`;
 }
 
@@ -2040,14 +2195,20 @@ function printMonthlyStatement() {
     return;
   }
 
-  let month = parseInt(prompt("Enter month number (1-12):", new Date().getMonth() + 1));
-  let year = parseInt(prompt("Enter year (YYYY):", new Date().getFullYear()));
-  if (!month || !year) return;
+  let month = parseInt(prompt(
+    "Enter month number (1-12):",
+    new Date().getMonth() + 1
+  ));
+  let year = parseInt(prompt(
+    "Enter year (YYYY):",
+    new Date().getFullYear()
+  ));
+
+  if (!month || !year || month < 1 || month > 12) return;
 
   const monthStr = String(month).padStart(2, '0');
-
   const monthRecords = dailyData.filter(d => {
-    const [y, m] = d.date.split('-');
+    const [y, m] = String(d.date || '').split('-');
     return parseInt(y) === year && m === monthStr;
   });
 
@@ -2060,271 +2221,169 @@ function printMonthlyStatement() {
   const manager = document.getElementById('managerName').value || 'Manager';
   const footer = document.getElementById('invoiceFooter').value || 'Drink It. Love It.';
 
-  let totalSales = 0,
-      totalExpenses = 0,
-      totalNet = 0,
-      totalQty = 0,
-      unitSum = 0,
-      unitCount = 0;
+  let totalSales = 0;
+  let totalExpenses = 0;
+  let totalNet = 0;
+  let totalQty = 0;
 
-  let materialTotal = 0, packingBagTotal = 0, dieselTotal = 0;
-  let materialRows = "", packingRows = "", dieselRows = "";
+  const monthCustomers = new Set();
   const monthlyExpenseBreakdown = buildExpenseBreakdown(monthRecords);
 
-  // PEOPLE PAYMENTS PER DATE
-  const payments = {
-    mummy: {},
-    richard: {},
-    precious: {},
-    blessing: {}
-  };
-
-  // BORROW ENTRIES
-  let borrowRows = "";
-  let totalBorrow = 0;
-
-  // DEBTORS SUMMARY
-  let debtorRows = "";
-  let totalOwing = 0;
-  debtData.forEach(d => {
-    const balance = Number(d.owing);
-    if (balance > 0) {
-      debtorRows += `
-        <tr>
-          <td>${d.customer}</td>
-          <td>₦${(d.totalPaid + d.owing).toFixed(2)}</td>
-          <td>₦${d.totalPaid.toFixed(2)}</td>
-          <td>₦${balance.toFixed(2)}</td>
-          <td>❌ Owing</td>
-        </tr>
-      `;
-      totalOwing += balance;
-    }
-  });
-
-  // Process each daily record
   monthRecords.forEach(d => {
     totalSales += Number(d.totalSales) || 0;
     totalExpenses += Number(d.totalExpenses) || 0;
     totalNet += Number(d.net) || 0;
 
-    if (d.sales) {
-      d.sales.forEach(s => {
-        totalQty += s.qty;
-        unitSum += Number(s.unit) || 0;
-        unitCount++;
-      });
-    }
+    (d.sales || []).forEach(s => {
+      totalQty += Number(s.qty) || 0;
+      monthCustomers.add(String(s.customer || '').toLowerCase());
+    });
+  });
 
-    if (d.expenses) {
-      d.expenses.forEach(e => {
-        const amount = Number(e.amount) || 0;
-        const type = (e.type || "").toLowerCase().trim();
-        const desc = (e.desc || "").toLowerCase().trim();
+  const monthDebtors = {};
+  let totalMonthDebt = 0;
 
-        // MATERIAL
-        if (type.includes("material") || desc.includes("material")) {
-          materialTotal += amount;
-          materialRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-        }
+  monthCustomers.forEach(name => {
+    const debt = debtData.find(
+      d => String(d.customer || '').toLowerCase() === name
+    );
 
-        // PACKING
-        if (type.includes("packing") || desc.includes("packing") || desc.includes("bag")) {
-          packingBagTotal += amount;
-          packingRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-        }
-
-        // DIESEL ONLY
-        if (type.includes("diesel") || desc.includes("diesel")) {
-          dieselTotal += amount;
-          dieselRows += `<tr><td>${d.date}</td><td>${e.desc}</td><td>₦${amount.toFixed(2)}</td></tr>`;
-        }
-
-        // PEOPLE PAYMENTS
-        if (type.includes("mummy") || desc.includes("mummy")) {
-          if (!payments.mummy[d.date]) payments.mummy[d.date] = [];
-          payments.mummy[d.date].push({desc: e.desc, amount});
-        }
-
-        if ((type.includes("richard") && type.includes("forcados")) || 
-            (desc.includes("richard") && desc.includes("forcados"))) {
-          if (!payments.richard[d.date]) payments.richard[d.date] = [];
-          payments.richard[d.date].push({desc: e.desc, amount});
-        }
-
-        if (type.includes("precious") || desc.includes("precious") ||
-            type.includes("forcados precious") || desc.includes("forcados precious")) {
-          if (!payments.precious[d.date]) payments.precious[d.date] = [];
-          payments.precious[d.date].push({desc: e.desc, amount});
-        }
-
-        if (type.includes("blessing") || desc.includes("blessing") ||
-            type.includes("forcados blessing") || desc.includes("forcados blessing")) {
-          if (!payments.blessing[d.date]) payments.blessing[d.date] = [];
-          payments.blessing[d.date].push({desc: e.desc, amount});
-        }
-
-        // BORROW
-        if (type.includes("borrow") || desc.includes("borrow")) {
-          borrowRows += `<tr>
-            <td>${d.date}</td>
-            <td>${e.type || "-"}</td>
-            <td>${e.desc || "-"}</td>
-            <td>₦${amount.toFixed(2)}</td>
-          </tr>`;
-          totalBorrow += amount;
-        }
-      });
+    if (debt && Number(debt.owing) > 0) {
+      monthDebtors[name] = {
+        totalOwed: Number(debt.totalPaid || 0) + Number(debt.owing || 0),
+        totalPaid: Number(debt.totalPaid || 0),
+        balance: Number(debt.owing || 0)
+      };
+      totalMonthDebt += Number(debt.owing || 0);
     }
   });
 
-  const monthlyAvgUnitPrice = totalQty
-  ? (totalSales / totalQty).toFixed(2)
-  : 0;
-  const win = window.open('', '', 'width=1000,height=800');
+  const avgUnitPrice = totalQty
+    ? (totalSales / totalQty).toFixed(2)
+    : "0.00";
+
+  const win = window.open('', '', 'width=1100,height=900');
   if (!win) {
     alert("Pop-up blocked! Allow pop-ups.");
     return;
   }
 
+  win.document.write(
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    buildReportStyles() +
+    '</head><body>'
+  );
+
   for (let i = 0; i < copies; i++) {
     const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
     win.document.write(`
-      <h2>SORICH CLASSY SERVICES</h2>
-      <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
-      <p>08164084402, 07012623006, 08067338211</p>
-      <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
-      <p>Period: ${year}-${monthStr}</p>
-      <p>ISSUER: ${manager}</p>
-      <hr>
+      <div class="report-copy">
+        <div class="report-header">
+          <h2>SORICH CLASSY SERVICES</h2>
+          <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
+          <p>08164084402, 07012623006, 08067338211</p>
+          <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
+          <p><strong>Period:</strong> ${year}-${monthStr}</p>
+          <p><strong>ISSUER:</strong> ${escapeReportHtml(manager)}</p>
+        </div>
 
-      <h4>DEBTORS SUMMARY</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Customer</th><th>Total Owed</th><th>Paid</th><th>Balance</th><th>Status</th></tr>
-        ${debtorRows || '<tr><td colspan="5">No debtors</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="4">TOTAL OWING</td>
-          <td>₦${totalOwing.toFixed(2)}</td>
-        </tr>
-      </table>
+        <h3>LIVE DEBTORS</h3>
+        <table border="1" width="100%" cellpadding="5">
+          <tr>
+            <th>Customer</th>
+            <th>Total Owed</th>
+            <th>Total Paid</th>
+            <th>Balance</th>
+          </tr>
     `);
 
-    // MONTHLY SUMMARY
-    win.document.write(`
-      <br><h4>MONTH SUMMARY</h4>
-      <table border="1" cellpadding="5" cellspacing="0" width="100%">
-        <tr>
-          <th>Date</th><th>Total Sales</th><th>Total Expenses</th>
-          <th>Net</th><th>Total Qty</th><th>Avg Unit Price</th>
-        </tr>
-    `);
-
-    monthRecords.forEach(d => {
-     const dailyQty = d.sales
-  ? d.sales.reduce((acc, s) => acc + Number(s.qty || 0), 0)
-  : 0;
-
-const dailyAvgUnit = dailyQty
-  ? ((Number(d.totalSales) || 0) / dailyQty).toFixed(2)
-  : 0;
-
+    Object.entries(monthDebtors).forEach(([name, d]) => {
       win.document.write(`
         <tr>
-          <td>${d.date}</td>
-          <td>₦${(Number(d.totalSales) || 0).toFixed(2)}</td>
-          <td>₦${(Number(d.totalExpenses) || 0).toFixed(2)}</td>
-          <td>₦${(Number(d.net) || 0).toFixed(2)}</td>
-          <td>${dailyQty}</td>
-          <td>₦${dailyAvgUnit}</td>
+          <td>${escapeReportHtml(name.toUpperCase())}</td>
+          <td>₦${d.totalOwed.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${d.totalPaid.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${d.balance.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
         </tr>
       `);
     });
 
     win.document.write(`
-        <tr style="font-weight:bold;">
-          <td>TOTAL</td>
-          <td>₦${totalSales.toFixed(2)}</td>
-          <td>₦${totalExpenses.toFixed(2)}</td>
-          <td>₦${totalNet.toFixed(2)}</td>
-          <td>${totalQty}</td>
-          <td>₦${monthlyAvgUnitPrice}</td>
-        </tr>
-      </table>
-    `);
-
-    win.document.write(`
-      <section class="expense-breakdown">
-        <h3>📊 ${year}-${monthStr} EXPENSE BREAKDOWN — 100%</h3>
-        <p class="section-note">Each percentage shows how much of the month's total recorded expenses went to that expense category.</p>
-        ${buildExpenseBreakdownChart(monthlyExpenseBreakdown)}
-        <p class="highest-expense-comment">🔎 <strong>Summary:</strong> ${getExpenseSummaryComment(monthlyExpenseBreakdown)}</p>
-      </section>
-    `);
-
-    // MATERIAL, PACKING, DIESEL TABLES
-    const renderExpenseTable = (title, rows, total) => {
-      win.document.write(`<br><h4>${title}</h4>
-        <table border="1" width="100%" cellpadding="5">
-          <tr><th>Date</th><th>Description</th><th>Amount</th></tr>
-          ${rows || `<tr><td colspan="3">No ${title.toLowerCase()}</td></tr>`}
-          <tr style="font-weight:bold;"><td colspan="2">TOTAL ${title.toUpperCase()}</td><td>₦${total.toFixed(2)}</td></tr>
-        </table>
-      `);
-    };
-
-    renderExpenseTable("Material Expenses", materialRows, materialTotal);
-    renderExpenseTable("Packing Bag Expenses", packingRows, packingBagTotal);
-    renderExpenseTable("Diesel Expenses", dieselRows, dieselTotal);
-
-    // PEOPLE TABLES
-    const renderPersonTable = (personName, personPayments) => {
-      win.document.write(`<br><h4>${personName.toUpperCase()} RECEIVED</h4>
-        <table border="1" width="100%" cellpadding="5">
-          <tr><th>Date</th><th>Description</th><th>Amount</th></tr>`);
-
-      const dates = Object.keys(personPayments).sort();
-      let total = 0;
-      dates.forEach(date => {
-        personPayments[date].forEach(entry => {
-          win.document.write(`
-            <tr>
-              <td>${date}</td>
-              <td>${entry.desc}</td>
-              <td>₦${entry.amount.toFixed(2)}</td>
-            </tr>
-          `);
-          total += entry.amount;
-        });
-      });
-
-      win.document.write(`
           <tr style="font-weight:bold;">
-            <td colspan="2">TOTAL</td>
-            <td>₦${total.toFixed(2)}</td>
+            <td>TOTAL</td><td>-</td><td>-</td>
+            <td>₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           </tr>
         </table>
-      `);
-    };
 
-    renderPersonTable("Mummy", payments.mummy);
-    renderPersonTable("Mr RICHARD FORCADOS", payments.richard);
-    renderPersonTable("FORCADOS PRECIOUS", payments.precious);
-    renderPersonTable("FORCADOS BLESSING", payments.blessing);
-
-    // BORROW TABLE
-    win.document.write(`<br><h4>BORROW</h4>
-      <table border="1" width="100%" cellpadding="5">
-        <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr>
-        ${borrowRows || '<tr><td colspan="4">No borrow entries</td></tr>'}
-        <tr style="font-weight:bold;">
-          <td colspan="3">TOTAL BORROW</td>
-          <td>₦${totalBorrow.toFixed(2)}</td>
-        </tr>
-      </table>
+        <br>
+        <h3>SALES SUMMARY</h3>
+        <table border="1" width="100%" cellpadding="5">
+          <tr>
+            <th>Date</th>
+            <th>Total Sales</th>
+            <th>Total Expenses</th>
+            <th>Net Balance</th>
+            <th>Total Qty</th>
+            <th>Avg Unit Price</th>
+          </tr>
     `);
 
-    win.document.write(`<p>${escapeReportHtml(footer)}</p><hr></div>`);
+    monthRecords.forEach(d => {
+      const dailyQty = (d.sales || []).reduce(
+        (acc, s) => acc + Number(s.qty || 0), 0
+      );
+      const dailyAvg = dailyQty
+        ? ((Number(d.totalSales) || 0) / dailyQty).toFixed(2)
+        : "0.00";
+
+      win.document.write(`
+        <tr>
+          <td>${d.date}</td>
+          <td>₦${Number(d.totalSales || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${Number(d.totalExpenses || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>₦${Number(d.net || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>${dailyQty}</td>
+          <td>₦${dailyAvg}</td>
+        </tr>
+      `);
+    });
+
+    win.document.write(`
+          <tr style="font-weight:bold;">
+            <td>TOTAL</td>
+            <td>₦${totalSales.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td>₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td>₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td>${totalQty}</td>
+            <td>₦${avgUnitPrice}</td>
+          </tr>
+        </table>
+
+        <br>
+        <h3>SUMMARY</h3>
+        <p><strong>Total Sales:</strong> ₦${totalSales.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+        <p><strong>Total Expenses:</strong> ₦${totalExpenses.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+        <p style="font-size:18px;font-weight:bold;"><strong>Net Profit:</strong> ₦${totalNet.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+        <p><strong>Total Quantity Sold:</strong> ${totalQty}</p>
+        <p><strong>Average Unit Price:</strong> ₦${avgUnitPrice}</p>
+
+        <section class="expense-breakdown">
+          <h3>📊 EXPENSE BREAKDOWN — 8 CATEGORIES</h3>
+          <p class="section-note">
+            Expenses are automatically grouped into the eight fixed categories used by the system.
+            Each category appears once with its total amount and percentage of total expenses.
+          </p>
+          ${buildExpenseBreakdownChart(monthlyExpenseBreakdown)}
+          <p class="highest-expense-comment">
+            🔎 <strong>Summary:</strong> ${getExpenseSummaryComment(monthlyExpenseBreakdown)}
+          </p>
+        </section>
+
+        <p>${escapeReportHtml(footer)}</p>
+        <hr>
+      </div>
+    `);
   }
 
   win.document.write('</body></html>');
@@ -2333,25 +2392,6 @@ const dailyAvgUnit = dailyQty
   win.print();
   win.close();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 async function showWeeklyProfitDeductionDialog() {
   return new Promise(resolve => {
