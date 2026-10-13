@@ -294,8 +294,9 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- CUSTOMER BUYING HISTORY PAGE -->
 <div id="customerHistoryPage" class="section" style="display:none;">
+  <button onclick="backToDashboard()" style="display:block;margin:0 0 14px;background:#0066cc;color:#fff;font-weight:bold">⬅ Back to Dashboard</button>
   <h2>👤 Customer Buying History</h2>
-  <p>Search a customer to see every recorded purchase, date, amount, amount paid, and whether that sale was paid or made on credit.</p>
+  <p>All recorded customer purchases are shown below. Search by customer name to filter the history; clear the search box to show every customer and every recorded purchase.</p>
   <label>Search Customer:
     <input type="text" id="customerHistorySearch" list="customerHistoryList" placeholder="Type or select customer name" oninput="renderCustomerBuyingHistory()" style="width:min(420px,90%);padding:10px;">
   </label>
@@ -304,7 +305,6 @@ body.dark-mode th {background-color:#003366;}
   <table id="customerHistoryTable">
     <tr><th>Date</th><th>Customer</th><th>Quantity</th><th>Sale Amount</th><th>Paid at Sale</th><th>Owing on This Sale</th><th>Sale Status</th></tr>
   </table>
-  <br><button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 
 <!-- SETTINGS PAGE -->
@@ -1179,13 +1179,13 @@ function addSaleToDailyRecord(dailyIndex){
   const paid=parseFloat(prompt('Amount Paid:',String(total))); if(!Number.isFinite(paid)||paid<0||paid>total){alert('Please enter a valid Amount Paid.');return;}
   saveCustomerSuggestion(customer.trim()); d.sales.push({customer:customer.trim(),qty,total,unit:total/qty,paid,owing:total-paid,debtHistoryId:Date.now()+'-'+Math.random().toString(36).slice(2)});
   recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
-  renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();editDailyRecord(dailyIndex);
+  renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();renderCustomerBuyingHistory();editDailyRecord(dailyIndex);
 }
 function updateDebtForDailySale(sale,recordDate){rebuildAllDebts();}
 function deleteDailySale(dailyIndex,saleIndex){
   const d=dailyData[dailyIndex], s=d&&d.sales?d.sales[saleIndex]:null; if(!s||!confirm('Delete this sale from the daily record?'))return;
   d.sales.splice(saleIndex,1); recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
-  renderDailyRecords();renderDebtors();renderSalesTable();editDailyRecord(dailyIndex);
+  renderDailyRecords();renderDebtors();renderSalesTable();renderCustomerBuyingHistory();editDailyRecord(dailyIndex);
 }
 
 function deleteDailyExpense(dailyIndex, expenseIndex) {
@@ -1206,7 +1206,7 @@ function editOneDailySale(dailyIndex,saleIndex){
   const total=parseFloat(prompt('Edit Total Amount:',sale.total)); if(!Number.isFinite(total)||total<=0)return alert('Sales is blank: total amount must be greater than 0.');
   const paid=parseFloat(prompt('Edit Amount Paid:',sale.paid)); if(!Number.isFinite(paid)||paid<0||paid>total)return alert('Invalid amount paid.');
   saveCustomerSuggestion(customer.trim()); Object.assign(sale,{customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); recalcDailyRecord(d); rebuildAllDebts();
-  localStorage.setItem('dailyData',JSON.stringify(dailyData));localStorage.setItem('debtData',JSON.stringify(debtData)); renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();editDailyRecord(dailyIndex);
+  localStorage.setItem('dailyData',JSON.stringify(dailyData));localStorage.setItem('debtData',JSON.stringify(debtData)); renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();renderCustomerBuyingHistory();editDailyRecord(dailyIndex);
 }
 
 // ====== RENDER DAILY RECORD INVOICE ======
@@ -3097,8 +3097,8 @@ function renderCustomerBuyingHistory(){
     cell.colSpan=7; cell.innerText=query?'No purchase history found for this customer.':'Enter or select a customer name to view their purchases.';
   }
   summary.innerText=query
-    ? `Matches: ${filtered.length} sale(s) | Quantity: ${totalQty} | Total sales: ₦${formatMoney(totalAmount)} | Paid at sale: ₦${formatMoney(totalPaid)} | Owing recorded on sales: ₦${formatMoney(totalOwing)}`
-    : 'Search for a customer to see their purchase history.';
+    ? `Customer filter: ${input.value} | Matches: ${filtered.length} sale(s) | Quantity: ${totalQty} | Total sales: ₦${formatMoney(totalAmount)} | Paid at sale: ₦${formatMoney(totalPaid)} | Owing recorded on sales: ₦${formatMoney(totalOwing)}`
+    : `ALL CUSTOMER HISTORY | ${filtered.length} sale(s) | Quantity: ${totalQty} | Total sales: ₦${formatMoney(totalAmount)} | Paid at sale: ₦${formatMoney(totalPaid)} | Owing recorded on sales: ₦${formatMoney(totalOwing)}`;
 }
 
 function updateDashboard(){renderSalesTable();renderExpenses();renderDebtors();}
