@@ -1179,13 +1179,13 @@ function addSaleToDailyRecord(dailyIndex){
   const paid=parseFloat(prompt('Amount Paid:',String(total))); if(!Number.isFinite(paid)||paid<0||paid>total){alert('Please enter a valid Amount Paid.');return;}
   saveCustomerSuggestion(customer.trim()); d.sales.push({customer:customer.trim(),qty,total,unit:total/qty,paid,owing:total-paid,debtHistoryId:Date.now()+'-'+Math.random().toString(36).slice(2)});
   recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
-  renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();renderCustomerBuyingHistory();editDailyRecord(dailyIndex);
+  renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();renderCustomerBuyingHistory();updateDashboard();editDailyRecord(dailyIndex);
 }
 function updateDebtForDailySale(sale,recordDate){rebuildAllDebts();}
 function deleteDailySale(dailyIndex,saleIndex){
   const d=dailyData[dailyIndex], s=d&&d.sales?d.sales[saleIndex]:null; if(!s||!confirm('Delete this sale from the daily record?'))return;
   d.sales.splice(saleIndex,1); recalcDailyRecord(d); rebuildAllDebts(); localStorage.setItem('dailyData',JSON.stringify(dailyData)); localStorage.setItem('debtData',JSON.stringify(debtData));
-  renderDailyRecords();renderDebtors();renderSalesTable();renderCustomerBuyingHistory();editDailyRecord(dailyIndex);
+  renderDailyRecords();renderDebtors();renderSalesTable();renderCustomerBuyingHistory();updateDashboard();editDailyRecord(dailyIndex);
 }
 
 function deleteDailyExpense(dailyIndex, expenseIndex) {
@@ -1205,8 +1205,21 @@ function editOneDailySale(dailyIndex,saleIndex){
   const qty=parseFloat(prompt('Edit Quantity:',sale.qty)); if(!Number.isFinite(qty)||qty<=0)return alert('Sales is blank: quantity must be greater than 0.');
   const total=parseFloat(prompt('Edit Total Amount:',sale.total)); if(!Number.isFinite(total)||total<=0)return alert('Sales is blank: total amount must be greater than 0.');
   const paid=parseFloat(prompt('Edit Amount Paid:',sale.paid)); if(!Number.isFinite(paid)||paid<0||paid>total)return alert('Invalid amount paid.');
-  saveCustomerSuggestion(customer.trim()); Object.assign(sale,{customer:customer.trim(),qty,total,paid,unit:total/qty,owing:total-paid}); recalcDailyRecord(d); rebuildAllDebts();
-  localStorage.setItem('dailyData',JSON.stringify(dailyData));localStorage.setItem('debtData',JSON.stringify(debtData)); renderDailyRecords();renderDebtors();renderSalesTable();updateCustomerSuggestions();renderCustomerBuyingHistory();editDailyRecord(dailyIndex);
+  saveCustomerSuggestion(customer.trim());
+  // Older archived sales may not have a stable ID. Give the edited row one so
+  // the ledger can identify it reliably and avoid duplicate/missing debtor rows.
+  if(!sale.debtHistoryId) sale.debtHistoryId='daily-edit-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+  Object.assign(sale,{customer:customer.trim(),qty,total,paid,unit:total/qty,owing:Math.max(0,total-paid),lastCorrectedAt:new Date().toISOString()});
+  // If this transaction is also still in current Sales, update that copy too.
+  const liveMatch=salesData.find(x=>x.debtHistoryId && String(x.debtHistoryId)===String(sale.debtHistoryId));
+  if(liveMatch) Object.assign(liveMatch,{customer:sale.customer,qty,total,paid,unit:sale.unit,owing:sale.owing,lastCorrectedAt:sale.lastCorrectedAt});
+  recalcDailyRecord(d);
+  localStorage.setItem('dailyData',JSON.stringify(dailyData));
+  localStorage.setItem('salesData',JSON.stringify(salesData));
+  rebuildAllDebts();
+  localStorage.setItem('debtData',JSON.stringify(debtData));
+  renderDailyRecords(); renderDebtors(); renderSalesTable(); updateCustomerSuggestions(); renderCustomerBuyingHistory(); updateDashboard();
+  editDailyRecord(dailyIndex);
 }
 
 // ====== RENDER DAILY RECORD INVOICE ======
@@ -1374,14 +1387,16 @@ function collectAllSalesForLedger(){
   dailyData.forEach(day=>(day.sales||[]).forEach((sale,i)=>{
     const customer=String(sale.customer||'').trim();
     if(!customer)return;
-    const saleId=String(sale.debtHistoryId||`daily-${day.date}-${i}`);
+    if(!sale.debtHistoryId) sale.debtHistoryId=`daily-${normalizeLedgerDate(day.date)}-${i}-${ledgerCustomerKey(customer).replace(/[^a-z0-9]+/g,'-')}`;
+    const saleId=String(sale.debtHistoryId);
     if(seen.has(saleId))return;
     seen.add(saleId);
     rows.push({
       customer, saleId,
       total:Number(sale.total||0), paid:Number(sale.paid||0),
       debt:Math.max(0,Number(sale.total||0)-Number(sale.paid||0)),
-      date:normalizeLedgerDate(day.date), time:sale.time||'00:00:00'
+      date:normalizeLedgerDate(day.date), time:sale.time||'00:00:00',
+      lastCorrectedAt:sale.lastCorrectedAt||''
     });
   }));
   salesData.forEach((sale,i)=>{
@@ -1397,6 +1412,8 @@ function collectAllSalesForLedger(){
       date:normalizeLedgerDate(sale.date), time:sale.time||'00:00:00'
     });
   });
+  // Persist generated IDs so future edits always point to the same sale.
+  localStorage.setItem('dailyData',JSON.stringify(dailyData));
   return rows;
 }
 
@@ -1518,7 +1535,24 @@ function rebuildAllDebts(){
     const orderedDates=Object.keys(dateGroups).sort();
     orderedDates.forEach(date=>{
       const g=dateGroups[date];
-      g.balance=Math.max(0,g.debt-g.payments);
+      // A corrected sale is a deliberate correction made after the original
+      // payment history was recorded. Do not let older payments silently hide
+      // the newly corrected outstanding amount. Payments entered after the
+      // correction still reduce the corrected balance normally.
+      const correctedSales=(g.sales||[]).filter(s=>s.lastCorrectedAt);
+      if(!correctedSales.length){
+        g.balance=Math.max(0,g.debt-g.payments);
+        return;
+      }
+      const correctionTime=Math.max(...correctedSales.map(s=>Date.parse(s.lastCorrectedAt)||0));
+      const correctedDebt=correctedSales.reduce((sum,s)=>sum+Math.max(0,Number(s.debt||0)),0);
+      const normalDebt=Math.max(0,g.debt-correctedDebt);
+      const datePayments=c.payments.filter(p=>normalizeLedgerDate(p.targetDate||p.date)===date);
+      const paymentsBefore=datePayments.filter(p=>(Date.parse(`${normalizeLedgerDate(p.date)}T${p.time||'00:00:00'}`)||0)<correctionTime).reduce((sum,p)=>sum+Number(p.amount||0),0);
+      const paymentsAfter=datePayments.filter(p=>(Date.parse(`${normalizeLedgerDate(p.date)}T${p.time||'00:00:00'}`)||0)>=correctionTime).reduce((sum,p)=>sum+Number(p.amount||0),0);
+      const correctedBalance=Math.max(0,correctedDebt-paymentsAfter);
+      const normalBalance=Math.max(0,normalDebt-paymentsBefore-Math.max(0,paymentsAfter-correctedDebt));
+      g.balance=correctedBalance+normalBalance;
     });
 
     // Build transaction history. This is what the History window reads.
