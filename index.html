@@ -62,6 +62,7 @@ body.dark-mode th {background-color:#003366;}
 
 <div class="dashboard-buttons">
 <button onclick="showSection('salesPage')">🛒 Sales</button>
+      <button onclick="showCustomerHistoryPage()">👤 Customer Buying History</button>
 <button onclick="showSection('debtorsPage')">💳 Debtors</button>
 <button onclick="showSection('expensesPage')">💰 Expenses</button>
 <button onclick="endOfDay()">📅 End of Day</button>
@@ -291,6 +292,21 @@ body.dark-mode th {background-color:#003366;}
   <br><button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 
+<!-- CUSTOMER BUYING HISTORY PAGE -->
+<div id="customerHistoryPage" class="section" style="display:none;">
+  <h2>👤 Customer Buying History</h2>
+  <p>Search a customer to see every recorded purchase, date, amount, amount paid, and whether that sale was paid or made on credit.</p>
+  <label>Search Customer:
+    <input type="text" id="customerHistorySearch" list="customerHistoryList" placeholder="Type or select customer name" oninput="renderCustomerBuyingHistory()" style="width:min(420px,90%);padding:10px;">
+  </label>
+  <datalist id="customerHistoryList"></datalist>
+  <div id="customerHistorySummary" style="margin:15px 0;font-weight:bold;"></div>
+  <table id="customerHistoryTable">
+    <tr><th>Date</th><th>Customer</th><th>Quantity</th><th>Sale Amount</th><th>Paid at Sale</th><th>Owing on This Sale</th><th>Sale Status</th></tr>
+  </table>
+  <br><button onclick="backToDashboard()">Back to Dashboard</button>
+</div>
+
 <!-- SETTINGS PAGE -->
 <div id="settingsPage" class="section" style="display:none;">
   <h2>Settings</h2>
@@ -338,7 +354,7 @@ function login(){
 }
 function logout(){ location.reload(); }
 function showSection(id){
-  ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','settingsPage']
+  ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','customerHistoryPage','settingsPage']
   .forEach(s=>document.getElementById(s).style.display='none');
   document.getElementById(id).style.display='block';
   if(id==='chartsPage') renderChart();
@@ -409,7 +425,13 @@ function renderSalesTable(){
 
   salesData.forEach((s,index)=>{
     const row=table.insertRow();
-    row.insertCell(0).innerText=s.customer;
+    const customerCell=row.insertCell(0);
+    const customerLink=document.createElement('button');
+    customerLink.innerText=s.customer;
+    customerLink.title='View this customer’s buying history';
+    customerLink.style.cssText='background:transparent;color:#0066cc;text-decoration:underline;padding:2px;margin:0;';
+    customerLink.onclick=()=>showCustomerHistoryPage(s.customer);
+    customerCell.appendChild(customerLink);
     row.insertCell(1).innerText=s.qty;
     row.insertCell(2).innerText=s.total;
     row.insertCell(3).innerText=s.unit;
@@ -3021,6 +3043,62 @@ function updateCustomerSuggestions() {
         list.appendChild(opt);
 
     });
+}
+
+
+// ==========================================
+// CUSTOMER BUYING HISTORY
+// Includes current sales and archived daily records.
+// ==========================================
+function showCustomerHistoryPage(customerName=''){
+  showSection('customerHistoryPage');
+  const input=document.getElementById('customerHistorySearch');
+  if(input) input.value=customerName || '';
+  const list=document.getElementById('customerHistoryList');
+  if(list){
+    list.innerHTML='';
+    const names=new Set();
+    customerData.forEach(n=>names.add(n));
+    salesData.forEach(x=>{if(x.customer)names.add(x.customer);});
+    dailyData.forEach(d=>(d.sales||[]).forEach(x=>{if(x.customer)names.add(x.customer);}));
+    [...names].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
+      const option=document.createElement('option'); option.value=n; list.appendChild(option);
+    });
+  }
+  renderCustomerBuyingHistory();
+}
+function renderCustomerBuyingHistory(){
+  const input=document.getElementById('customerHistorySearch');
+  const query=String(input?.value||'').trim().toLowerCase();
+  const table=document.getElementById('customerHistoryTable');
+  const summary=document.getElementById('customerHistorySummary');
+  if(!table||!summary)return;
+  table.innerHTML='<tr><th>Date</th><th>Customer</th><th>Quantity</th><th>Sale Amount</th><th>Paid at Sale</th><th>Owing on This Sale</th><th>Sale Status</th></tr>';
+  const records=[];
+  salesData.forEach(s=>records.push({...s,historyDate:s.date||new Date().toISOString().slice(0,10)}));
+  dailyData.forEach(d=>(d.sales||[]).forEach(s=>records.push({...s,historyDate:d.date||s.date||'-'})));
+  const filtered=records.filter(s=>String(s.customer||'').toLowerCase().includes(query))
+    .sort((a,b)=>String(b.historyDate).localeCompare(String(a.historyDate)));
+  let totalAmount=0,totalPaid=0,totalOwing=0,totalQty=0;
+  filtered.forEach(s=>{
+    const total=Number(s.total||0), paid=Number(s.paid||0), owing=Math.max(0,Number(s.owing ?? (total-paid)));
+    totalAmount+=total; totalPaid+=paid; totalOwing+=owing; totalQty+=Number(s.qty||0);
+    const row=table.insertRow();
+    row.insertCell(0).innerText=s.historyDate;
+    row.insertCell(1).innerText=s.customer||'-';
+    row.insertCell(2).innerText=Number(s.qty||0);
+    row.insertCell(3).innerText='₦'+formatMoney(total);
+    row.insertCell(4).innerText='₦'+formatMoney(paid);
+    row.insertCell(5).innerText='₦'+formatMoney(owing);
+    row.insertCell(6).innerText=owing<=0?'✅ Paid in full':paid>0?'🟠 Part-paid / Owing':'🔴 Unpaid / Credit';
+  });
+  if(!filtered.length){
+    const row=table.insertRow(); const cell=row.insertCell(0);
+    cell.colSpan=7; cell.innerText=query?'No purchase history found for this customer.':'Enter or select a customer name to view their purchases.';
+  }
+  summary.innerText=query
+    ? `Matches: ${filtered.length} sale(s) | Quantity: ${totalQty} | Total sales: ₦${formatMoney(totalAmount)} | Paid at sale: ₦${formatMoney(totalPaid)} | Owing recorded on sales: ₦${formatMoney(totalOwing)}`
+    : 'Search for a customer to see their purchase history.';
 }
 
 function updateDashboard(){renderSalesTable();renderExpenses();renderDebtors();}
