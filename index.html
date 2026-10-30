@@ -26,16 +26,11 @@ body.dark-mode th {background-color:#003366;}
 .close-btn {float:right;background:red;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<header style="padding:10px 12px;background:linear-gradient(110deg,#e7f7ff,#fff,#d8f1ff);border-bottom:3px solid #168bd0;">
-<div style="display:flex;justify-content:center;align-items:center;gap:12px;">
-<svg width="58" height="58" viewBox="0 0 100 100" aria-label="Sorich water droplet logo"><defs><linearGradient id="mainSorichDrop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43c8ff"/><stop offset="1" stop-color="#0052a5"/></linearGradient></defs><path d="M50 5 C40 23 17 47 17 65 C17 84 31 96 50 96 C69 96 83 84 83 65 C83 47 60 23 50 5Z" fill="url(#mainSorichDrop)" stroke="#064d91" stroke-width="3"/><path d="M27 67 Q50 53 73 67 M25 77 Q50 64 75 77" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
-<div style="text-align:left;line-height:1.02"><div style="font-size:30px;font-weight:900;letter-spacing:1px;color:#07549b">SORICH</div><div style="font-size:17px;font-weight:800;letter-spacing:2px;color:#087ec4">TABLE WATER</div><div style="font-family:Georgia,serif;font-size:16px;font-style:italic;color:#0872b9;margin-top:4px">Drink It. Love It.</div></div>
-</div></header>
+<header>SORICH TABLE WATER — DRINK IT. LOVE IT</header>
 <div class="time" id="liveTime"></div>
 <div class="container">
 
@@ -80,7 +75,6 @@ body.dark-mode th {background-color:#003366;}
 
 <!-- SALES PAGE -->
 <div id="salesPage" class="section" style="display:none;">
-<div id="salesBrand" style="margin:0 auto 10px;"></div>
 <h2>Sales</h2>
 
 <label>Customer: 
@@ -241,9 +235,7 @@ body.dark-mode th {background-color:#003366;}
 <div id="dailyRecordsPage" class="section" style="display:none; position: relative;">
   <h2>Daily Records</h2>
   <button onclick="printMonthlyStatement()">🖨 Print Monthly Statement</button>
- <button onclick="shareMonthlyStatementWhatsApp()">Share Monthly to WhatsApp</button>
  <button onclick="printWeeklyStatement()">🖨 Print Weekly Statement (Mon–Sat)</button>
- <button onclick="shareWeeklyStatementWhatsApp()">Share Weekly to WhatsApp</button>
 
 
   <!-- BACK TO DASHBOARD BUTTON AT TOP-RIGHT -->
@@ -278,8 +270,6 @@ body.dark-mode th {background-color:#003366;}
       <th>Avg Unit Price</th>
       <th>Total Qty</th>
       <th>View</th>
-      <th>Share</th>
-      <th>Edit / Add</th>
       <th>Clear</th>
     </tr>
   </table>
@@ -334,27 +324,9 @@ body.dark-mode th {background-color:#003366;}
   <label>Confirm New Password: <input type="password" id="confirmPassword"></label><br>
   <button onclick="changeCredentials()">Update Credentials</button><br><br>
 
-  <button onclick="saveSorichSettings()">Save Settings</button>
   <button onclick="backToDashboard()">Back to Dashboard</button>
 </div>
 <script>
-function sorichBrandHeader(){
-  return `<div style="display:flex;align-items:center;justify-content:center;gap:14px;text-align:left;padding:12px 8px;margin:0 auto 12px;max-width:720px;border-bottom:3px solid #1594df;background:linear-gradient(110deg,#eaf8ff,#ffffff,#d9f2ff);">
-    <svg width="76" height="76" viewBox="0 0 100 100" role="img" aria-label="Sorich water droplet logo" style="flex:0 0 auto">
-      <defs><linearGradient id="sorichDrop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43c8ff"/><stop offset="1" stop-color="#0052a5"/></linearGradient></defs>
-      <path d="M50 5 C40 23 17 47 17 65 C17 84 31 96 50 96 C69 96 83 84 83 65 C83 47 60 23 50 5Z" fill="url(#sorichDrop)" stroke="#064d91" stroke-width="3"/>
-      <path d="M27 67 Q50 53 73 67 M25 77 Q50 64 75 77" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
-      <path d="M37 31 Q48 17 57 16" fill="none" stroke="#bceeff" stroke-width="5" stroke-linecap="round"/>
-    </svg>
-    <div style="line-height:1.05">
-      <div style="font-family:Arial,sans-serif;font-size:clamp(23px,4vw,34px);font-weight:900;letter-spacing:1px;color:#07549b;">SORICH</div>
-      <div style="font-family:Arial,sans-serif;font-size:clamp(14px,2.5vw,20px);font-weight:800;letter-spacing:2px;color:#087ec4;">TABLE WATER</div>
-      <div style="font-family:Georgia,serif;font-size:16px;font-style:italic;font-weight:bold;color:#0872b9;margin-top:5px;">Drink It. Love It.</div>
-    </div>
-  </div>`;
-}
-
-
 // ====== Offline JS Logic ======
 let salesData=JSON.parse(localStorage.getItem('salesData'))||[];
 let debtData=JSON.parse(localStorage.getItem('debtData'))||[];
@@ -374,89 +346,24 @@ function updateTime(){ document.getElementById('liveTime').innerText=new Date().
 setInterval(updateTime,1000); updateTime();
 
 // ====== LOGIN ======
-function login(){
-  const usernameField=document.getElementById('username');
-  const passwordField=document.getElementById('password');
-  const u=String(usernameField?.value||'').trim().toLowerCase();
-  const p=String(passwordField?.value||'');
-  let saved=loginCredentials;
-  if(!saved || typeof saved.username!=='string' || typeof saved.password!=='string'){
-    saved={username:'manager',password:'1234'};
-    loginCredentials=saved;
-    localStorage.setItem('loginCredentials',JSON.stringify(saved));
-  }
-  if(u===String(saved.username).trim().toLowerCase() && p===String(saved.password)){
-    showSection('enterDashboardPage');
-    if(passwordField) passwordField.value='';
-  } else {
-    alert('Incorrect username or password. If you have not changed the login details, use username: manager and password: 1234.');
-    passwordField?.focus();
-  }
+function login(){ 
+  const u=document.getElementById('username').value; 
+  const p=document.getElementById('password').value;
+  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
+  else alert('Invalid credentials');
 }
 function logout(){ location.reload(); }
 function showSection(id){
   ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','customerHistoryPage','settingsPage']
-  .forEach(s=>{const el=document.getElementById(s);if(el)el.style.display='none';});
-  const target=document.getElementById(id);
-  if(!target){alert('Page could not be opened: '+id);return;}
-  target.style.display='block';
-  if(id==='chartsPage' && typeof renderChart==='function') renderChart();
-  if(id==='debtorsPage' && typeof renderDebtors==='function') renderDebtors();
+  .forEach(s=>document.getElementById(s).style.display='none');
+  document.getElementById(id).style.display='block';
+  if(id==='chartsPage') renderChart();
+  if(id==='debtorsPage') renderDebtors();
 }
 function backToDashboard(){ showSection('dashboardPage'); }
-function loadSorichSettings(){
-  let saved={};
-  try{ saved=JSON.parse(localStorage.getItem('sorichSettings')||'{}')||{}; }catch(e){ saved={}; }
-  const setValue=(id,value)=>{const el=document.getElementById(id);if(el&&value!==undefined&&value!==null)el.value=value;};
-  setValue('managerName',saved.managerName||'');
-  setValue('contact1',saved.contact1||'');
-  setValue('invoiceFooter',saved.invoiceFooter||'Drink It. Love It.');
-  setValue('invoiceCopies',saved.invoiceCopies||4);
-  setValue('bgColorPicker',saved.bgColor||'#cceeff');
-  const dark=document.getElementById('darkModeToggle');
-  if(dark){dark.checked=!!saved.darkMode;document.body.classList.toggle('dark-mode',dark.checked);}
-  if(saved.bgColor)document.body.style.background=saved.bgColor;
-}
-function saveSorichSettings(){
-  const get=id=>document.getElementById(id);
-  const settings={
-    managerName:get('managerName')?.value||'',
-    contact1:get('contact1')?.value||'',
-    invoiceFooter:get('invoiceFooter')?.value||'Drink It. Love It.',
-    invoiceCopies:Math.max(1,parseInt(get('invoiceCopies')?.value,10)||4),
-    bgColor:get('bgColorPicker')?.value||'#cceeff',
-    darkMode:!!get('darkModeToggle')?.checked
-  };
-  localStorage.setItem('sorichSettings',JSON.stringify(settings));
-  document.body.classList.toggle('dark-mode',settings.darkMode);
-  document.body.style.background=settings.bgColor;
-  alert('Settings saved successfully.');
-}
-function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); saveSorichSettingsSilent(); }
-function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; saveSorichSettingsSilent(); }
-function saveSorichSettingsSilent(){
-  const get=id=>document.getElementById(id);
-  const settings={managerName:get('managerName')?.value||'',contact1:get('contact1')?.value||'',invoiceFooter:get('invoiceFooter')?.value||'Drink It. Love It.',invoiceCopies:Math.max(1,parseInt(get('invoiceCopies')?.value,10)||4),bgColor:get('bgColorPicker')?.value||'#cceeff',darkMode:!!get('darkModeToggle')?.checked};
-  localStorage.setItem('sorichSettings',JSON.stringify(settings));
-}
-function settingsPage(){ 
-  showSection('settingsPage');
-  ['oldPassword','newUsername','newPassword','confirmPassword'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-}
-function changeCredentials(){
-  const oldPassword=document.getElementById('oldPassword').value;
-  const newUsername=document.getElementById('newUsername').value.trim();
-  const newPassword=document.getElementById('newPassword').value;
-  const confirmPassword=document.getElementById('confirmPassword').value;
-  if(oldPassword!==loginCredentials.password){ alert('The old password is incorrect.'); return; }
-  if(!newUsername){ alert('Please enter a new username.'); return; }
-  if(!newPassword){ alert('Please enter a new password.'); return; }
-  if(newPassword!==confirmPassword){ alert('The new passwords do not match.'); return; }
-  loginCredentials={username:newUsername,password:newPassword};
-  localStorage.setItem('loginCredentials',JSON.stringify(loginCredentials));
-  ['oldPassword','newUsername','newPassword','confirmPassword'].forEach(id=>document.getElementById(id).value='');
-  alert('Login credentials updated successfully. Use the new username and password the next time you log in.');
-}
+function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
+function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
+function settingsPage(){ showSection('settingsPage'); }
 
 // ====== SALES ======
 const saleQty = document.getElementById('saleQty'),
@@ -469,19 +376,6 @@ function updateSaleCalc(){
   document.getElementById('saleUnitPrice').innerText=q?(t/q).toFixed(2):'0.00';
   document.getElementById('saleOwing').innerText=Math.max(0,t-p).toFixed(2);
 }
-let salePaidWasAuto = true;
-let previousSaleTotal = Number(saleTotal.value) || 0;
-salePaid.addEventListener('input',()=>{ salePaidWasAuto = false; updateSaleCalc(); });
-saleTotal.addEventListener('input',()=>{
-  const oldTotal=previousSaleTotal;
-  const paidNow=Number(salePaid.value)||0;
-  if(salePaidWasAuto || Math.abs(paidNow-oldTotal)<0.005){
-    salePaid.value=saleTotal.value;
-    salePaidWasAuto=true;
-  }
-  previousSaleTotal=Number(saleTotal.value)||0;
-  updateSaleCalc();
-});
 [saleQty,saleTotal,salePaid].forEach(e=>e.addEventListener('input',updateSaleCalc));
 updateSaleCalc();
 function handleCustomerTyping(){
@@ -505,7 +399,7 @@ function addSale(){
   rebuildAllDebts();
   localStorage.setItem('salesData',JSON.stringify(salesData)); localStorage.setItem('debtData',JSON.stringify(debtData));
   renderSalesTable(); renderDebtors(); updateCustomerSuggestions();
-  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2500; salePrevDebt.value=0; salePaidWasAuto=true; previousSaleTotal=2500; updateSaleCalc();
+  document.getElementById('saleCustomer').value=''; saleQty.value=10; saleTotal.value=2500; salePaid.value=2500; salePrevDebt.value=0; updateSaleCalc();
 }
 
 function renderSalesTable(){
@@ -539,10 +433,10 @@ function renderSalesTable(){
     customerLink.onclick=()=>showCustomerHistoryPage(s.customer);
     customerCell.appendChild(customerLink);
     row.insertCell(1).innerText=s.qty;
-    row.insertCell(2).innerText='₦'+formatMoney(s.total);
-    row.insertCell(3).innerText='₦'+formatMoney(s.unit);
-    row.insertCell(4).innerText='₦'+formatMoney(s.paid);
-    row.insertCell(5).innerText='₦'+formatMoney(s.owing);
+    row.insertCell(2).innerText=s.total;
+    row.insertCell(3).innerText=s.unit;
+    row.insertCell(4).innerText=s.paid;
+    row.insertCell(5).innerText=s.owing;
 
     // ✏️ EDIT BUTTON
     const editBtn=document.createElement('button');
@@ -610,13 +504,13 @@ function renderSalesTable(){
   const avgUnit = sumQty ? (sumTotal / sumQty).toFixed(2) : 0;
 
   document.getElementById('sumQty').innerText = sumQty;
-  document.getElementById('sumTotal').innerText = formatMoney(sumTotal);
-  document.getElementById('sumPaid').innerText = formatMoney(sumPaid);
-  document.getElementById('sumOwing').innerText = formatMoney(sumOwing);
+  document.getElementById('sumTotal').innerText = sumTotal.toFixed(2);
+  document.getElementById('sumPaid').innerText = sumPaid.toFixed(2);
+  document.getElementById('sumOwing').innerText = sumOwing.toFixed(2);
 
   document.getElementById('avgPrice').innerText = avgUnit;
 
-  document.getElementById('totalSales').innerText = formatMoney(sumTotal);
+  document.getElementById('totalSales').innerText = sumTotal.toFixed(2);
   document.getElementById('totalPaid').innerText = sumPaid.toFixed(2);
 
   const totalDebt = debtData.reduce((acc,d)=>acc + Number(d.owing),0);
@@ -895,7 +789,7 @@ function printInvoice(sale){
   const win=window.open('','PRINT','width=600,height=800');
   for(let i=0;i<copies;i++){
     const copyName=['Customer','Driver','Security','Manager'][i]||'Copy';
-    win.document.write(`${sorichBrandHeader()}<h2>SORICH TABLE WATER</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
+    win.document.write(`<h2>SORICH CLASSY SERVICES</h2><p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p><p>08164084402, 07012623006, 08067338211</p><h3>FACTORY SALE - ${copyName.toUpperCase()} COPY</h3><p>RECEIPT: F${invoiceNumber}</p><p>DATE: ${now.toLocaleDateString()} TIME: ${now.toLocaleTimeString()}</p><p>ISSUER: ${m}</p><hr>`);
     win.document.write(`<p>DESCRIPTION | QTY | UNIT | TOTAL | PAID | OWING</p><p>${customer} | ${qty} | ${unit} | ${total} | ${paid} | ${owing}</p><p>${f}</p><hr>`);
   }
   win.document.close(); win.focus(); win.print(); win.close();
@@ -1090,8 +984,7 @@ function clearMonthlyExpenses() {
 function clearDailyExpenses() {
   if (!confirm("Clear today's expenses? This will archive them in daily records.")) return;
 
-  const localToday = new Date();
-   const todayStr = `${localToday.getFullYear()}-${String(localToday.getMonth()+1).padStart(2,'0')}-${String(localToday.getDate()).padStart(2,'0')}`;
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Archive today's expenses along with sales if any
   const todaySales = salesData; // current sales
@@ -1171,13 +1064,7 @@ function dailyTableRows(records, table) {
     viewBtn.onclick = () => renderDailyRecordInvoice(d);
     viewCell.appendChild(viewBtn);
 
-    const shareCell=row.insertCell(7);
-    const shareBtn=document.createElement('button');
-    shareBtn.innerText='Share to WhatsApp';
-    shareBtn.onclick=()=>shareDailyRecordWhatsApp(originalIndex);
-    shareCell.appendChild(shareBtn);
-
-    const editCell = row.insertCell(8);
+    const editCell = row.insertCell(7);
     const editBtn = document.createElement('button');
     editBtn.innerText = '✏️ Edit / Add';
     editBtn.style.background = '#0066cc';
@@ -1185,7 +1072,7 @@ function dailyTableRows(records, table) {
     editBtn.onclick = () => editDailyRecord(originalIndex);
     editCell.appendChild(editBtn);
 
-    const clearCell = row.insertCell(9);
+    const clearCell = row.insertCell(8);
     const clearBtn = document.createElement('button');
     clearBtn.innerText = 'Clear';
     clearBtn.onclick = () => {
@@ -1204,7 +1091,7 @@ function renderDailyRecords() {
   const table = document.getElementById('dailyTable');
   table.innerHTML = `<tr>
     <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th>
-    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Share</th><th>Edit / Add</th><th>Clear</th>
+    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Edit / Add</th><th>Clear</th>
   </tr>`;
   dailyTableRows([...dailyData].sort((a,b) => String(b.date).localeCompare(String(a.date))), table);
 }
@@ -1216,7 +1103,7 @@ function filterDailyRecords() {
   const table = document.getElementById('dailyTable');
   table.innerHTML = `<tr>
     <th>Date</th><th>Total Sales</th><th>Total Expenses</th><th>Net Balance</th>
-    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Share</th><th>Edit / Add</th><th>Clear</th>
+    <th>Avg Unit Price</th><th>Total Qty</th><th>View</th><th>Edit / Add</th><th>Clear</th>
   </tr>`;
   dailyTableRows(dailyData.filter(d => String(d.date) >= from && String(d.date) <= to)
     .sort((a,b) => String(b.date).localeCompare(String(a.date))), table);
@@ -1355,7 +1242,7 @@ function renderDailyRecordInvoice(d) {
         const copyName = ['Customer', 'Driver', 'Security', 'Manager'][i] || 'Copy';
 
         win.document.write(`
-            ${sorichBrandHeader()}<h2>SORICH TABLE WATER</h2>
+            <h2>SORICH CLASSY SERVICES</h2>
             <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
             <p>08164084402, 07012623006, 08067338211</p>
             <h3>DAILY RECORD - ${copyName.toUpperCase()} COPY</h3>
@@ -1418,13 +1305,11 @@ function renderDailyRecordInvoice(d) {
     win.close();
 }
 function endOfDay() {
-  if (!salesData.length && !expenseData.length) {
-    alert('There are no current sales or expenses to close. Add records first, or open Daily Records to view previous days.');
-    return;
-  }
-  if (!confirm("Do you want to end sales for today?\n\nYES = archive today's sales and expenses in Daily Records and clear the current sales/expenses.\nNO = leave everything unchanged.")) return;
-  const localNow = new Date();
-  const chosenDate = `${localNow.getFullYear()}-${String(localNow.getMonth()+1).padStart(2,'0')}-${String(localNow.getDate()).padStart(2,'0')}`;
+  if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const chosenDate = prompt('Enter the DATE for this record (YYYY-MM-DD):', todayStr);
+  if (!chosenDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) { alert('Use YYYY-MM-DD.'); return; }
 
   // IMPORTANT: the date entered here is the actual date of the debt.
   // If today's work is being closed as yesterday, debt history must show yesterday.
@@ -1469,9 +1354,7 @@ function endOfDay() {
   rebuildAllDebts();
   localStorage.setItem('salesData','[]'); localStorage.setItem('expenseData','[]');
   renderSalesTable(); renderExpenses(); renderDebtors(); renderDailyRecords();
-  showSection('dailyRecordsPage');
-  renderDailyRecords();
-  alert('End of day completed! Record saved under ' + chosenDate + '. You can now see it in Daily Records.');
+  alert('End of day completed! Record saved under ' + chosenDate + '.');
 }
 
 // ==========================================
@@ -2016,18 +1899,10 @@ function editSale(index){
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
-// Recover safely if browser storage contains invalid/legacy login data.
-let loginCredentials;
-try {
-  loginCredentials = JSON.parse(localStorage.getItem('loginCredentials') || 'null');
-} catch (error) {
-  loginCredentials = null;
-}
-if (!loginCredentials || typeof loginCredentials.username !== 'string' || typeof loginCredentials.password !== 'string' || !loginCredentials.username || !loginCredentials.password || (loginCredentials.username === 'admin' && loginCredentials.password === 'admin')) {
-  // Replace the old starter credentials from earlier versions with the current starter login.
-  loginCredentials = { username: 'manager', password: '1234' };
-  localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
-}
+let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
+  username: 'admin',
+  password: 'admin'
+};
 
 
 
@@ -2480,14 +2355,6 @@ async function printMonthlyStatement() {
     return;
   }
 
-  // Open the print window while the original button click is still active.
-  // Browsers block window.open() when it is first called after an awaited dialog.
-  const win = window.open('', '', 'width=1100,height=900');
-  if (!win) {
-    alert('Pop-up blocked. Allow pop-ups for this website, then click Print Monthly Statement again.');
-    return;
-  }
-
   // MONTHLY OPTIONAL DEDUCTIONS — use the same clickable YES/NO design as Weekly Statement.
   const includeSalary = await showMonthlyYesNoDialog(
     '👷',
@@ -2498,11 +2365,10 @@ async function printMonthlyStatement() {
   let monthlySalary = 0;
   if (includeSalary) {
     const salaryInput = prompt('Enter TOTAL SALARY FOR WORKERS for this month:', '');
-    if (salaryInput === null) { win.close(); return; }
+    if (salaryInput === null) return;
     monthlySalary = Number(String(salaryInput).replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(monthlySalary) || monthlySalary < 0) {
       alert('Please enter a valid salary amount.');
-      win.close();
       return;
     }
   }
@@ -2516,11 +2382,10 @@ async function printMonthlyStatement() {
   let monthlyMaterial = 0;
   if (includeMaterial) {
     const materialInput = prompt('Enter TOTAL MATERIAL BOUGHT for this month:', '');
-    if (materialInput === null) { win.close(); return; }
+    if (materialInput === null) return;
     monthlyMaterial = Number(String(materialInput).replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(monthlyMaterial) || monthlyMaterial < 0) {
       alert('Please enter a valid material amount.');
-      win.close();
       return;
     }
   }
@@ -2642,6 +2507,12 @@ async function printMonthlyStatement() {
     ? (totalSales / totalQty).toFixed(2)
     : "0.00";
 
+  const win = window.open('', '', 'width=1100,height=900');
+  if (!win) {
+    alert("Pop-up blocked! Allow pop-ups.");
+    return;
+  }
+
   win.document.write(
     '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
     buildReportStyles() +
@@ -2654,7 +2525,7 @@ async function printMonthlyStatement() {
     win.document.write(`
       <div class="report-copy">
         <div class="report-header">
-          ${sorichBrandHeader()}<h2>SORICH TABLE WATER</h2>
+          <h2>SORICH CLASSY SERVICES</h2>
           <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
           <p>08164084402, 07012623006, 08067338211</p>
           <h3>MONTHLY STATEMENT - ${copyName.toUpperCase()} COPY</h3>
@@ -2816,31 +2687,19 @@ async function printWeeklyStatement() {
     return;
   }
 
-  const now = new Date();
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const day = monday.getDay();
-  monday.setDate(monday.getDate() + (day === 0 ? -6 : 1 - day));
-  const saturday = new Date(monday);
-  saturday.setDate(monday.getDate() + 5);
-  const toISODate = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-
   const start = prompt(
-    "Enter START date (YYYY-MM-DD) for the weekly report:",
-    toISODate(monday)
+    "Enter START date (YYYY-MM-DD):",
+    new Date().toISOString().split('T')[0]
   );
 
   if (!start) return;
 
   const end = prompt(
-    "Enter END date (YYYY-MM-DD) for the weekly report (normally Saturday):",
-    toISODate(saturday)
+    "Enter END date (YYYY-MM-DD):",
+    new Date().toISOString().split('T')[0]
   );
 
   if (!end) return;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
-    alert('Please enter valid dates in YYYY-MM-DD format. The start date must not be after the end date.');
-    return;
-  }
 
   const weekRecords = dailyData.filter(
     d => d.date >= start && d.date <= end
@@ -2848,14 +2707,6 @@ async function printWeeklyStatement() {
 
   if (!weekRecords.length) {
     alert(`No records found between ${start} and ${end}`);
-    return;
-  }
-
-  // Open the print window before the asynchronous YES/NO dialog.
-  // Otherwise browsers may treat the later window.open() as an unwanted popup.
-  const win = window.open('', '', 'width=1100,height=900');
-  if (!win) {
-    alert('Pop-up blocked. Allow pop-ups for this website, then click Print Weekly Statement again.');
     return;
   }
 
@@ -2893,14 +2744,12 @@ async function printWeeklyStatement() {
     );
 
     if (enteredAmount === null) {
-      win.close();
       return;
     }
 
     sharingDeductionAmount = Number(String(enteredAmount).replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(sharingDeductionAmount) || sharingDeductionAmount < 0) {
       alert('Please enter a valid positive amount.');
-      win.close();
       return;
     }
   }
@@ -2967,6 +2816,13 @@ async function printWeeklyStatement() {
     ? 'Total Sharing Profit'
     : 'Normal Net Profit';
 
+  const win = window.open('', '', 'width=1100,height=900');
+
+  if (!win) {
+    alert("Pop-up blocked! Allow pop-ups.");
+    return;
+  }
+
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">' + buildReportStyles() + '</head><body>');
 
   for (let i = 0; i < copies; i++) {
@@ -2977,7 +2833,7 @@ async function printWeeklyStatement() {
     win.document.write(`
       <div class="report-copy">
       <div class="report-header">
-        ${sorichBrandHeader()}<h2>SORICH TABLE WATER</h2>
+        <h2>SORICH CLASSY SERVICES</h2>
         <p>PLOT 1 UGBSIS OFF UGBOGO, UDU ROAD, DELTA STATE</p>
         <p>08164084402, 07012623006, 08067338211</p>
 
@@ -3279,130 +3135,9 @@ function renderCustomerBuyingHistory(){
     : `ALL CUSTOMER HISTORY | ${filtered.length} sale(s) | Quantity: ${totalQty} | Total sales: ₦${formatMoney(totalAmount)} | Paid at sale: ₦${formatMoney(totalPaid)} | Owing recorded on sales: ₦${formatMoney(totalOwing)}`;
 }
 
-
-// Capture the exact HTML produced by the existing Print functions. This keeps
-// the same report layout, colours, tables, charts, headings and copy design.
-async function captureExistingPrintHtml(renderReport){
-  let capturedHtml = '';
-  const originalOpen = window.open;
-  const fakeWindow = {
-    document: {
-      write: chunk => { capturedHtml += String(chunk || ''); },
-      close: () => {},
-      open: () => { capturedHtml = ''; }
-    },
-    focus: () => {}, print: () => {}, close: () => {}
-  };
-  try {
-    window.open = () => fakeWindow;
-    await renderReport();
-  } finally {
-    window.open = originalOpen;
-  }
-  if (!capturedHtml.trim()) return null;
-  return capturedHtml;
-}
-
-async function existingReportHtmlToPdf(html, filename){
-  if(!window.jspdf || !window.jspdf.jsPDF || !window.html2canvas){
-    alert('PDF export could not load. Please connect to the internet, refresh the website and try again.');
-    return null;
-  }
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:1100px;height:1000px;border:0;';
-  document.body.appendChild(iframe);
-  try{
-    iframe.srcdoc = html;
-    await new Promise((resolve,reject)=>{
-      iframe.onload = resolve;
-      setTimeout(()=>reject(new Error('Report rendering timed out')),15000);
-    });
-    const body = iframe.contentDocument && iframe.contentDocument.body;
-    if(!body) throw new Error('Could not render the report.');
-    await new Promise(resolve=>setTimeout(resolve,350));
-    const canvas = await html2canvas(body, {
-      scale: 1.6,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      windowWidth: 1100,
-      logging: false
-    });
-    const {jsPDF} = window.jspdf;
-    const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const pagePixelHeight = Math.floor(canvas.width * pageHeight / pageWidth);
-    let page = 0;
-    for(let y=0; y<canvas.height; y+=pagePixelHeight){
-      if(page>0) pdf.addPage();
-      const sliceHeight = Math.min(pagePixelHeight, canvas.height-y);
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width;
-      slice.height = sliceHeight;
-      slice.getContext('2d').drawImage(canvas,0,y,canvas.width,sliceHeight,0,0,canvas.width,sliceHeight);
-      const image = slice.toDataURL('image/jpeg',0.94);
-      const renderedHeight = sliceHeight * pageWidth / canvas.width;
-      pdf.addImage(image,'JPEG',0,0,pageWidth,renderedHeight,undefined,'FAST');
-      page++;
-    }
-    return {doc:pdf, filename};
-  } finally {
-    iframe.remove();
-  }
-}
-
-async function sharePdfToWhatsApp(pdfInfo){
-  if(!pdfInfo)return;
-  const blob = pdfInfo.doc.output('blob');
-  const file = new File([blob], pdfInfo.filename, {type:'application/pdf'});
-  try{
-    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({title:pdfInfo.filename, text:'SORICH TABLE WATER SYSTEM report', files:[file]});
-      return;
-    }
-  }catch(error){
-    if(error && error.name==='AbortError')return;
-  }
-  pdfInfo.doc.save(pdfInfo.filename);
-  const win=window.open('https://wa.me/','_blank');
-  if(!win) alert('The PDF has been downloaded. Open WhatsApp, choose the recipient and attach the PDF.');
-  else alert('The PDF has been downloaded. In WhatsApp, choose the recipient, attach the PDF and send it.');
-}
-
-async function shareDailyRecordWhatsApp(index){
-  const d=dailyData[index]; if(!d)return;
-  try{
-    const html=await captureExistingPrintHtml(()=>renderDailyRecordInvoice(d));
-    if(!html){alert('The daily record PDF was not created. Please try again.');return;}
-    const pdf=await existingReportHtmlToPdf(html,'SORICH_Daily_Record_'+String(d.date||'record')+'.pdf');
-    if(pdf) await sharePdfToWhatsApp(pdf);
-  }catch(error){console.error(error);alert('Could not create the daily record PDF. Please try again.');}
-}
-
-async function shareWeeklyStatementWhatsApp(){
-  try{
-    const html=await captureExistingPrintHtml(()=>printWeeklyStatement());
-    if(!html){alert('The weekly statement was not created. Please check your dates and try again.');return;}
-    const pdf=await existingReportHtmlToPdf(html,'SORICH_Weekly_Statement.pdf');
-    if(pdf) await sharePdfToWhatsApp(pdf);
-  }catch(error){console.error(error);alert('Could not create the weekly statement PDF. Please try again.');}
-}
-
-async function shareMonthlyStatementWhatsApp(){
-  try{
-    const html=await captureExistingPrintHtml(()=>printMonthlyStatement());
-    if(!html){alert('The monthly statement was not created. Please check your month and year and try again.');return;}
-    const pdf=await existingReportHtmlToPdf(html,'SORICH_Monthly_Statement.pdf');
-    if(pdf) await sharePdfToWhatsApp(pdf);
-  }catch(error){console.error(error);alert('Could not create the monthly statement PDF. Please try again.');}
-}
-
 function updateDashboard(){renderSalesTable();renderExpenses();renderDebtors();}
 
 // ====== INIT ======
-loadSorichSettings();
-const salesBrand = document.getElementById('salesBrand');
-if (salesBrand) salesBrand.innerHTML = sorichBrandHeader();
 rebuildAllDebts();
 renderSalesTable();
 renderDebtors();
