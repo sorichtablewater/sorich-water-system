@@ -334,7 +334,7 @@ body.dark-mode th {background-color:#003366;}
   <label>Confirm New Password: <input type="password" id="confirmPassword"></label><br>
   <button onclick="changeCredentials()">Update Credentials</button><br><br>
 
-  <button onclick="backToDashboard()">Back to Dashboard</button>
+  <button onclick="saveSorichSettings(); backToDashboard()">Save Settings & Back to Dashboard</button>
 </div>
 <script>
 function sorichBrandHeader(){
@@ -372,6 +372,19 @@ function formatMoney(value){
 function updateTime(){ document.getElementById('liveTime').innerText=new Date().toLocaleString();}
 setInterval(updateTime,1000); updateTime();
 
+// ====== LOGIN CREDENTIALS ======
+// Keep credentials private from the visible login page. First use defaults to manager / 1234;
+// later changes are stored in this browser's localStorage.
+let loginCredentials = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('loginCredentials') || 'null');
+    if (saved && typeof saved.username === 'string' && typeof saved.password === 'string') return saved;
+  } catch (e) {}
+  const defaults = { username: 'manager', password: '1234' };
+  localStorage.setItem('loginCredentials', JSON.stringify(defaults));
+  return defaults;
+})();
+
 // ====== LOGIN ======
 function login(){ 
   const u=document.getElementById('username').value; 
@@ -388,10 +401,29 @@ function showSection(id){
   if(id==='debtorsPage') renderDebtors();
 }
 function backToDashboard(){ showSection('dashboardPage'); }
-function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); }
-function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; }
+function toggleDarkMode(){ document.body.classList.toggle('dark-mode'); saveSorichSettings(); }
+function saveSorichSettings(){
+  const data = {
+    managerName: document.getElementById('managerName').value,
+    contact1: document.getElementById('contact1').value,
+    invoiceFooter: document.getElementById('invoiceFooter').value,
+    invoiceCopies: Math.max(1, parseInt(document.getElementById('invoiceCopies').value,10) || 4),
+    bgColor: document.getElementById('bgColorPicker').value,
+    darkMode: document.getElementById('darkModeToggle').checked
+  };
+  localStorage.setItem('sorichSettings', JSON.stringify(data));
+}
+function updateBgColor(){ document.body.style.background=document.getElementById('bgColorPicker').value; saveSorichSettings(); }
+
 function settingsPage(){ 
   showSection('settingsPage');
+  const savedSettings = JSON.parse(localStorage.getItem('sorichSettings') || '{}');
+  if (savedSettings.managerName !== undefined) document.getElementById('managerName').value = savedSettings.managerName;
+  if (savedSettings.contact1 !== undefined) document.getElementById('contact1').value = savedSettings.contact1;
+  if (savedSettings.invoiceFooter !== undefined) document.getElementById('invoiceFooter').value = savedSettings.invoiceFooter;
+  if (savedSettings.invoiceCopies !== undefined) document.getElementById('invoiceCopies').value = savedSettings.invoiceCopies;
+  if (savedSettings.bgColor) { document.getElementById('bgColorPicker').value = savedSettings.bgColor; document.body.style.background = savedSettings.bgColor; }
+  if (savedSettings.darkMode) { document.body.classList.add('dark-mode'); document.getElementById('darkModeToggle').checked = true; }
   // Load the saved credentials into the form only as blank fields; never expose the current password.
   ['oldPassword','newUsername','newPassword','confirmPassword'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
 }
@@ -1373,11 +1405,9 @@ function endOfDay() {
     alert('There are no current sales or expenses to close. Add records first, or open Daily Records to view previous days.');
     return;
   }
-  if (!confirm("Close the day? Today's sales and expenses will be archived.")) return;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const chosenDate = prompt('Enter the DATE for this record (YYYY-MM-DD):', todayStr);
-  if (!chosenDate) return;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) { alert('Use YYYY-MM-DD.'); return; }
+  if (!confirm("Do you want to end sales for today?\n\nYES = archive today's sales and expenses in Daily Records.\nNO = leave everything unchanged.")) return;
+  const nowLocal = new Date();
+  const chosenDate = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth()+1).padStart(2,'0')}-${String(nowLocal.getDate()).padStart(2,'0')}`;
 
   // IMPORTANT: the date entered here is the actual date of the debt.
   // If today's work is being closed as yesterday, debt history must show yesterday.
@@ -1968,13 +1998,7 @@ function editSale(index){
   localStorage.setItem('salesData',JSON.stringify(salesData));localStorage.setItem('debtData',JSON.stringify(debtData));renderSalesTable();renderDebtors();updateCustomerSuggestions();
 }
 
-// ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
-  username: 'admin',
-  password: 'admin'
-};
-
-
+// Login credentials are initialized above before the login handler.\n
 
 // ====== EXPENSE CATEGORY SYSTEM ======
 const EXPENSE_CATEGORIES = [
@@ -3251,8 +3275,9 @@ async function existingReportHtmlToPdf(html, filename){
   try{
     iframe.srcdoc = html;
     await new Promise((resolve,reject)=>{
-      iframe.onload = resolve;
-      setTimeout(()=>reject(new Error('Report rendering timed out')),15000);
+      const timeout = setTimeout(()=>reject(new Error('Report rendering timed out')),15000);
+      iframe.onload = () => { clearTimeout(timeout); resolve(); };
+      iframe.onerror = () => { clearTimeout(timeout); reject(new Error('Could not load report HTML')); };
     });
     const body = iframe.contentDocument && iframe.contentDocument.body;
     if(!body) throw new Error('Could not render the report.');
@@ -3301,9 +3326,9 @@ async function sharePdfToWhatsApp(pdfInfo){
     if(error && error.name==='AbortError')return;
   }
   pdfInfo.doc.save(pdfInfo.filename);
-  const win=window.open('https://wa.me/','_blank');
-  if(!win) alert('The PDF has been downloaded. Open WhatsApp, choose the recipient and attach the PDF.');
-  else alert('The PDF has been downloaded. In WhatsApp, choose the recipient, attach the PDF and send it.');
+  const win=window.open('https://web.whatsapp.com/','_blank');
+  if(!win) alert('The PDF has been downloaded. Open WhatsApp, choose the recipient and attach the downloaded PDF. Browsers do not allow this app to attach files automatically when file sharing is unavailable.');
+  else alert('The PDF has been downloaded. In WhatsApp, choose the recipient, click the attachment icon, select the downloaded PDF, and send it. The browser cannot attach the PDF automatically on this device.');
 }
 
 async function shareDailyRecordWhatsApp(index){
