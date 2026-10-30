@@ -374,19 +374,34 @@ function updateTime(){ document.getElementById('liveTime').innerText=new Date().
 setInterval(updateTime,1000); updateTime();
 
 // ====== LOGIN ======
-function login(){ 
-  const u=document.getElementById('username').value; 
-  const p=document.getElementById('password').value;
-  if(u===loginCredentials.username && p===loginCredentials.password){ showSection('enterDashboardPage'); } 
-  else alert('Invalid credentials');
+function login(){
+  const usernameField=document.getElementById('username');
+  const passwordField=document.getElementById('password');
+  const u=String(usernameField?.value||'').trim().toLowerCase();
+  const p=String(passwordField?.value||'');
+  let saved=loginCredentials;
+  if(!saved || typeof saved.username!=='string' || typeof saved.password!=='string'){
+    saved={username:'manager',password:'1234'};
+    loginCredentials=saved;
+    localStorage.setItem('loginCredentials',JSON.stringify(saved));
+  }
+  if(u===String(saved.username).trim().toLowerCase() && p===String(saved.password)){
+    showSection('enterDashboardPage');
+    if(passwordField) passwordField.value='';
+  } else {
+    alert('Incorrect username or password. If you have not changed the login details, use username: manager and password: 1234.');
+    passwordField?.focus();
+  }
 }
 function logout(){ location.reload(); }
 function showSection(id){
   ['loginPage','enterDashboardPage','dashboardPage','salesPage','debtorsPage','expensesPage','dailyRecordsPage','chartsPage','customerHistoryPage','settingsPage']
-  .forEach(s=>document.getElementById(s).style.display='none');
-  document.getElementById(id).style.display='block';
-  if(id==='chartsPage') renderChart();
-  if(id==='debtorsPage') renderDebtors();
+  .forEach(s=>{const el=document.getElementById(s);if(el)el.style.display='none';});
+  const target=document.getElementById(id);
+  if(!target){alert('Page could not be opened: '+id);return;}
+  target.style.display='block';
+  if(id==='chartsPage' && typeof renderChart==='function') renderChart();
+  if(id==='debtorsPage' && typeof renderDebtors==='function') renderDebtors();
 }
 function backToDashboard(){ showSection('dashboardPage'); }
 function loadSorichSettings(){
@@ -2001,11 +2016,18 @@ function editSale(index){
 }
 
 // ====== INITIAL LOGIN CREDENTIALS ======
-let loginCredentials = JSON.parse(localStorage.getItem('loginCredentials')) || {
-  username: 'manager',
-  password: '1234'
-};
-localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
+// Recover safely if browser storage contains invalid/legacy login data.
+let loginCredentials;
+try {
+  loginCredentials = JSON.parse(localStorage.getItem('loginCredentials') || 'null');
+} catch (error) {
+  loginCredentials = null;
+}
+if (!loginCredentials || typeof loginCredentials.username !== 'string' || typeof loginCredentials.password !== 'string' || !loginCredentials.username || !loginCredentials.password || (loginCredentials.username === 'admin' && loginCredentials.password === 'admin')) {
+  // Replace the old starter credentials from earlier versions with the current starter login.
+  loginCredentials = { username: 'manager', password: '1234' };
+  localStorage.setItem('loginCredentials', JSON.stringify(loginCredentials));
+}
 
 
 
