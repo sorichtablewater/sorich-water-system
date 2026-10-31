@@ -2690,30 +2690,38 @@ async function printMonthlyStatement() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const monthlyBorrowDetailHtml = monthlyBorrowWorkers.length
     ? monthlyBorrowWorkers.map(worker => worker.entries.map(entry => `
-        <tr><td>${escapeReportHtml(worker.name)}</td><td>${escapeReportHtml(entry.date)}</td><td>${escapeReportHtml(entry.details)}</td><td>₦${entry.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
-      `).join('')).join('') + `<tr style="font-weight:bold;background:#d8f2ff"><td colspan="3">TOTAL BORROWED</td><td>₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`
+        <tr class="borrow-worker-row" data-worker="${escapeReportHtml(worker.name.toLocaleLowerCase())}"><td>${escapeReportHtml(worker.name)}</td><td>${escapeReportHtml(entry.date)}</td><td>${escapeReportHtml(entry.details)}</td><td>₦${entry.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+      `).join('')).join('') + `<tr id="borrow-detail-total-row" style="font-weight:bold;background:#d8f2ff"><td colspan="3" id="borrow-detail-total-label">TOTAL BORROWED — ALL WORKERS</td><td id="borrow-detail-total-amount">₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`
     : '<tr><td colspan="4" style="text-align:center">No borrow/loan expenses were recorded for this month.</td></tr>';
   const monthlyBorrowWorkerTotalsHtml = monthlyBorrowWorkers.length
-    ? monthlyBorrowWorkers.map(worker => `<tr><td>${escapeReportHtml(worker.name)}</td><td>₦${worker.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`).join('') + `<tr style="font-weight:bold;background:#d8f2ff"><td>ALL WORKERS — TOTAL</td><td>₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`
+    ? monthlyBorrowWorkers.map(worker => `<tr class="borrow-worker-total-row" data-worker="${escapeReportHtml(worker.name.toLocaleLowerCase())}"><td>${escapeReportHtml(worker.name)}</td><td>₦${worker.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`).join('') + `<tr id="borrow-worker-grand-total-row" style="font-weight:bold;background:#d8f2ff"><td>ALL WORKERS — OVERALL TOTAL</td><td>₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`
     : '<tr><td colspan="2" style="text-align:center">No workers have borrow entries for this month.</td></tr>';
 
-  // LIVE DEBTORS
+  // LIVE DEBTORS: include every customer with a current outstanding balance,
+  // not only customers who bought something during the selected month.
   const monthDebtors = {};
   let totalMonthDebt = 0;
 
-  monthCustomers.forEach(name => {
-    const debt = debtData.find(
-      d => String(d.customer || '').toLowerCase() === name
-    );
-
-    if (debt && Number(debt.owing) > 0) {
-      monthDebtors[name] = {
-        totalOwed: Number(debt.totalPaid || 0) + Number(debt.owing || 0),
+  debtData.forEach(debt => {
+    const name = String(debt.customer || '').trim();
+    const balance = Math.max(0, Number(debt.owing || debt.balance || 0));
+    if (!name || balance <= 0) return;
+    const key = name.toLocaleLowerCase();
+    if (!monthDebtors[key]) {
+      monthDebtors[key] = {
+        name,
+        totalOwed: Number(debt.totalPaid || 0) + balance,
         totalPaid: Number(debt.totalPaid || 0),
-        balance: Number(debt.owing || 0)
+        balance: 0
       };
-      totalMonthDebt += Number(debt.owing || 0);
     }
+    monthDebtors[key].balance += balance;
+    monthDebtors[key].totalOwed = Math.max(
+      monthDebtors[key].totalOwed,
+      Number(debt.totalPaid || 0) + monthDebtors[key].balance
+    );
+    monthDebtors[key].totalPaid = Math.max(monthDebtors[key].totalPaid, Number(debt.totalPaid || 0));
+    totalMonthDebt += balance;
   });
 
   // MONTHLY CATEGORY DAILY DETAILS: every category lists the exact days
@@ -2797,10 +2805,10 @@ async function printMonthlyStatement() {
           </tr>
     `);
 
-    Object.entries(monthDebtors).forEach(([name, d]) => {
+    Object.values(monthDebtors).sort((a, b) => a.name.localeCompare(b.name)).forEach(d => {
       win.document.write(`
         <tr>
-          <td>${escapeReportHtml(name.toUpperCase())}</td>
+          <td>${escapeReportHtml(d.name.toUpperCase())}</td>
           <td>₦${d.totalOwed.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           <td>₦${d.totalPaid.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           <td>₦${d.balance.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
@@ -2810,7 +2818,7 @@ async function printMonthlyStatement() {
 
     win.document.write(`
           <tr style="font-weight:bold;">
-            <td>TOTAL</td><td>-</td><td>-</td>
+            <td colspan="3">TOTAL OVERALL CURRENT DEBTORS BALANCE</td>
             <td>₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           </tr>
         </table>
@@ -2818,7 +2826,15 @@ async function printMonthlyStatement() {
         <br>
         <section class="monthly-borrow-ledger" style="margin:18px 0;padding:14px;border:2px solid #0b78b8;border-radius:10px;background:#eefaff;">
           <h3>👷 MONTHLY WORKERS' BORROW / LOAN RECORD</h3>
-          <p><strong>TOTAL AMOUNT BORROWED THIS MONTH: ₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
+          <p id="borrow-overall-summary"><strong>OVERALL BORROWED THIS MONTH — ALL WORKERS: ₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
+          <p id="borrow-selected-summary" style="font-weight:bold;color:#075da8;">SELECTED WORKER TOTAL: All workers combined</p>
+          <p><strong>OVERALL CURRENT CUSTOMER DEBTORS BALANCE: ₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
+          <label style="display:inline-block;margin:8px 0;font-weight:bold;">Filter by worker name:
+            <select class="borrow-worker-filter" style="padding:7px;margin-left:8px;">
+              <option value="all">All workers</option>
+              ${monthlyBorrowWorkers.map(worker => `<option value="${escapeReportHtml(worker.name.toLocaleLowerCase())}">${escapeReportHtml(worker.name)}</option>`).join('')}
+            </select>
+          </label>
           <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
             <tr><th>Worker Name</th><th>Date</th><th>Borrow Details</th><th>Amount Borrowed</th></tr>
             ${monthlyBorrowDetailHtml}
@@ -2906,11 +2922,43 @@ async function printMonthlyStatement() {
     `);
   }
 
+  win.document.write(`
+    <style>@media print { .report-tools, .borrow-worker-filter, .monthly-borrow-ledger label { display:none !important; } }</style>
+    <div class="report-tools" style="position:sticky;top:0;background:#fff;padding:12px;border:2px solid #0b78b8;text-align:center;">
+      <strong>Monthly statement ready.</strong> Filter worker names above, then print when ready.
+      <button onclick="window.print()" style="padding:9px 18px;margin-left:12px;background:#075da8;color:white;border:0;border-radius:6px;cursor:pointer;">Print Monthly Statement</button>
+    </div>
+    <script>
+      var workerBorrowTotals = ${JSON.stringify(Object.fromEntries(monthlyBorrowWorkers.map(worker => [worker.name.toLocaleLowerCase(), { name: worker.name, total: worker.total }] )))};
+      var allBorrowTotal = ${JSON.stringify(totalMonthlyBorrow)};
+      function formatBorrowMoney(value) {
+        return '₦' + Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      }
+      document.querySelectorAll('.borrow-worker-filter').forEach(function(select) {
+        select.addEventListener('change', function() {
+          var chosen = this.value;
+          document.querySelectorAll('.borrow-worker-filter').forEach(function(other) { other.value = chosen; });
+          document.querySelectorAll('.borrow-worker-row, .borrow-worker-total-row').forEach(function(row) {
+            row.style.display = (chosen === 'all' || row.getAttribute('data-worker') === chosen) ? '' : 'none';
+          });
+          var grandTotalRow = document.getElementById('borrow-worker-grand-total-row');
+          if (grandTotalRow) grandTotalRow.style.display = chosen === 'all' ? '' : 'none';
+          var selected = chosen === 'all' ? null : workerBorrowTotals[chosen];
+          var detailLabel = document.getElementById('borrow-detail-total-label');
+          var detailAmount = document.getElementById('borrow-detail-total-amount');
+          if (detailLabel) detailLabel.textContent = selected ? 'TOTAL BORROWED — ' + selected.name : 'TOTAL BORROWED — ALL WORKERS';
+          if (detailAmount) detailAmount.textContent = formatBorrowMoney(selected ? selected.total : allBorrowTotal);
+          var selectedSummary = document.getElementById('borrow-selected-summary');
+          if (selectedSummary) selectedSummary.textContent = selected
+            ? 'TOTAL BORROWED BY ' + selected.name.toLocaleUpperCase() + ': ' + formatBorrowMoney(selected.total)
+            : 'SELECTED WORKER TOTAL: All workers combined — ' + formatBorrowMoney(allBorrowTotal);
+        });
+      });
+    <\/script>
+  `);
   win.document.write('</body></html>');
   win.document.close();
   win.focus();
-  win.print();
-  win.close();
 }
 
 async function showWeeklyProfitDeductionDialog() {
