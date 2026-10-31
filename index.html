@@ -1237,7 +1237,17 @@ function dailyTableRows(records, table) {
     const originalIndex = dailyData.indexOf(d);
     const totalQty = d.sales.reduce((sum, s) => sum + Number(s.qty || 0), 0);
     const row = table.insertRow();
-    row.insertCell(0).innerText = d.date;
+
+    // Show weekday beside the saved date without changing the stored date.
+    const dateParts = String(d.date || '').split('-').map(Number);
+    let displayDate = d.date || '';
+    if (dateParts.length === 3 && dateParts.every(Number.isFinite)) {
+      const dateObject = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+      const weekday = dateObject.toLocaleDateString('en-GB', { weekday: 'long' });
+      const formattedDate = dateObject.toLocaleDateString('en-GB');
+      displayDate = `${weekday}, ${formattedDate}`;
+    }
+    row.insertCell(0).innerText = displayDate;
     row.insertCell(1).innerText = formatMoney(d.totalSales);
     row.insertCell(2).innerText = formatMoney(d.totalExpenses);
     row.insertCell(3).innerText = formatMoney(d.net);
@@ -1495,12 +1505,33 @@ function endOfDay() {
     alert('There are no current sales or expenses to close. Add records first, or open Daily Records to view previous days.');
     return;
   }
-  if (!confirm("Do you want to end sales for today?\n\nYES = archive today's sales and expenses in Daily Records and clear the current sales/expenses.\nNO = leave everything unchanged.")) return;
-  const localNow = new Date();
-  const chosenDate = `${localNow.getFullYear()}-${String(localNow.getMonth()+1).padStart(2,'0')}-${String(localNow.getDate()).padStart(2,'0')}`;
 
-  // IMPORTANT: the date entered here is the actual date of the debt.
-  // If today's work is being closed as yesterday, debt history must show yesterday.
+  const now = new Date();
+  const todayValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const enteredDate = prompt(
+    'Enter the date for the sales you want to end (YYYY-MM-DD):',
+    todayValue
+  );
+  if (enteredDate === null) return;
+
+  const chosenDate = enteredDate.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) {
+    alert('Invalid date format. Please enter the date as YYYY-MM-DD, for example 2026-10-31.');
+    return;
+  }
+  const [year, month, day] = chosenDate.split('-').map(Number);
+  const dateCheck = new Date(year, month - 1, day);
+  if (dateCheck.getFullYear() !== year || dateCheck.getMonth() !== month - 1 || dateCheck.getDate() !== day) {
+    alert('That date does not exist. Please enter a valid calendar date.');
+    return;
+  }
+
+  const weekday = dateCheck.toLocaleDateString('en-GB', { weekday: 'long' });
+  if (!confirm(
+    `DO YOU WANT TO END SALES FOR THIS DAY?\n\nDate: ${weekday}, ${dateCheck.toLocaleDateString('en-GB')}\n\nYES = save these sales and expenses under this date in Daily Records and clear the current sales/expenses.\nNO = cancel and leave everything unchanged.`
+  )) return;
+
+  // Update debt-history dates to the date selected for this end-of-day record.
   salesData.forEach(sale => {
     const customerName = String(sale.customer || '').toLowerCase();
     const debt = debtData.find(d => String(d.customer || '').toLowerCase() === customerName);
@@ -1514,37 +1545,50 @@ function endOfDay() {
     }
   });
 
-  // Use the selected date exactly. If a record already exists for that date, merge into it.
+  // Use the entered date exactly. Merge with an existing record for that date.
   let d = dailyData.find(x => x.date === chosenDate);
   if (!d) {
-    d = {date:chosenDate, totalSales:0, totalExpenses:0, net:0, avgUnitPrice:0, sales:[], expenses:[]};
+    d = { date: chosenDate, totalSales: 0, totalExpenses: 0, net: 0, avgUnitPrice: 0, sales: [], expenses: [] };
     dailyData.push(d);
   }
   if (!Array.isArray(d.sales)) d.sales = [];
   if (!Array.isArray(d.expenses)) d.expenses = [];
 
   salesData.forEach(s => d.sales.push({
-    customer:s.customer,
-    qty:Number(s.qty||0),
-    total:Number(s.total||0),
-    unit:Number(s.unit||0),
-    paid:Number(s.paid||0),
-    owing:Number(s.owing||0),
-    debtHistoryId:s.debtHistoryId || null
+    customer: s.customer,
+    qty: Number(s.qty || 0),
+    total: Number(s.total || 0),
+    unit: Number(s.unit || 0),
+    paid: Number(s.paid || 0),
+    owing: Number(s.owing || 0),
+    debtHistoryId: s.debtHistoryId || null
   }));
-  expenseData.forEach(e => d.expenses.push({type:e.type, desc:getExpenseCategory(e), category:getExpenseCategory(e), categoryManual:e.categoryManual === true, amount:Number(e.amount||0), paidTo:e.paidTo}));
-  recalcDailyRecord(d);
+  expenseData.forEach(e => d.expenses.push({
+    type: e.type,
+    desc: getExpenseCategory(e),
+    category: getExpenseCategory(e),
+    categoryManual: e.categoryManual === true,
+    amount: Number(e.amount || 0),
+    paidTo: e.paidTo
+  }));
 
+  recalcDailyRecord(d);
   localStorage.setItem('dailyData', JSON.stringify(dailyData));
   rebuildAllDebts();
   localStorage.setItem('debtData', JSON.stringify(debtData));
-  salesData = []; expenseData = [];
+
+  salesData = [];
+  expenseData = [];
   rebuildAllDebts();
-  localStorage.setItem('salesData','[]'); localStorage.setItem('expenseData','[]');
-  renderSalesTable(); renderExpenses(); renderDebtors(); renderDailyRecords();
+  localStorage.setItem('salesData', '[]');
+  localStorage.setItem('expenseData', '[]');
+  renderSalesTable();
+  renderExpenses();
+  renderDebtors();
+  renderDailyRecords();
   showSection('dailyRecordsPage');
   renderDailyRecords();
-  alert('End of day completed! Record saved under ' + chosenDate + '. You can now see it in Daily Records.');
+  alert(`End of day completed! Record saved under ${weekday}, ${dateCheck.toLocaleDateString('en-GB')}. You can now see it in Daily Records.`);
 }
 
 // ==========================================
