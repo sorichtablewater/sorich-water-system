@@ -1495,9 +1495,27 @@ function endOfDay() {
     alert('There are no current sales or expenses to close. Add records first, or open Daily Records to view previous days.');
     return;
   }
-  if (!confirm("Do you want to end sales for today?\n\nYES = archive today's sales and expenses in Daily Records and clear the current sales/expenses.\nNO = leave everything unchanged.")) return;
+
+  // Let the manager choose the business date instead of forcing today's date.
   const localNow = new Date();
-  const chosenDate = `${localNow.getFullYear()}-${String(localNow.getMonth()+1).padStart(2,'0')}-${String(localNow.getDate()).padStart(2,'0')}`;
+  const todayISO = `${localNow.getFullYear()}-${String(localNow.getMonth()+1).padStart(2,'0')}-${String(localNow.getDate()).padStart(2,'0')}`;
+  let chosenDate = prompt(
+    'Enter the date these sales and expenses belong to (YYYY-MM-DD). You can enter a past date:',
+    todayISO
+  );
+  if (chosenDate === null) return;
+  chosenDate = String(chosenDate).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) {
+    alert('Invalid date. Please use YYYY-MM-DD, for example 2026-10-30. Nothing has been moved.');
+    return;
+  }
+  const dateCheck = new Date(`${chosenDate}T12:00:00`);
+  if (Number.isNaN(dateCheck.getTime()) ||
+      `${dateCheck.getFullYear()}-${String(dateCheck.getMonth()+1).padStart(2,'0')}-${String(dateCheck.getDate()).padStart(2,'0')}` !== chosenDate) {
+    alert('That date does not exist. Nothing has been moved.');
+    return;
+  }
+  if (!confirm(`Do you want to end/close the sales for ${chosenDate}?\n\nYES = save these sales and expenses under ${chosenDate} in Daily Records, then clear the current sales/expenses.\nNO = leave everything unchanged.`)) return;
 
   // IMPORTANT: the date entered here is the actual date of the debt.
   // If today's work is being closed as yesterday, debt history must show yesterday.
@@ -2649,6 +2667,36 @@ async function printMonthlyStatement() {
   const mainProfit = totalNet - monthlySalary - monthlyMaterial;
   const totalExpensesWithSalary = recordedExpenses + monthlySalary;
 
+  // MONTHLY BORROW LEDGER: total borrowed and a separate total for each worker.
+  // The worker's name is taken from the expense form's "Paid To" field.
+  const monthlyBorrowByWorker = {};
+  let totalMonthlyBorrow = 0;
+  monthRecords.forEach(record => {
+    (record.expenses || []).forEach(expense => {
+      if (getExpenseCategory(expense) !== 'Borrow') return;
+      const amount = Math.max(0, Number(expense.amount || 0));
+      if (!amount) return;
+      const workerName = String(expense.paidTo || '').trim() || 'Worker name not entered';
+      const key = workerName.toLocaleLowerCase();
+      if (!monthlyBorrowByWorker[key]) {
+        monthlyBorrowByWorker[key] = { name: workerName, total: 0, entries: [] };
+      }
+      monthlyBorrowByWorker[key].total += amount;
+      monthlyBorrowByWorker[key].entries.push({ date: record.date || '-', amount, details: String(expense.type || expense.desc || 'Borrow').trim() });
+      totalMonthlyBorrow += amount;
+    });
+  });
+  const monthlyBorrowWorkers = Object.values(monthlyBorrowByWorker)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const monthlyBorrowDetailHtml = monthlyBorrowWorkers.length
+    ? monthlyBorrowWorkers.map(worker => worker.entries.map(entry => `
+        <tr><td>${escapeReportHtml(worker.name)}</td><td>${escapeReportHtml(entry.date)}</td><td>${escapeReportHtml(entry.details)}</td><td>₦${entry.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+      `).join('')).join('') + `<tr style="font-weight:bold;background:#d8f2ff"><td colspan="3">TOTAL BORROWED</td><td>₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`
+    : '<tr><td colspan="4" style="text-align:center">No borrow/loan expenses were recorded for this month.</td></tr>';
+  const monthlyBorrowWorkerTotalsHtml = monthlyBorrowWorkers.length
+    ? monthlyBorrowWorkers.map(worker => `<tr><td>${escapeReportHtml(worker.name)}</td><td>₦${worker.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`).join('') + `<tr style="font-weight:bold;background:#d8f2ff"><td>ALL WORKERS — TOTAL</td><td>₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`
+    : '<tr><td colspan="2" style="text-align:center">No workers have borrow entries for this month.</td></tr>';
+
   // LIVE DEBTORS
   const monthDebtors = {};
   let totalMonthDebt = 0;
@@ -2766,6 +2814,21 @@ async function printMonthlyStatement() {
             <td>₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
           </tr>
         </table>
+
+        <br>
+        <section class="monthly-borrow-ledger" style="margin:18px 0;padding:14px;border:2px solid #0b78b8;border-radius:10px;background:#eefaff;">
+          <h3>👷 MONTHLY WORKERS' BORROW / LOAN RECORD</h3>
+          <p><strong>TOTAL AMOUNT BORROWED THIS MONTH: ₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
+          <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
+            <tr><th>Worker Name</th><th>Date</th><th>Borrow Details</th><th>Amount Borrowed</th></tr>
+            ${monthlyBorrowDetailHtml}
+          </table>
+          <h4>Borrow Total by Worker</h4>
+          <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
+            <tr><th>Worker Name</th><th>Total Amount Borrowed</th></tr>
+            ${monthlyBorrowWorkerTotalsHtml}
+          </table>
+        </section>
 
         <br>
         <h3>SALES SUMMARY</h3>
