@@ -2823,28 +2823,7 @@ async function printMonthlyStatement() {
           </tr>
         </table>
 
-        <br>
-        <section class="monthly-borrow-ledger" style="margin:18px 0;padding:14px;border:2px solid #0b78b8;border-radius:10px;background:#eefaff;">
-          <h3>👷 MONTHLY WORKERS' BORROW / LOAN RECORD</h3>
-          <p id="borrow-overall-summary"><strong>OVERALL BORROWED THIS MONTH — ALL WORKERS: ₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
-          <p id="borrow-selected-summary" style="font-weight:bold;color:#075da8;">SELECTED WORKER TOTAL: All workers combined</p>
-          <p><strong>OVERALL CURRENT CUSTOMER DEBTORS BALANCE: ₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
-          <label style="display:inline-block;margin:8px 0;font-weight:bold;">Filter by worker name:
-            <select class="borrow-worker-filter" style="padding:7px;margin-left:8px;">
-              <option value="all">All workers</option>
-              ${monthlyBorrowWorkers.map(worker => `<option value="${escapeReportHtml(worker.name.toLocaleLowerCase())}">${escapeReportHtml(worker.name)}</option>`).join('')}
-            </select>
-          </label>
-          <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
-            <tr><th>Worker Name</th><th>Date</th><th>Borrow Details</th><th>Amount Borrowed</th></tr>
-            ${monthlyBorrowDetailHtml}
-          </table>
-          <h4>Borrow Total by Worker</h4>
-          <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
-            <tr><th>Worker Name</th><th>Total Amount Borrowed</th></tr>
-            ${monthlyBorrowWorkerTotalsHtml}
-          </table>
-        </section>
+
 
         <br>
         <h3>SALES SUMMARY</h3>
@@ -2887,6 +2866,27 @@ async function printMonthlyStatement() {
         </table>
 
         <br>
+        <section class="monthly-borrow-ledger" style="margin:18px 0;padding:14px;border:2px solid #0b78b8;border-radius:10px;background:#eefaff;">
+          <h3>👷 MONTHLY WORKERS' BORROW / LOAN RECORD</h3>
+          <p id="borrow-overall-summary"><strong>OVERALL BORROWED THIS MONTH — ALL WORKERS: ₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
+          <p class="borrow-selected-summary" style="font-weight:bold;color:#075da8;">ALL WORKERS: ${monthlyBorrowWorkers.length} workers | ${monthlyBorrowWorkers.reduce((n, w) => n + w.entries.length, 0)} borrowing occasions | TOTAL BORROWED: ₦${totalMonthlyBorrow.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</p>
+          <p><strong>OVERALL CURRENT CUSTOMER DEBTORS BALANCE: ₦${totalMonthDebt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></p>
+          <label style="display:inline-block;margin:8px 0;font-weight:bold;">Search a worker's name:
+            <input type="search" class="borrow-worker-search" placeholder="Type worker name, e.g. Precious" autocomplete="off" style="padding:8px;margin-left:8px;min-width:240px;max-width:100%;">
+          </label>
+          <p class="borrow-search-hint" style="font-size:13px;color:#334155;">Search a name to see how many times that worker borrowed, the dates, and the total amount.</p>
+          <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
+            <tr><th>Worker Name</th><th>Date</th><th>Borrow Details</th><th>Amount Borrowed</th></tr>
+            ${monthlyBorrowDetailHtml}
+          </table>
+          <h4>Borrow Total by Worker</h4>
+          <table border="1" width="100%" cellpadding="5" style="border-collapse:collapse;background:#fff;">
+            <tr><th>Worker Name</th><th>Total Amount Borrowed</th></tr>
+            ${monthlyBorrowWorkerTotalsHtml}
+          </table>
+        </section>
+
+        <br>
         <section class="monthly-daily-expenses">
           <h3>📅 DAILY EXPENSES BY CATEGORY</h3>
           <p class="section-note">Each category below shows the exact days the expense was bought/paid, the amount for each day, the category total, and a daily bar chart. The longest bar is the highest spending day for that category.</p>
@@ -2923,35 +2923,66 @@ async function printMonthlyStatement() {
   }
 
   win.document.write(`
-    <style>@media print { .report-tools, .borrow-worker-filter, .monthly-borrow-ledger label { display:none !important; } }</style>
+    <style>@media print { .report-tools, .borrow-worker-search, .monthly-borrow-ledger label, .borrow-search-hint { display:none !important; } }</style>
     <div class="report-tools" style="position:sticky;top:0;background:#fff;padding:12px;border:2px solid #0b78b8;text-align:center;">
       <strong>Monthly statement ready.</strong> Filter worker names above, then print when ready.
       <button onclick="window.print()" style="padding:9px 18px;margin-left:12px;background:#075da8;color:white;border:0;border-radius:6px;cursor:pointer;">Print Monthly Statement</button>
     </div>
     <script>
-      var workerBorrowTotals = ${JSON.stringify(Object.fromEntries(monthlyBorrowWorkers.map(worker => [worker.name.toLocaleLowerCase(), { name: worker.name, total: worker.total }] )))};
+      var workerBorrowTotals = ${JSON.stringify(monthlyBorrowWorkers.map(worker => ({ key: worker.name.toLocaleLowerCase(), name: worker.name, total: worker.total, occasions: worker.entries.length })))};
       var allBorrowTotal = ${JSON.stringify(totalMonthlyBorrow)};
+      var allBorrowOccasions = ${JSON.stringify(monthlyBorrowWorkers.reduce((n, worker) => n + worker.entries.length, 0))};
       function formatBorrowMoney(value) {
         return '₦' + Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
       }
-      document.querySelectorAll('.borrow-worker-filter').forEach(function(select) {
-        select.addEventListener('change', function() {
-          var chosen = this.value;
-          document.querySelectorAll('.borrow-worker-filter').forEach(function(other) { other.value = chosen; });
-          document.querySelectorAll('.borrow-worker-row, .borrow-worker-total-row').forEach(function(row) {
-            row.style.display = (chosen === 'all' || row.getAttribute('data-worker') === chosen) ? '' : 'none';
+      function normalizeWorkerSearch(value) {
+        return String(value || '').trim().toLocaleLowerCase();
+      }
+      document.querySelectorAll('.borrow-worker-search').forEach(function(input) {
+        input.addEventListener('input', function() {
+          var query = normalizeWorkerSearch(this.value);
+          var reportCopy = this.closest('.report-copy') || document;
+          var detailRows = reportCopy.querySelectorAll('.borrow-worker-row');
+          var workerRows = reportCopy.querySelectorAll('.borrow-worker-total-row');
+          var matchingWorkers = workerBorrowTotals.filter(function(worker) {
+            return !query || worker.name.toLocaleLowerCase().includes(query);
           });
-          var grandTotalRow = document.getElementById('borrow-worker-grand-total-row');
-          if (grandTotalRow) grandTotalRow.style.display = chosen === 'all' ? '' : 'none';
-          var selected = chosen === 'all' ? null : workerBorrowTotals[chosen];
-          var detailLabel = document.getElementById('borrow-detail-total-label');
-          var detailAmount = document.getElementById('borrow-detail-total-amount');
-          if (detailLabel) detailLabel.textContent = selected ? 'TOTAL BORROWED — ' + selected.name : 'TOTAL BORROWED — ALL WORKERS';
-          if (detailAmount) detailAmount.textContent = formatBorrowMoney(selected ? selected.total : allBorrowTotal);
-          var selectedSummary = document.getElementById('borrow-selected-summary');
-          if (selectedSummary) selectedSummary.textContent = selected
-            ? 'TOTAL BORROWED BY ' + selected.name.toLocaleUpperCase() + ': ' + formatBorrowMoney(selected.total)
-            : 'SELECTED WORKER TOTAL: All workers combined — ' + formatBorrowMoney(allBorrowTotal);
+          var matchingKeys = matchingWorkers.map(function(worker) { return worker.key; });
+          var matchingTotal = matchingWorkers.reduce(function(sum, worker) { return sum + worker.total; }, 0);
+          var matchingOccasions = matchingWorkers.reduce(function(sum, worker) { return sum + worker.occasions; }, 0);
+
+          detailRows.forEach(function(row) {
+            var key = row.getAttribute('data-worker') || '';
+            row.style.display = (!query || key.includes(query)) ? '' : 'none';
+          });
+          workerRows.forEach(function(row) {
+            var key = row.getAttribute('data-worker') || '';
+            row.style.display = (!query || matchingKeys.includes(key)) ? '' : 'none';
+          });
+
+          var grandTotalRow = reportCopy.querySelector('#borrow-worker-grand-total-row');
+          if (grandTotalRow) grandTotalRow.style.display = query ? 'none' : '';
+          var detailLabel = reportCopy.querySelector('#borrow-detail-total-label');
+          var detailAmount = reportCopy.querySelector('#borrow-detail-total-amount');
+          if (detailLabel) detailLabel.textContent = query ? 'TOTAL BORROWED — MATCHING WORKER NAME(S)' : 'TOTAL BORROWED — ALL WORKERS';
+          if (detailAmount) detailAmount.textContent = formatBorrowMoney(query ? matchingTotal : allBorrowTotal);
+
+          var selectedSummary = reportCopy.querySelector('.borrow-selected-summary');
+          if (selectedSummary) {
+            if (!query) {
+              selectedSummary.textContent = 'ALL WORKERS: ' + workerBorrowTotals.length + ' workers | ' + allBorrowOccasions + ' borrowing occasions | TOTAL BORROWED: ' + formatBorrowMoney(allBorrowTotal);
+            } else if (!matchingWorkers.length) {
+              selectedSummary.textContent = 'NO WORKER FOUND matching "' + this.value.trim() + '". Try another spelling.';
+            } else {
+              selectedSummary.textContent = matchingWorkers.map(function(worker) {
+                return worker.name.toLocaleUpperCase() + ' — BORROWED ' + worker.occasions + ' TIME(S) — TOTAL: ' + formatBorrowMoney(worker.total);
+              }).join(' | ') + ' | MATCHING BORROWING OCCASIONS: ' + matchingOccasions + ' | MATCHING TOTAL: ' + formatBorrowMoney(matchingTotal);
+            }
+          }
+          var hint = reportCopy.querySelector('.borrow-search-hint');
+          if (hint) hint.textContent = query && matchingWorkers.length
+            ? 'Showing the dates and details for ' + matchingOccasions + ' borrowing occasion(s). The table total is ' + formatBorrowMoney(matchingTotal) + '.'
+            : (query ? 'No borrowing record matched this name in the selected month.' : 'Search a name to see how many times that worker borrowed, the dates, and the total amount.');
         });
       });
     <\/script>
